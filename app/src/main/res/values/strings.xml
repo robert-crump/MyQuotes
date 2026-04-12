@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name">My Quotes</string>
+    <string name="action_settings">Settings</string>
+
+    <!-- Activity Titles -->
+    <string name="title_search">Search Quotes</string>
+    <string name="title_add_quote">Add Quote</string>
+    <string name="title_edit_quote">Edit Quote</string>
+
+    <!-- Hints -->
+    <string name="hint_author">Author *</string>
+    <string name="hint_source">Source</string>
+    <string name="hint_category">Category</string>
+    <string name="hint_quote">Quote *</string>
+    <string name="hint_search">Search for quotes, authors, or sources…</string>
+
+    <!-- Buttons -->
+    <string name="button_save">Save</string>
+    <string name="button_dismiss">Dismiss</string>
+    <string name="button_search">Search</string>
+
+    <!-- Messages -->
+    <string name="msg_quote_saved">Quote saved</string>
+    <string name="msg_quote_updated">Quote updated</string>
+    <string name="msg_draft_dismissed">Changes discarded</string>
+    <string name="msg_quote_not_found">Quote not found</string>
+    <string name="msg_required_fields">* Required fields</string>
+    <string name="msg_search_results">%d search results</string>
+    <string name="msg_no_results">No results found</string>
+    <string name="msg_type_to_search">Type at least 3 characters to search</string>
+
+    <!-- Errors -->
+    <string name="error_author_required">Author is required</string>
+    <string name="error_quote_required">Quote text is required</string>
+
+    <!-- Content Descriptions -->
+    <string name="cd_new_quote">New random quote</string>
+    <string name="cd_search">Search quotes</string>
+    <string name="cd_favorite">Favorite</string>
+    <string name="cd_thumbs_up">Thumbs up</string>
+    <string name="cd_thumbs_down">Thumbs down</string>
+
+    <!-- Background permission dialog -->
+    <string name="bg_permission_title">Background access required</string>
+    <string name="bg_permission_message">Please enable unrestricted background access so daily notifications are delivered reliably.</string>
+    <string name="bg_permission_ok">OK</string>
+    <string name="bg_permission_ignore">Ignore</string>
+</resources>

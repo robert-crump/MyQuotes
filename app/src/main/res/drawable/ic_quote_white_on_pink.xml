@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Bottom layer: Pink Background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FF4081"/> <!-- Pink color -->
+        </shape>
+    </item>
+
+    <!-- Top layer: White Icon -->
+    <item android:drawable="@drawable/ic_quotation_24dp"
+        android:gravity="center">
+    </item>
+</layer-list>

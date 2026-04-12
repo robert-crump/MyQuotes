@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ========== LIGHT THEME COLORS ========== -->
+
+    <!-- Primary Color - Pink from App Icon -->
+    <color name="pink_primary">#E91E63</color>
+    <color name="pink_primary_variant">#C2185B</color>
+    <color name="pink_primary_dark">#AD1457</color>
+
+    <!-- Light Theme Surfaces -->
+    <color name="light_background">#FFFFFF</color>
+    <color name="light_surface">#FFFFFF</color>
+
+    <!-- Light Theme Text -->
+    <color name="dark_text">#000000</color>
+    <color name="dark_text_secondary">#616161</color>
+
+    <!-- ========== DARK THEME COLORS ========== -->
+
+    <!-- Dark Mode Surface Colors -->
+    <color name="dark_background">#121212</color>
+    <color name="dark_surface">#1E1E1E</color>
+    <color name="dark_card_surface">#2B2B2B</color>
+
+    <!-- Dark Mode Text -->
+    <color name="light_text">#FFFFFF</color>
+    <color name="light_text_secondary">#B0B0B0</color>
+
+    <!-- Dark Mode Primary Colors -->
+    <color name="purple_primary">#BB86FC</color>
+    <color name="purple_primary_variant">#9966FF</color>
+
+    <!-- ========== SHARED COLORS ========== -->
+
+    <!-- Secondary Colors -->
+    <color name="teal_secondary">#03DAC6</color>
+    <color name="teal_secondary_variant">#00BFA4</color>
+
+    <!-- Accent Colors -->
+    <color name="pink_tertiary">#FF6B9D</color>
+    <color name="favorite_red">#FF6B9D</color>
+
+    <!-- Rating Colors -->
+    <color name="rating_positive">#4CAF50</color>
+    <color name="rating_negative">#F44336</color>
+
+    <!-- Basic Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Legacy Colors -->
+    <color name="purple_500">#BB86FC</color>
+    <color name="purple_700">#9966FF</color>
+    <color name="teal_200">#03DAC6</color>
+    <color name="teal_700">#00BFA4</color>
+    <color name="pink_500">#FF6B9D</color>
+</resources>
