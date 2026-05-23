@@ -1,0 +1,11 @@
+2026-05-23 — Issue #3: Add QuoteCodec module and migrate QuotePreferences to use it
+
+Implemented:
+- QuoteCodecException.java — checked exception for top-level parse failures
+- QuoteCodec.java — encode/encodePretty/decode with v1 envelope; legacy bare-array decode
+- QuotePreferences.java — saveQuotes/loadQuotes now delegate to QuoteCodec
+- app/build.gradle — added testImplementation 'org.json:json:20231013' and testOptions.returnDefaultValues true
+- gradle-wrapper.properties — upgraded Gradle 8.13 → 9.0 (Java 25 support)
+- QuoteCodecTest.java — 7 unit tests: roundtrip, envelope shape, legacy array, malformed JSON, missing id skip, empty list, encodePretty indent
+
+All 7 tests passed. Issue #3 closed.

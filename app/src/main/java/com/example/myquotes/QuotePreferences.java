@@ -4,11 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
 import java.util.List;
 
 public class QuotePreferences {
@@ -50,28 +45,8 @@ public class QuotePreferences {
     }
 
     public void saveQuotes(List<Quote> quotes) {
-        try {
-            JSONArray jsonArray = new JSONArray();
-            for (Quote quote : quotes) {
-                JSONObject jsonQuote = new JSONObject();
-                jsonQuote.put("id", quote.getId());
-                jsonQuote.put("author", quote.getAuthor());
-                jsonQuote.put("quoteText", quote.getQuoteText());
-                jsonQuote.put("source", quote.getSource());
-                jsonQuote.put("category", quote.getCategory());
-                jsonQuote.put("rating", quote.getRating());
-                jsonQuote.put("isFavorite", quote.isFavorite());
-                jsonQuote.put("favoritedAt", quote.getFavoritedAt());
-                jsonQuote.put("lastShown", quote.getLastShown());
-                jsonQuote.put("timesShown", quote.getTimesShown());
-                jsonArray.put(jsonQuote);
-            }
-
-            prefs.edit().putString(KEY_QUOTES_JSON, jsonArray.toString()).apply();
-            Log.d(TAG, "Saved " + quotes.size() + " quotes to preferences");
-        } catch (JSONException e) {
-            Log.e(TAG, "Failed to save quotes", e);
-        }
+        prefs.edit().putString(KEY_QUOTES_JSON, QuoteCodec.encode(quotes)).apply();
+        Log.d(TAG, "Saved " + quotes.size() + " quotes to preferences");
     }
 
     public List<Quote> loadQuotes() {
@@ -82,37 +57,10 @@ public class QuotePreferences {
         }
 
         try {
-            JSONArray jsonArray = new JSONArray(jsonString);
-            List<Quote> quotes = new ArrayList<>();
-
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONObject jsonQuote = jsonArray.getJSONObject(i);
-
-                int id = jsonQuote.getInt("id");
-                String author = jsonQuote.optString("author", "");
-                String quoteText = jsonQuote.optString("quoteText", "");
-                String source = jsonQuote.optString("source", "");
-                String category = jsonQuote.optString("category", "");
-                int rating = jsonQuote.optInt("rating", 0);
-                boolean isFavorite = jsonQuote.optBoolean("isFavorite", false);
-                long favoritedAt = jsonQuote.optLong("favoritedAt", 0);
-                long lastShown = jsonQuote.optLong("lastShown", 0);
-                int timesShown = jsonQuote.optInt("timesShown", 0);
-
-                Quote quote = new Quote(id, author, quoteText, source);
-                quote.setCategory(category);
-                quote.setRating(rating);
-                quote.setFavorite(isFavorite);
-                quote.setFavoritedAt(favoritedAt);
-                quote.setLastShown(lastShown);
-                quote.setTimesShown(timesShown);
-
-                quotes.add(quote);
-            }
-
+            List<Quote> quotes = QuoteCodec.decode(jsonString);
             Log.d(TAG, "Loaded " + quotes.size() + " quotes from preferences");
             return quotes;
-        } catch (JSONException e) {
+        } catch (QuoteCodecException e) {
             Log.e(TAG, "Failed to load quotes", e);
             return null;
         }
