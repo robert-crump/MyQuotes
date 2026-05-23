@@ -15,9 +15,6 @@ import androidx.cardview.widget.CardView;
 
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import java.util.ArrayList;
 
 import java.io.BufferedReader;
@@ -178,26 +175,11 @@ public class SettingsActivity extends AppCompatActivity {
                     return;
                 }
 
-                JSONArray jsonArray = new JSONArray();
-                for (Quote quote : quotes) {
-                    JSONObject jsonQuote = new JSONObject();
-                    jsonQuote.put("id", quote.getId());
-                    jsonQuote.put("author", quote.getAuthor());
-                    jsonQuote.put("quoteText", quote.getQuoteText());
-                    jsonQuote.put("source", quote.getSource());
-                    jsonQuote.put("category", quote.getCategory());
-                    jsonQuote.put("rating", quote.getRating());
-                    jsonQuote.put("isFavorite", quote.isFavorite());
-                    jsonQuote.put("favoritedAt", quote.getFavoritedAt());
-                    jsonQuote.put("lastShown", quote.getLastShown());
-                    jsonQuote.put("timesShown", quote.getTimesShown());
-                    jsonArray.put(jsonQuote);
-                }
+                String json = QuoteCodec.encodePretty(quotes);
 
-                // Schreibe in Datei
                 OutputStream outputStream = getContentResolver().openOutputStream(uri);
                 if (outputStream != null) {
-                    outputStream.write(jsonArray.toString(2).getBytes(StandardCharsets.UTF_8));
+                    outputStream.write(json.getBytes(StandardCharsets.UTF_8));
                     outputStream.close();
 
                     final int count = quotes.size();
@@ -235,38 +217,17 @@ public class SettingsActivity extends AppCompatActivity {
                 reader.close();
                 inputStream.close();
 
-                JSONArray jsonArray = new JSONArray(jsonString.toString());
+                List<Quote> importedQuotes = QuoteCodec.decode(jsonString.toString());
                 List<Quote> currentQuotes = quoteViewModel.getQuoteList().getValue();
 
                 int importedCount = 0;
                 int updatedCount = 0;
 
-                for (int i = 0; i < jsonArray.length(); i++) {
-                    JSONObject jsonQuote = jsonArray.getJSONObject(i);
-
-                    int id = jsonQuote.getInt("id");
-                    String author = jsonQuote.optString("author", "");
-                    String quoteText = jsonQuote.optString("quoteText", "");
-                    String source = jsonQuote.optString("source", "");
-                    String category = jsonQuote.optString("category", "");
-                    int rating = jsonQuote.optInt("rating", 0);
-                    boolean isFavorite = jsonQuote.optBoolean("isFavorite", false);
-                    long favoritedAt = jsonQuote.optLong("favoritedAt", 0);
-                    long lastShown = jsonQuote.optLong("lastShown", 0);
-                    int timesShown = jsonQuote.optInt("timesShown", 0);
-
-                    Quote quote = new Quote(id, author, quoteText, source);
-                    quote.setCategory(category);
-                    quote.setRating(rating);
-                    quote.setFavorite(isFavorite);
-                    quote.setFavoritedAt(favoritedAt);
-                    quote.setLastShown(lastShown);
-                    quote.setTimesShown(timesShown);
-
+                for (Quote quote : importedQuotes) {
                     Quote existingQuote = null;
                     if (currentQuotes != null) {
                         for (Quote q : currentQuotes) {
-                            if (q.getId() == id) {
+                            if (q.getId() == quote.getId()) {
                                 existingQuote = q;
                                 break;
                             }
@@ -274,19 +235,17 @@ public class SettingsActivity extends AppCompatActivity {
                     }
 
                     if (existingQuote != null) {
-                        // Update existing quote
-                        existingQuote.setAuthor(author);
-                        existingQuote.setQuoteText(quoteText);
-                        existingQuote.setSource(source);
-                        existingQuote.setCategory(category);
-                        existingQuote.setRating(rating);
-                        existingQuote.setFavorite(isFavorite);
-                        existingQuote.setFavoritedAt(favoritedAt);
-                        existingQuote.setLastShown(lastShown);
-                        existingQuote.setTimesShown(timesShown);
+                        existingQuote.setAuthor(quote.getAuthor());
+                        existingQuote.setQuoteText(quote.getQuoteText());
+                        existingQuote.setSource(quote.getSource());
+                        existingQuote.setCategory(quote.getCategory());
+                        existingQuote.setRating(quote.getRating());
+                        existingQuote.setFavorite(quote.isFavorite());
+                        existingQuote.setFavoritedAt(quote.getFavoritedAt());
+                        existingQuote.setLastShown(quote.getLastShown());
+                        existingQuote.setTimesShown(quote.getTimesShown());
                         updatedCount++;
                     } else {
-                        // Add new quote
                         if (currentQuotes != null) {
                             currentQuotes.add(quote);
                         }
@@ -309,7 +268,7 @@ public class SettingsActivity extends AppCompatActivity {
                 );
                 Log.d(TAG, "Import successful: " + importedCount + " new, " + updatedCount + " updated");
 
-            } catch (JSONException e) {
+            } catch (QuoteCodecException e) {
                 Log.e(TAG, "JSON parsing failed", e);
                 runOnUiThread(() ->
                         Toast.makeText(this, "Invalid JSON format", Toast.LENGTH_LONG).show()
