@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
 import com.example.myquotes.databinding.ActivitySettingsBinding;
+import com.example.myquotes.notifications.QuoteNotifications;
 
 import java.util.ArrayList;
 
@@ -95,8 +96,7 @@ public class SettingsActivity extends AppCompatActivity {
                 findViewById(R.id.switch_daily_notification);
 
         // Set initial state
-        boolean notificationsEnabled = QuoteNotificationScheduler.areNotificationsEnabled(this);
-        switchDailyNotification.setChecked(notificationsEnabled);
+        switchDailyNotification.setChecked(QuoteNotifications.isEnabled(this));
 
         // Set listener
         switchDailyNotification.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -106,7 +106,7 @@ public class SettingsActivity extends AppCompatActivity {
                 Toast.makeText(this, "Daily notifications disabled", Toast.LENGTH_SHORT).show();
             }
 
-            QuoteNotificationScheduler.setNotificationsEnabled(this, isChecked);
+            QuoteNotifications.setEnabled(this, isChecked);
         });
 
         // Setup Delete Negative Quotes Button

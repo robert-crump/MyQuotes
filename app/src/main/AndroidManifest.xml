@@ -5,8 +5,6 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- android:name=".MyApplication" gives the ViewModel application scope,
-         allowing it to be shared across all activities. -->
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
@@ -60,7 +58,7 @@
 
         <!-- Broadcast receiver for notification actions (snooze, boot re-schedule) -->
         <receiver
-            android:name=".QuoteNotificationReceiver"
+            android:name=".notifications.QuoteNotificationReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

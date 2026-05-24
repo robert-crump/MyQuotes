@@ -17,6 +17,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.myquotes.notifications.QuoteNotifications;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
@@ -338,7 +339,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
 
         // Bring MainActivity to front (keeps SearchActivity in back stack)
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID, quote.getId());
+        intent.putExtra(QuoteNotifications.EXTRA_QUOTE_ID, quote.getId());
         intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
     }

@@ -1,13 +1,10 @@
 package com.example.myquotes;
 
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.WindowInsetsController;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -15,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myquotes.databinding.ActivityMainBinding;
+import com.example.myquotes.notifications.QuoteNotifications;
 
 import java.util.List;
 
@@ -48,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
                 new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        int quoteId = result.getData().getIntExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID, -1);
+                        int quoteId = result.getData().getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
                         if (quoteId != -1) {
                             navigateToQuote(quoteId);
                         }
@@ -61,16 +59,7 @@ public class MainActivity extends AppCompatActivity {
             getSupportActionBar().setTitle("My Quotes");
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 100);
-            }
-        }
-
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        boolean isIgnoring = pm.isIgnoringBatteryOptimizations(getPackageName());
-        Log.d(TAG, "Battery optimization ignored: " + isIgnoring);
+        QuoteNotifications.requestPostNotificationsPermission(this);
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
         readingSession = new ViewModelProvider(this).get(ReadingSession.class);
@@ -108,9 +97,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        if (!BackgroundPermissionHelper.isBackgroundUnrestricted(this)) {
-            BackgroundPermissionHelper.showBackgroundPermissionDialog(this);
-        }
+        QuoteNotifications.promptBackgroundPermissionIfNeeded(this);
 
         viewPager.setAdapter(pagerAdapter);
 
@@ -173,8 +160,8 @@ public class MainActivity extends AppCompatActivity {
         readingSession.getCurrentQuote().observe(this, quote -> currentQuote = quote);
 
         Intent intent = getIntent();
-        if (intent.hasExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID)) {
-            pendingQuoteId = intent.getIntExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID, -1);
+        if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
+            pendingQuoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
             Log.d(TAG, "Opened from notification with quote ID: " + pendingQuoteId);
         }
 
@@ -184,8 +171,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent.hasExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID)) {
-            int quoteId = intent.getIntExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID, -1);
+        if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
+            int quoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
             if (quoteId != -1) {
                 navigateToQuote(quoteId);
             }
@@ -350,10 +337,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 100) {
+        if (requestCode == QuoteNotifications.REQUEST_CODE_POST_NOTIFICATIONS) {
             if (grantResults.length > 0 &&
                     grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                QuoteNotificationScheduler.setNotificationsEnabled(this, true);
+                QuoteNotifications.setEnabled(this, true);
                 Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Notification permission denied", Toast.LENGTH_SHORT).show();
