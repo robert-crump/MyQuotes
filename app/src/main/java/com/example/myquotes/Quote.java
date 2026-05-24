@@ -79,24 +79,6 @@ public class Quote {
         this.lastShown = System.currentTimeMillis();
     }
 
-    public boolean shouldBeDeleted() {
-        return this.rating <= -3;
-    }
-
-    // Score used for weighted-random selection: higher = more likely to be shown
-    public float calculateScore() {
-        float score = 1.0f;
-
-        if (isFavorite) score *= 5f;
-
-        if (rating > 0) score *= (1 + rating * 0.5f);
-
-        // Prefer less-frequently shown quotes
-        score *= (1f / (timesShown + 1));
-
-        return score;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;

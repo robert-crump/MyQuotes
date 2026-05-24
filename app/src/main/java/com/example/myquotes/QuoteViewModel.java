@@ -6,7 +6,6 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 import androidx.lifecycle.LiveData;
@@ -18,7 +17,6 @@ public class QuoteViewModel extends ViewModel {
 
     private final MutableLiveData<List<Quote>> liveQuoteList = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Quote> currentlyDisplayedQuote = new MutableLiveData<>();
-    private final Random random = new Random();
     private List<Quote> shuffledQuoteList = null;
     private int currentQuoteIndex = 0;
     private Context applicationContext;
@@ -234,56 +232,6 @@ public class QuoteViewModel extends ViewModel {
                 .filter(q -> q.getId() == quoteId)
                 .findFirst()
                 .orElse(null);
-    }
-
-    // Weighted-random selection, biased toward favorites and less-shown quotes
-    public Quote getNextQuote() {
-        List<Quote> quotes = getCurrentList();
-        if (quotes.isEmpty()) {
-            Log.w(TAG, "Quote list is empty");
-            return null;
-        }
-
-        Quote currentQuote = currentlyDisplayedQuote.getValue();
-
-        // Prefer quotes not shown in the last 7 days
-        long oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L);
-        List<Quote> candidates = quotes.stream()
-                .filter(q -> !q.equals(currentQuote))
-                .filter(q -> q.getLastShown() < oneWeekAgo || q.getLastShown() == 0)
-                .collect(Collectors.toList());
-
-        // Fallback: all quotes except the current one
-        if (candidates.isEmpty()) {
-            candidates = quotes.stream()
-                    .filter(q -> !q.equals(currentQuote))
-                    .collect(Collectors.toList());
-        }
-
-        if (candidates.isEmpty()) {
-            return quotes.get(0);
-        }
-
-        return selectWeightedRandom(candidates);
-    }
-
-    private Quote selectWeightedRandom(List<Quote> quotes) {
-        float totalWeight = 0f;
-        for (Quote quote : quotes) {
-            totalWeight += quote.calculateScore();
-        }
-
-        float randomValue = random.nextFloat() * totalWeight;
-
-        float currentWeight = 0f;
-        for (Quote quote : quotes) {
-            currentWeight += quote.calculateScore();
-            if (currentWeight >= randomValue) {
-                return quote;
-            }
-        }
-
-        return quotes.get(random.nextInt(quotes.size()));
     }
 
     // ========== RATING & FAVORITES ==========
