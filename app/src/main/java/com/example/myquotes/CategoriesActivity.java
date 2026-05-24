@@ -22,7 +22,7 @@ public class CategoriesActivity extends AppCompatActivity {
     private static final String KEY_CATEGORIES = "saved_categories";
 
     private ActivityCategoriesBinding binding;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
     private CategoriesAdapter adapter;
     private List<String> categories;
 
@@ -41,7 +41,7 @@ public class CategoriesActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
         // Setup RecyclerView
         RecyclerView recyclerView = binding.categoriesRecyclerView;
@@ -73,7 +73,7 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void loadCategories() {
-        List<Quote> allQuotes = quoteViewModel.getCurrentList();
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         categories = new ArrayList<>();
 
         // 1. Load saved categories from SharedPreferences
@@ -223,14 +223,14 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void renameCategory(String oldName, String newName) {
-        List<Quote> allQuotes = quoteViewModel.getCurrentList();
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         int updatedCount = 0;
 
         // Update Quotes
         for (Quote quote : allQuotes) {
             if (oldName.equals(quote.getCategory())) {
                 quote.setCategory(newName);
-                quoteViewModel.updateQuote(quote);
+                quoteCollection.update(quote);
                 updatedCount++;
             }
         }
@@ -247,7 +247,7 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void showDeleteCategoryDialog(String categoryName) {
-        List<Quote> allQuotes = quoteViewModel.getCurrentList();
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         int affectedQuotes = 0;
 
         for (Quote quote : allQuotes) {
@@ -270,13 +270,13 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void deleteCategory(String categoryName) {
-        List<Quote> allQuotes = quoteViewModel.getCurrentList();
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         int updatedCount = 0;
 
         for (Quote quote : allQuotes) {
             if (categoryName.equals(quote.getCategory())) {
                 quote.setCategory(null);
-                quoteViewModel.updateQuote(quote);
+                quoteCollection.update(quote);
                 updatedCount++;
             }
         }

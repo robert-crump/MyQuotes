@@ -21,7 +21,7 @@ public class AddEditActivity extends AppCompatActivity {
     private EditText editTextQuote;
     private EditText editTextSource;
     private android.widget.AutoCompleteTextView editTextCategory;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
     private int quoteId = -1;
     private boolean isEditMode = false;
 
@@ -52,7 +52,7 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     private void setupViewModel() {
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
     }
 
     private void setupViews() {
@@ -128,7 +128,7 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     private void loadQuote(int id) {
-        Quote quote = quoteViewModel.getQuoteById(id);
+        Quote quote = quoteCollection.findById(id);
         if (quote != null) {
             editTextAuthor.setText(quote.getAuthor());
             editTextQuote.setText(quote.getQuoteText());
@@ -151,14 +151,13 @@ public class AddEditActivity extends AppCompatActivity {
 
         if (isEditMode) {
             quote.setId(quoteId);
-            quoteViewModel.updateQuote(quote);
+            quoteCollection.update(quote);
             Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
         } else {
-            quoteViewModel.addQuote(quote);
+            quoteCollection.add(quote);
             Toast.makeText(this, "Quote added", Toast.LENGTH_SHORT).show();
         }
 
-        quoteViewModel.setCurrentlyDisplayedQuote(quote);
         finish();
     }
 

@@ -18,7 +18,7 @@ public class FavoritesActivity extends AppCompatActivity {
     private ActivityFavoritesBinding binding;
     private ViewPager2 viewPager;
     private QuotePagerAdapter pagerAdapter;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
     private List<Quote> favoriteQuotes;
     private TextView favoriteCounter;
 
@@ -35,7 +35,7 @@ public class FavoritesActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
         favoriteCounter = binding.favoriteCounter;
 
         // Setup ViewPager
@@ -106,7 +106,7 @@ public class FavoritesActivity extends AppCompatActivity {
     }
 
     private void loadFavorites(boolean resetPosition) {
-        favoriteQuotes = quoteViewModel.getFavoriteQuotes();
+        favoriteQuotes = quoteCollection.getFavorites();
 
         if (favoriteQuotes.isEmpty()) {
             favoriteCounter.setText("No favorites yet");
@@ -137,7 +137,7 @@ public class FavoritesActivity extends AppCompatActivity {
 
     private void rateQuote(Quote quote, int delta) {
         if (quote != null) {
-            quoteViewModel.rateQuote(quote.getId(), delta);
+            quoteCollection.rateQuote(quote.getId(), delta);
 
             // Refresh current page
             int currentPosition = viewPager.getCurrentItem();
@@ -150,7 +150,7 @@ public class FavoritesActivity extends AppCompatActivity {
 
     private void toggleFavorite(Quote quote) {
         if (quote != null) {
-            quoteViewModel.toggleFavorite(quote.getId());
+            quoteCollection.toggleFavorite(quote.getId());
 
             // Remove from list when un-favorited
             if (!quote.isFavorite()) {

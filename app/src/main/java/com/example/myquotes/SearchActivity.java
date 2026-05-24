@@ -38,7 +38,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     private EditText searchEditText;
     private TextView searchResultsCountTextView;
     private RecyclerView searchResultsRecyclerView;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes;
 
@@ -72,9 +72,9 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         filterSource = findViewById(R.id.filter_source);
         filterCategory = findViewById(R.id.filter_category);
 
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
-        quoteViewModel.getQuoteList().observe(this, quotes -> {
+        quoteCollection.getQuoteList().observe(this, quotes -> {
             allQuotes = quotes;
             if (allQuotes == null) {
                 allQuotes = new ArrayList<>();
@@ -317,12 +317,12 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     @Override
     public void onQuoteClick(Quote quote) {
         // Verify the quote still exists (may have been deleted in another screen)
-        Quote currentQuote = quoteViewModel.getQuoteById(quote.getId());
+        Quote currentQuote = quoteCollection.findById(quote.getId());
 
         if (currentQuote == null) {
             Log.w(TAG, "Quote #" + quote.getId() + " no longer exists - refreshing results");
 
-            allQuotes = quoteViewModel.getQuoteList().getValue();
+            allQuotes = quoteCollection.getQuoteList().getValue();
             if (allQuotes == null) {
                 allQuotes = new ArrayList<>();
             }
@@ -336,8 +336,6 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
             return;
         }
 
-        quoteViewModel.setCurrentlyDisplayedQuote(currentQuote);
-
         // Bring MainActivity to front (keeps SearchActivity in back stack)
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra(QuoteNotificationReceiver.EXTRA_QUOTE_ID, quote.getId());
@@ -349,7 +347,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     protected void onStart() {
         super.onStart();
         // Refresh list in case it changed while this activity was in the background
-        List<Quote> currentQuotes = quoteViewModel.getQuoteList().getValue();
+        List<Quote> currentQuotes = quoteCollection.getQuoteList().getValue();
         if (currentQuotes != null && !currentQuotes.equals(allQuotes)) {
             allQuotes = currentQuotes;
 

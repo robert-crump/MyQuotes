@@ -11,18 +11,11 @@ import android.os.Build;
 import android.util.Log;
 
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.lifecycle.ViewModelProvider;
 
-/*
- * Custom Application class that acts as a ViewModelStoreOwner with application scope.
- * This allows the QuoteViewModel to be shared across all activities rather than being
- * tied to any single activity's lifecycle.
- * AndroidManifest.xml must declare android:name=".MyApplication" in <application>.
- */
 public class MyApplication extends Application {
     private static final String TAG = "MyApplication";
     private static MyApplication instance;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
 
     private static final String PREFS_NAME = "AppSettings";
     private static final String KEY_THEME_MODE = "theme_mode";
@@ -38,10 +31,7 @@ public class MyApplication extends Application {
 
         applyTheme();
 
-        ViewModelProvider.Factory factory = ViewModelProvider.AndroidViewModelFactory.getInstance(this);
-        quoteViewModel = new ViewModelProvider(new MyAppViewModelStoreOwner(), factory).get(QuoteViewModel.class);
-
-        quoteViewModel.setApplicationContext(this);
+        quoteCollection = new QuoteCollection(this);
 
         // One-time migration: cancel any legacy AlarmManager alarms
         migrateFromAlarmManager();
@@ -56,8 +46,8 @@ public class MyApplication extends Application {
         return instance;
     }
 
-    public QuoteViewModel getQuoteViewModel() {
-        return quoteViewModel;
+    public QuoteCollection getQuoteCollection() {
+        return quoteCollection;
     }
 
     private void createNotificationChannel() {

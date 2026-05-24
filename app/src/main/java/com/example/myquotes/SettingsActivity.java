@@ -30,7 +30,7 @@ import java.util.Locale;
 public class SettingsActivity extends AppCompatActivity {
     private static final String TAG = "SettingsActivity";
     private ActivitySettingsBinding binding;
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
 
     private ActivityResultLauncher<Intent> exportLauncher;
     private ActivityResultLauncher<Intent> importLauncher;
@@ -48,7 +48,7 @@ public class SettingsActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
         // Initialize ActivityResultLaunchers
         exportLauncher = registerForActivityResult(
@@ -84,7 +84,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Setup Quote Counter (observes LiveData)
         android.widget.TextView quoteCountTextView = findViewById(R.id.quote_count_text);
-        quoteViewModel.getQuoteList().observe(this, quotes -> {
+        quoteCollection.getQuoteList().observe(this, quotes -> {
             if (quotes != null) {
                 quoteCountTextView.setText("Total quotes: " + quotes.size());
             }
@@ -167,7 +167,7 @@ public class SettingsActivity extends AppCompatActivity {
     private void exportQuotesToJson(Uri uri) {
         new Thread(() -> {
             try {
-                List<Quote> quotes = quoteViewModel.getQuoteList().getValue();
+                List<Quote> quotes = quoteCollection.getQuoteList().getValue();
                 if (quotes == null || quotes.isEmpty()) {
                     runOnUiThread(() ->
                             Toast.makeText(this, "No quotes to export", Toast.LENGTH_SHORT).show()
@@ -218,19 +218,17 @@ public class SettingsActivity extends AppCompatActivity {
                 inputStream.close();
 
                 List<Quote> importedQuotes = QuoteCodec.decode(jsonString.toString());
-                List<Quote> currentQuotes = quoteViewModel.getQuoteList().getValue();
+                List<Quote> currentQuotes = quoteCollection.getCurrentList();
 
                 int importedCount = 0;
                 int updatedCount = 0;
 
                 for (Quote quote : importedQuotes) {
                     Quote existingQuote = null;
-                    if (currentQuotes != null) {
-                        for (Quote q : currentQuotes) {
-                            if (q.getId() == quote.getId()) {
-                                existingQuote = q;
-                                break;
-                            }
+                    for (Quote q : currentQuotes) {
+                        if (q.getId() == quote.getId()) {
+                            existingQuote = q;
+                            break;
                         }
                     }
 
@@ -246,21 +244,16 @@ public class SettingsActivity extends AppCompatActivity {
                         existingQuote.setTimesShown(quote.getTimesShown());
                         updatedCount++;
                     } else {
-                        if (currentQuotes != null) {
-                            currentQuotes.add(quote);
-                        }
+                        currentQuotes.add(quote);
                         importedCount++;
                     }
                 }
 
-                // Update ViewModel
-                if (currentQuotes != null) {
-                    quoteViewModel.updateQuoteList(currentQuotes);
-                }
+                quoteCollection.setList(currentQuotes);
 
                 final int finalImported = importedCount;
                 final int finalUpdated = updatedCount;
-                final int totalQuotes = currentQuotes != null ? currentQuotes.size() : 0;
+                final int totalQuotes = currentQuotes.size();
                 runOnUiThread(() ->
                         Toast.makeText(this,
                                 "Import: " + finalImported + " new, " + finalUpdated + " updated. Total: " + totalQuotes + " quotes",
@@ -283,7 +276,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void showDeleteNegativeQuotesDialog() {
-        List<Quote> allQuotes = quoteViewModel.getCurrentList();
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         List<Quote> negativeQuotes = new ArrayList<>();
 
         for (Quote quote : allQuotes) {
@@ -311,7 +304,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void deleteNegativeQuotes(List<Quote> quotesToDelete) {
-        List<Quote> allQuotes = new ArrayList<>(quoteViewModel.getCurrentList());
+        List<Quote> allQuotes = quoteCollection.getCurrentList();
         List<Quote> updatedQuotes = new ArrayList<>();
         int deletedCount = 0;
 
@@ -329,7 +322,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
         }
 
-        quoteViewModel.setQuoteList(updatedQuotes);
+        quoteCollection.setList(updatedQuotes);
 
         Toast.makeText(this, "Deleted " + deletedCount + " quotes with negative rating",
                 Toast.LENGTH_LONG).show();

@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class StatisticsActivity extends AppCompatActivity {
-    private QuoteViewModel quoteViewModel;
+    private QuoteCollection quoteCollection;
 
     private TextView textTotalQuotes;
     private TextView textFavorites;
@@ -41,7 +41,7 @@ public class StatisticsActivity extends AppCompatActivity {
     }
 
     private void setupViewModel() {
-        quoteViewModel = MyApplication.getInstance().getQuoteViewModel();
+        quoteCollection = MyApplication.getInstance().getQuoteCollection();
     }
 
     private void setupViews() {
@@ -59,7 +59,7 @@ public class StatisticsActivity extends AppCompatActivity {
     }
 
     private void loadStatistics()   {
-        List<Quote> quotes = quoteViewModel.getQuoteList().getValue();
+        List<Quote> quotes = quoteCollection.getQuoteList().getValue();
 
         if (quotes == null || quotes.isEmpty()) {
             textTotalQuotes.setText("No quotes available");
