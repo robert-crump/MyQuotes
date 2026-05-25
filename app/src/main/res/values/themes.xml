@@ -24,6 +24,7 @@
         <!-- Status bar -->
         <item name="android:statusBarColor">@color/pink_primary_dark</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/white</item>

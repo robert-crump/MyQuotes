@@ -54,6 +54,7 @@
         <activity
             android:name=".CategoriesActivity"
             android:label="Categories"
+            android:theme="@style/Theme.MyQuotes.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
         <!-- Broadcast receiver for notification actions (snooze, boot re-schedule) -->

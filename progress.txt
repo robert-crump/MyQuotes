@@ -9,3 +9,13 @@ Implemented:
 - QuoteCodecTest.java — 7 unit tests: roundtrip, envelope shape, legacy array, malformed JSON, missing id skip, empty list, encodePretty indent
 
 All 7 tests passed. Issue #3 closed.
+
+2026-05-23 — Issues #4 and #5: Migrate SettingsActivity export/import to QuoteCodec
+
+Implemented:
+- exportQuotesToJson: replaced inline JSONArray/JSONObject build with QuoteCodec.encodePretty(quotes)
+- importQuotesFromJson: replaced inline JSONArray/JSONObject parsing with QuoteCodec.decode(json); upsert-by-id merge loop unchanged
+- Catch block: QuoteCodecException → "Invalid JSON format"; other Exception → "Import failed: $msg"
+- Removed org.json imports (JSONArray, JSONException, JSONObject) from SettingsActivity
+
+Build and all unit tests passed. Issues #4 and #5 closed.
