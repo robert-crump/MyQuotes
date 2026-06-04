@@ -1,14 +1,21 @@
 package com.example.myquotes;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ListPopupWindow;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
+import java.util.List;
 
 public class AddEditActivity extends AppCompatActivity {
     private static final String TAG = "AddEditActivity";
@@ -22,6 +29,9 @@ public class AddEditActivity extends AppCompatActivity {
     private EditText editTextSource;
     private android.widget.AutoCompleteTextView editTextCategory;
     private QuoteCollection quoteCollection;
+    private SuggestionProvider suggestionProvider;
+    private ListPopupWindow authorPopup;
+    private ListPopupWindow sourcePopup;
     private int quoteId = -1;
     private boolean isEditMode = false;
 
@@ -53,6 +63,7 @@ public class AddEditActivity extends AppCompatActivity {
 
     private void setupViewModel() {
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
+        suggestionProvider = new SuggestionProvider();
     }
 
     private void setupViews() {
@@ -74,7 +85,7 @@ public class AddEditActivity extends AppCompatActivity {
         editTextCategory.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
                 android.view.inputmethod.InputMethodManager imm =
-                        (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
                 }
@@ -89,7 +100,7 @@ public class AddEditActivity extends AppCompatActivity {
             editTextCategory.postDelayed(() -> {
                 editTextQuote.requestFocus();
                 android.view.inputmethod.InputMethodManager imm =
-                        (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.showSoftInput(editTextQuote, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
                 }
@@ -98,7 +109,7 @@ public class AddEditActivity extends AppCompatActivity {
 
         editTextCategory.setOnClickListener(v -> {
             android.view.inputmethod.InputMethodManager imm =
-                    (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                    (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
                 imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
             }
@@ -106,6 +117,107 @@ public class AddEditActivity extends AppCompatActivity {
         });
 
         editTextAuthor.requestFocus();
+
+        setupAuthorSuggestions();
+        setupSourceSuggestions();
+    }
+
+    private void setupAuthorSuggestions() {
+        authorPopup = new ListPopupWindow(this);
+        authorPopup.setAnchorView(editTextAuthor);
+        authorPopup.setModal(false);
+
+        authorPopup.setOnItemClickListener((parent, view, position, id) -> {
+            String selected = ((SuggestionAdapter) parent.getAdapter()).getStringAt(position);
+            if (selected == null) return;
+            editTextAuthor.setText(selected);
+            editTextAuthor.setSelection(selected.length());
+            authorPopup.dismiss();
+            editTextSource.requestFocus();
+        });
+
+        editTextAuthor.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String input = s.toString().trim();
+                if (input.length() < 2) {
+                    authorPopup.dismiss();
+                    return;
+                }
+                List<Quote> quotes = quoteCollection.getCurrentList();
+                List<String> suggestions = suggestionProvider.getAuthorSuggestions(quotes, input);
+                if (suggestions.isEmpty()) {
+                    authorPopup.dismiss();
+                    return;
+                }
+                SuggestionAdapter suggestionAdapter = SuggestionAdapter.forAuthors(AddEditActivity.this, suggestions);
+                authorPopup.setAdapter(suggestionAdapter);
+                authorPopup.setWidth(editTextAuthor.getWidth());
+                authorPopup.setHeight(calcPopupHeight(suggestionAdapter.getSuggestionCount(), false));
+                authorPopup.show();
+            }
+        });
+
+        editTextAuthor.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) authorPopup.dismiss();
+        });
+    }
+
+    private void setupSourceSuggestions() {
+        sourcePopup = new ListPopupWindow(this);
+        sourcePopup.setAnchorView(editTextSource);
+        sourcePopup.setModal(false);
+
+        sourcePopup.setOnItemClickListener((parent, view, position, id) -> {
+            String selected = ((SuggestionAdapter) parent.getAdapter()).getStringAt(position);
+            if (selected == null) return;
+            editTextSource.setText(selected);
+            editTextSource.setSelection(selected.length());
+            sourcePopup.dismiss();
+        });
+
+        editTextSource.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String input = s.toString().trim();
+                if (input.length() < 2) {
+                    sourcePopup.dismiss();
+                    return;
+                }
+                String authorContext = editTextAuthor.getText().toString().trim();
+                List<Quote> quotes = quoteCollection.getCurrentList();
+                SourceSuggestions suggestions = suggestionProvider.getSourceSuggestions(quotes, input, authorContext);
+                if (suggestions.authorSources.isEmpty() && suggestions.otherSources.isEmpty()) {
+                    sourcePopup.dismiss();
+                    return;
+                }
+                SuggestionAdapter suggestionAdapter = SuggestionAdapter.forSources(AddEditActivity.this, suggestions);
+                sourcePopup.setAdapter(suggestionAdapter);
+                sourcePopup.setWidth(editTextSource.getWidth());
+                sourcePopup.setHeight(calcPopupHeight(suggestionAdapter.getSuggestionCount(), suggestions.hasSplit()));
+                sourcePopup.show();
+            }
+        });
+
+        editTextSource.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) sourcePopup.dismiss();
+        });
+    }
+
+    private int calcPopupHeight(int suggestionCount, boolean hasDivider) {
+        float density = getResources().getDisplayMetrics().density;
+        int itemHeightPx = Math.round(48 * density);
+        int dividerHeightPx = Math.round(density); // 1dp
+        int visibleItems = Math.min(suggestionCount, 4);
+        int height = visibleItems * itemHeightPx;
+        if (hasDivider) height += dividerHeightPx;
+        return height;
     }
 
     private void handleIntent() {
@@ -162,6 +274,8 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     private void clearForm() {
+        authorPopup.dismiss();
+        sourcePopup.dismiss();
         editTextAuthor.setText("");
         editTextQuote.setText("");
         editTextSource.setText("");

@@ -35,3 +35,15 @@ Implemented:
 - Edit mode behavior unchanged: still calls finish() after saving
 
 Issue #7 closed.
+
+2026-06-04 — Issue #2: Add quote: Auto-suggest author and source
+
+Implemented:
+- SourceSuggestions.java — value object with authorSources/otherSources lists and hasSplit()
+- SuggestionProvider.java — pure Java filtering/ranking; authors ranked by tier (exact→prefix→contains) with quote-count tiebreak; sources sorted alphabetically within each section
+- SuggestionAdapter.java — BaseAdapter for ListPopupWindow with TYPE_ITEM/TYPE_DIVIDER view types; divider rows non-selectable
+- res/layout/item_suggestion.xml — 48dp suggestion row with selectableItemBackground
+- res/layout/item_suggestion_divider.xml — 1dp listDivider separator
+- AddEditActivity.java — wired TextWatchers (2-char threshold) on author and source fields; author popup auto-advances focus to source on selection; source popup reads author field live for context; popup height capped at 4 visible items; both popups dismissed on clearForm()
+
+Build passed. Issue #2 closed.
