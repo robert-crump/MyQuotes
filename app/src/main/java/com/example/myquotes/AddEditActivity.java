@@ -153,12 +153,20 @@ public class AddEditActivity extends AppCompatActivity {
             quote.setId(quoteId);
             quoteCollection.update(quote);
             Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
+            finish();
         } else {
             quoteCollection.add(quote);
             Toast.makeText(this, "Quote added", Toast.LENGTH_SHORT).show();
+            clearForm();
         }
+    }
 
-        finish();
+    private void clearForm() {
+        editTextAuthor.setText("");
+        editTextQuote.setText("");
+        editTextSource.setText("");
+        editTextCategory.setText("");
+        editTextAuthor.requestFocus();
     }
 
     private boolean validateInput() {

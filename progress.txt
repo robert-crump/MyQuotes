@@ -26,3 +26,12 @@ Implemented:
 - activity_add_edit_quote.xml: changed android:inputType on edit_text_author from textCapSentences to textCapWords
 
 Issue #1 closed.
+
+2026-06-04 — Issue #7: Stay in AddEditQuote activity after saving new quote
+
+Implemented:
+- AddEditActivity.java: in add mode, saveButtonOnClick now calls clearForm() instead of finish()
+- Added clearForm(): clears all four fields and returns focus to the author field
+- Edit mode behavior unchanged: still calls finish() after saving
+
+Issue #7 closed.
