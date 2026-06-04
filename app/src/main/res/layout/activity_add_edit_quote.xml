@@ -44,7 +44,7 @@
                     android:id="@+id/edit_text_author"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textCapSentences"
+                    android:inputType="textCapWords"
                     android:maxLines="1"
                     android:imeOptions="actionNext"
                     android:textColor="?android:attr/textColorPrimary" />

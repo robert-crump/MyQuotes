@@ -19,3 +19,10 @@ Implemented:
 - Removed org.json imports (JSONArray, JSONException, JSONObject) from SettingsActivity
 
 Build and all unit tests passed. Issues #4 and #5 closed.
+
+2026-06-04 — Issue #1: Author name field capitalizes every word
+
+Implemented:
+- activity_add_edit_quote.xml: changed android:inputType on edit_text_author from textCapSentences to textCapWords
+
+Issue #1 closed.
