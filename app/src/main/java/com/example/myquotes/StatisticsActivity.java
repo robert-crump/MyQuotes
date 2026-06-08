@@ -16,7 +16,6 @@ public class StatisticsActivity extends AppCompatActivity {
 
     private TextView textTotalQuotes;
     private TextView textFavorites;
-    private TextView textAvgRating;
     private RecyclerView recyclerTopAuthors;
     private RecyclerView recyclerTopSources;
     private RecyclerView recyclerCategories;
@@ -47,7 +46,6 @@ public class StatisticsActivity extends AppCompatActivity {
     private void setupViews() {
         textTotalQuotes = findViewById(R.id.text_total_quotes);
         textFavorites = findViewById(R.id.text_favorites);
-        textAvgRating = findViewById(R.id.text_avg_rating);
         recyclerTopAuthors = findViewById(R.id.recycler_top_authors);
         recyclerTopSources = findViewById(R.id.recycler_top_sources);
         recyclerCategories = findViewById(R.id.recycler_categories);
@@ -69,14 +67,9 @@ public class StatisticsActivity extends AppCompatActivity {
         // Basis-Statistiken
         int totalQuotes = quotes.size();
         int favoriteCount = (int) quotes.stream().filter(Quote::isFavorite).count();
-        double avgRating = quotes.stream()
-                .mapToInt(Quote::getRating)
-                .average()
-                .orElse(0.0);
 
         textTotalQuotes.setText("Total Quotes: " + totalQuotes);
         textFavorites.setText("Favorites: " + favoriteCount);
-        textAvgRating.setText(String.format("Average Rating: %.2f", avgRating));
 
         // Top 10 Autoren
         Map<String, Integer> authorCounts = new HashMap<>();

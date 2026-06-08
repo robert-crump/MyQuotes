@@ -64,7 +64,6 @@ public final class QuoteCodec {
             jsonQuote.put("quoteText", quote.getQuoteText());
             jsonQuote.put("source", quote.getSource());
             jsonQuote.put("category", quote.getCategory());
-            jsonQuote.put("rating", quote.getRating());
             jsonQuote.put("isFavorite", quote.isFavorite());
             jsonQuote.put("favoritedAt", quote.getFavoritedAt());
             jsonQuote.put("lastShown", quote.getLastShown());
@@ -91,7 +90,6 @@ public final class QuoteCodec {
                 String quoteText = jsonQuote.optString("quoteText", "");
                 String source = jsonQuote.optString("source", "");
                 String category = jsonQuote.optString("category", "");
-                int rating = jsonQuote.optInt("rating", 0);
                 boolean isFavorite = jsonQuote.optBoolean("isFavorite", false);
                 long favoritedAt = jsonQuote.optLong("favoritedAt", 0);
                 long lastShown = jsonQuote.optLong("lastShown", 0);
@@ -99,7 +97,6 @@ public final class QuoteCodec {
 
                 Quote quote = new Quote(id, author, quoteText, source);
                 quote.setCategory(category);
-                quote.setRating(rating);
                 quote.setFavorite(isFavorite);
                 quote.setFavoritedAt(favoritedAt);
                 quote.setLastShown(lastShown);

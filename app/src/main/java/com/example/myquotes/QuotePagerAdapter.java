@@ -9,7 +9,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +19,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
     private final QuoteInteractionListener listener;
 
     public interface QuoteInteractionListener {
-        void onRateQuote(Quote quote, int delta);
         void onToggleFavorite(Quote quote);
         void onShareQuote(Quote quote);
         void onAuthorClick(Quote quote);
@@ -72,11 +70,8 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
         private final TextView textAuthor;
         private final TextView textSource;
         private final TextView textCategory;
-        private final TextView textRatingInfo;
         private final ImageButton buttonFavorite;
         private final ImageButton buttonShare;
-        private final MaterialButton buttonThumbsUp;
-        private final MaterialButton buttonThumbsDown;
 
         public QuoteViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -84,11 +79,8 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             textAuthor = itemView.findViewById(R.id.text_author);
             textSource = itemView.findViewById(R.id.text_source);
             textCategory = itemView.findViewById(R.id.text_category);
-            textRatingInfo = itemView.findViewById(R.id.text_rating_info);
             buttonFavorite = itemView.findViewById(R.id.button_favorite);
             buttonShare = itemView.findViewById(R.id.button_share);
-            buttonThumbsUp = itemView.findViewById(R.id.button_thumbs_up);
-            buttonThumbsDown = itemView.findViewById(R.id.button_thumbs_down);
         }
 
         public void bind(Quote quote) {
@@ -111,9 +103,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
                 textCategory.setVisibility(View.GONE);
             }
 
-            // Rating
-            textRatingInfo.setText("Rating: " + quote.getRating());
-
             // Favorite Icon
             if (quote.isFavorite()) {
                 buttonFavorite.setImageResource(R.drawable.ic_favorite_heart_filled);
@@ -122,8 +111,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             }
 
             // Click Listeners
-            buttonThumbsUp.setOnClickListener(v -> listener.onRateQuote(quote, 1));
-            buttonThumbsDown.setOnClickListener(v -> listener.onRateQuote(quote, -1));
             buttonFavorite.setOnClickListener(v -> listener.onToggleFavorite(quote));
             buttonShare.setOnClickListener(v -> listener.onShareQuote(quote));
 

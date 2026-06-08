@@ -67,11 +67,6 @@ public class MainActivity extends AppCompatActivity {
         viewPager = findViewById(R.id.quotes_viewpager);
         pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
             @Override
-            public void onRateQuote(Quote quote, int delta) {
-                rateQuote(quote);
-            }
-
-            @Override
             public void onToggleFavorite(Quote quote) {
                 toggleFavorite(quote);
             }
@@ -213,14 +208,6 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void rateQuote(Quote quote) {
-        if (quote != null) {
-            quote.setRating(quote.getRating() + 1);
-            quoteCollection.update(quote);
-            Log.d(TAG, "Quote #" + quote.getId() + " rated to: " + quote.getRating());
-        }
-    }
-
     private void toggleFavorite(Quote quote) {
         if (quote != null) {
             quote.toggleFavorite();
@@ -268,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             List<Quote> quotes = CsvLoader.loadQuotesFromRaw(
                     MainActivity.this,
-                    R.raw.zitate_260123
+                    R.raw.zitate
             );
 
             runOnUiThread(() -> {

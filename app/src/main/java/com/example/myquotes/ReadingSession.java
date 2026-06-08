@@ -64,7 +64,7 @@ public class ReadingSession extends ViewModel {
             }
         }
 
-        // Replace updated quotes in place (rating, favorite status, text edits, etc.)
+        // Replace updated quotes in place (favorite status, text edits, etc.)
         for (int j = 0; j < updated.size(); j++) {
             final int id = updated.get(j).getId();
             for (Quote newQ : newList) {

@@ -16,7 +16,6 @@ public class QuoteCodecTest {
     private Quote makeQuote(int id) {
         Quote q = new Quote(id, "Author " + id, "Text " + id, "Source " + id);
         q.setCategory("Category");
-        q.setRating(2);
         q.setFavorite(true);
         q.setFavoritedAt(1000L);
         q.setLastShown(2000L);
@@ -25,7 +24,7 @@ public class QuoteCodecTest {
     }
 
     @Test
-    public void roundtrip_allTenFields() throws QuoteCodecException {
+    public void roundtrip_allNineFields() throws QuoteCodecException {
         List<Quote> in = Arrays.asList(makeQuote(42));
 
         List<Quote> out = QuoteCodec.decode(QuoteCodec.encode(in));
@@ -37,7 +36,6 @@ public class QuoteCodecTest {
         assertEquals("Text 42", result.getQuoteText());
         assertEquals("Source 42", result.getSource());
         assertEquals("Category", result.getCategory());
-        assertEquals(2, result.getRating());
         assertTrue(result.isFavorite());
         assertEquals(1000L, result.getFavoritedAt());
         assertEquals(2000L, result.getLastShown());
@@ -57,7 +55,7 @@ public class QuoteCodecTest {
     @Test
     public void decode_acceptsLegacyBareArray() throws QuoteCodecException {
         String legacy = "[{\"id\":7,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\"," +
-                "\"category\":\"C\",\"rating\":0,\"isFavorite\":false," +
+                "\"category\":\"C\",\"isFavorite\":false," +
                 "\"favoritedAt\":0,\"lastShown\":0,\"timesShown\":0}]";
 
         List<Quote> quotes = QuoteCodec.decode(legacy);

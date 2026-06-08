@@ -87,15 +87,6 @@
 
                     </LinearLayout>
 
-                    <!-- Delete Negative Quotes Button -->
-                    <Button
-                        android:id="@+id/btn_delete_negative_quotes"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Delete quotes with negative rating"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:backgroundTint="?attr/colorPrimary" />
-
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>

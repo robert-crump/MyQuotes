@@ -109,10 +109,6 @@ public class SettingsActivity extends AppCompatActivity {
             QuoteNotifications.setEnabled(this, isChecked);
         });
 
-        // Setup Delete Negative Quotes Button
-        Button btnDeleteNegative = findViewById(R.id.btn_delete_negative_quotes);
-        btnDeleteNegative.setOnClickListener(v -> showDeleteNegativeQuotesDialog());
-
         // Setup Theme RadioGroup
         android.widget.RadioGroup radioGroupTheme = findViewById(R.id.radio_group_theme);
         android.widget.RadioButton radioLight = findViewById(R.id.radio_theme_light);
@@ -218,48 +214,15 @@ public class SettingsActivity extends AppCompatActivity {
                 inputStream.close();
 
                 List<Quote> importedQuotes = QuoteCodec.decode(jsonString.toString());
-                List<Quote> currentQuotes = quoteCollection.getCurrentList();
 
-                int importedCount = 0;
-                int updatedCount = 0;
-
-                for (Quote quote : importedQuotes) {
-                    Quote existingQuote = null;
-                    for (Quote q : currentQuotes) {
-                        if (q.getId() == quote.getId()) {
-                            existingQuote = q;
-                            break;
-                        }
-                    }
-
-                    if (existingQuote != null) {
-                        existingQuote.setAuthor(quote.getAuthor());
-                        existingQuote.setQuoteText(quote.getQuoteText());
-                        existingQuote.setSource(quote.getSource());
-                        existingQuote.setCategory(quote.getCategory());
-                        existingQuote.setRating(quote.getRating());
-                        existingQuote.setFavorite(quote.isFavorite());
-                        existingQuote.setFavoritedAt(quote.getFavoritedAt());
-                        existingQuote.setLastShown(quote.getLastShown());
-                        existingQuote.setTimesShown(quote.getTimesShown());
-                        updatedCount++;
-                    } else {
-                        currentQuotes.add(quote);
-                        importedCount++;
-                    }
-                }
-
-                quoteCollection.setList(currentQuotes);
-
-                final int finalImported = importedCount;
-                final int finalUpdated = updatedCount;
-                final int totalQuotes = currentQuotes.size();
-                runOnUiThread(() ->
-                        Toast.makeText(this,
-                                "Import: " + finalImported + " new, " + finalUpdated + " updated. Total: " + totalQuotes + " quotes",
-                                Toast.LENGTH_LONG).show()
-                );
-                Log.d(TAG, "Import successful: " + importedCount + " new, " + updatedCount + " updated");
+                final int totalQuotes = importedQuotes.size();
+                runOnUiThread(() -> {
+                    quoteCollection.setList(importedQuotes);
+                    Toast.makeText(this,
+                            "Import replaced database with " + totalQuotes + " quotes",
+                            Toast.LENGTH_LONG).show();
+                });
+                Log.d(TAG, "Import successful: replaced database with " + totalQuotes + " quotes");
 
             } catch (QuoteCodecException e) {
                 Log.e(TAG, "JSON parsing failed", e);
@@ -273,59 +236,6 @@ public class SettingsActivity extends AppCompatActivity {
                 );
             }
         }).start();
-    }
-
-    private void showDeleteNegativeQuotesDialog() {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        List<Quote> negativeQuotes = new ArrayList<>();
-
-        for (Quote quote : allQuotes) {
-            if (quote.getRating() < 0) {
-                negativeQuotes.add(quote);
-            }
-        }
-
-        if (negativeQuotes.isEmpty()) {
-            Toast.makeText(this, "No quotes with negative rating found", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        final int count = negativeQuotes.size();
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Delete Negative Quotes")
-                .setMessage("Delete all quotes with negative rating?\n\n" +
-                        count + " quote(s) found with negative rating.")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    deleteNegativeQuotes(negativeQuotes);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void deleteNegativeQuotes(List<Quote> quotesToDelete) {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        List<Quote> updatedQuotes = new ArrayList<>();
-        int deletedCount = 0;
-
-        for (Quote quote : allQuotes) {
-            boolean shouldDelete = false;
-            for (Quote toDelete : quotesToDelete) {
-                if (quote.getId() == toDelete.getId()) {
-                    shouldDelete = true;
-                    deletedCount++;
-                    break;
-                }
-            }
-            if (!shouldDelete) {
-                updatedQuotes.add(quote);
-            }
-        }
-
-        quoteCollection.setList(updatedQuotes);
-
-        Toast.makeText(this, "Deleted " + deletedCount + " quotes with negative rating",
-                Toast.LENGTH_LONG).show();
     }
 
     @Override

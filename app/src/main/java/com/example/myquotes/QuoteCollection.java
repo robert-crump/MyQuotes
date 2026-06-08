@@ -123,20 +123,6 @@ public class QuoteCollection {
         return favorites;
     }
 
-    public void rateQuote(int quoteId, int delta) {
-        Quote quote = findById(quoteId);
-        if (quote == null) {
-            Log.w(TAG, "Cannot rate quote - not found: " + quoteId);
-            return;
-        }
-        if (delta > 0) {
-            quote.incrementRating();
-        } else {
-            quote.decrementRating();
-        }
-        update(quote);
-    }
-
     public void toggleFavorite(int quoteId) {
         Quote quote = findById(quoteId);
         if (quote == null) {

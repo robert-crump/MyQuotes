@@ -9,7 +9,6 @@ public class Quote {
     private String source;
     private String category;
 
-    private int rating = 0;
     private boolean isFavorite = false;
     private long favoritedAt = 0L;    // Timestamp when marked as favorite
     private long lastShown = 0L;      // Timestamp of last display
@@ -42,9 +41,6 @@ public class Quote {
     public String getCategory() { return category != null ? category : ""; }
     public void setCategory(String category) { this.category = category; }
 
-    public int getRating() { return rating; }
-    public void setRating(int rating) { this.rating = rating; }
-
     public boolean isFavorite() { return isFavorite; }
     public void setFavorite(boolean favorite) { isFavorite = favorite; }
 
@@ -56,14 +52,6 @@ public class Quote {
 
     public int getTimesShown() { return timesShown; }
     public void setTimesShown(int timesShown) { this.timesShown = timesShown; }
-
-    public void incrementRating() {
-        this.rating++;
-    }
-
-    public void decrementRating() {
-        this.rating--;
-    }
 
     public void toggleFavorite() {
         this.isFavorite = !this.isFavorite;
@@ -97,7 +85,6 @@ public class Quote {
         return "Quote{" +
                 "id=" + id +
                 ", author='" + author + '\'' +
-                ", rating=" + rating +
                 ", favorite=" + isFavorite +
                 '}';
     }

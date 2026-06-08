@@ -2,7 +2,7 @@
 
 ## Core domain objects
 
-**Quote** — a single quotation with text, author, source, category, rating, favorite status, view count, and a stable integer id.
+**Quote** — a single quotation with text, author, source, category, favorite status, view count, and a stable integer id.
 
 **Quote Collection** — the canonical, ordered set of all quotes the user owns. Responsible for CRUD, id assignment, persistence, and notifying observers when the set changes. Implemented as a plain Java object (not a ViewModel) held by `MyApplication` for the lifetime of the process. The authoritative source of truth for quote data.
 

@@ -69,15 +69,6 @@
                         android:layout_height="wrap_content"
                         android:text="Favorites: 0"
                         android:textSize="16sp"
-                        android:layout_marginBottom="8dp"
-                        android:textColor="?android:attr/textColorPrimary" />
-
-                    <TextView
-                        android:id="@+id/text_avg_rating"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Average Rating: 0.00"
-                        android:textSize="16sp"
                         android:textColor="?android:attr/textColorPrimary" />
 
                 </LinearLayout>

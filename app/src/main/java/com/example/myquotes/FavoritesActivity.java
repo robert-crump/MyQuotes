@@ -42,11 +42,6 @@ public class FavoritesActivity extends AppCompatActivity {
         viewPager = binding.favoritesViewpager;
         pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
             @Override
-            public void onRateQuote(Quote quote, int delta) {
-                rateQuote(quote, delta);
-            }
-
-            @Override
             public void onToggleFavorite(Quote quote) {
                 toggleFavorite(quote);
             }
@@ -132,19 +127,6 @@ public class FavoritesActivity extends AppCompatActivity {
     private void updateCounter(int position) {
         if (favoriteQuotes != null && !favoriteQuotes.isEmpty()) {
             favoriteCounter.setText((position + 1) + " of " + favoriteQuotes.size());
-        }
-    }
-
-    private void rateQuote(Quote quote, int delta) {
-        if (quote != null) {
-            quoteCollection.rateQuote(quote.getId(), delta);
-
-            // Refresh current page
-            int currentPosition = viewPager.getCurrentItem();
-            pagerAdapter.notifyItemChanged(currentPosition);
-
-            Log.d(TAG, "Rated quote #" + quote.getId() +
-                    " with delta " + delta + ", new rating: " + quote.getRating());
         }
     }
 
