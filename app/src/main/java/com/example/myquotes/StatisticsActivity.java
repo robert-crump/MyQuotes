@@ -29,7 +29,8 @@ public class StatisticsActivity extends AppCompatActivity {
         setupToolbar();
         setupViewModel();
         setupViews();
-        loadStatistics();
+
+        quoteCollection.getQuoteList().observe(this, this::loadStatistics);
     }
 
     private void setupToolbar() {
@@ -56,9 +57,7 @@ public class StatisticsActivity extends AppCompatActivity {
         recyclerCategories.setLayoutManager(new LinearLayoutManager(this));
     }
 
-    private void loadStatistics()   {
-        List<Quote> quotes = quoteCollection.getQuoteList().getValue();
-
+    private void loadStatistics(List<Quote> quotes)   {
         if (quotes == null || quotes.isEmpty()) {
             textTotalQuotes.setText("No quotes available");
             return;
