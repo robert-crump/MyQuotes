@@ -97,7 +97,6 @@ public class StatisticsActivity extends AppCompatActivity {
                 .limit(10)
                 .map(e -> new StatItem(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
-
         // Kategorien-Statistik
         Map<String, Integer> categoryCounts = new HashMap<>();
         int noCategoryCount = 0;
