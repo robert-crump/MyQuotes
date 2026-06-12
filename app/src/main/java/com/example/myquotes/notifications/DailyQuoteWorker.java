@@ -37,8 +37,6 @@ public class DailyQuoteWorker extends Worker {
             return Result.success();
         }
 
-        int specificQuoteId = getInputData().getInt(QuoteNotifications.EXTRA_QUOTE_ID, -1);
-
         // Load quotes directly from SharedPreferences (NOT QuoteCollection -- fixes race condition)
         QuotePreferences prefs = new QuotePreferences(context);
         List<Quote> quotes = prefs.loadQuotes();
@@ -48,20 +46,8 @@ public class DailyQuoteWorker extends Worker {
             return Result.retry();
         }
 
-        Quote selectedQuote;
-        if (specificQuoteId != -1) {
-            selectedQuote = null;
-            for (Quote q : quotes) {
-                if (q.getId() == specificQuoteId) { selectedQuote = q; break; }
-            }
-            if (selectedQuote == null) {
-                selectedQuote = quotes.get(new Random().nextInt(quotes.size()));
-            }
-            Log.d(TAG, "Showing snoozed quote #" + specificQuoteId);
-        } else {
-            selectedQuote = quotes.get(new Random().nextInt(quotes.size()));
-            Log.d(TAG, "Showing random quote #" + selectedQuote.getId());
-        }
+        Quote selectedQuote = quotes.get(new Random().nextInt(quotes.size()));
+        Log.d(TAG, "Showing random quote #" + selectedQuote.getId());
 
         showQuoteNotification(context, selectedQuote);
         return Result.success();
@@ -74,14 +60,6 @@ public class DailyQuoteWorker extends Worker {
 
         PendingIntent openPendingIntent = PendingIntent.getActivity(
                 context, 0, openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        Intent snoozeIntent = new Intent(context, QuoteNotificationReceiver.class);
-        snoozeIntent.setAction(QuoteNotifications.ACTION_SNOOZE);
-        snoozeIntent.putExtra(QuoteNotifications.EXTRA_QUOTE_ID, selectedQuote.getId());
-
-        PendingIntent snoozePendingIntent = PendingIntent.getBroadcast(
-                context, 1, snoozeIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         String quoteText = selectedQuote.getQuoteText();
@@ -97,8 +75,7 @@ public class DailyQuoteWorker extends Worker {
                         .bigText(quoteText + "\n\n— " + selectedQuote.getAuthor()))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(openPendingIntent)
-                .setAutoCancel(true)
-                .addAction(R.drawable.ic_quotation_24dp, "Snooze (60min)", snoozePendingIntent);
+                .setAutoCancel(true);
 
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

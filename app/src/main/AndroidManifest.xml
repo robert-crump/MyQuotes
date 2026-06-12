@@ -57,14 +57,13 @@
             android:theme="@style/Theme.MyQuotes.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-        <!-- Broadcast receiver for notification actions (snooze, boot re-schedule) -->
+        <!-- Broadcast receiver for boot re-schedule -->
         <receiver
             android:name=".notifications.QuoteNotificationReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="com.example.myquotes.SNOOZE_NOTIFICATION" />
             </intent-filter>
         </receiver>
 

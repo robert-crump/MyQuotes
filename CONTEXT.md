@@ -22,4 +22,4 @@
 
 ## Subsystems
 
-**Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the snooze BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.
+**Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the boot-reschedule BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.

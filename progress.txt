@@ -47,3 +47,14 @@ Implemented:
 - AddEditActivity.java — wired TextWatchers (2-char threshold) on author and source fields; author popup auto-advances focus to source on selection; source popup reads author field live for context; popup height capped at 4 visible items; both popups dismissed on clearForm()
 
 Build passed. Issue #2 closed.
+
+2026-06-12 — Issue #10: Daily notification: Remove snooze functionality
+
+Implemented:
+- QuoteNotifications.java: removed snooze(), WORK_NAME_SNOOZE, ACTION_SNOOZE; cancelScheduledWork no longer cancels snooze work; AlarmManager migration no longer cancels the old snooze PendingIntent
+- QuoteNotificationReceiver.java: removed ACTION_SNOOZE handling, now only handles BOOT_COMPLETED re-schedule
+- DailyQuoteWorker.java: removed snooze notification action button and the specific-quote-id branch (always picks a random quote now)
+- AndroidManifest.xml: removed SNOOZE_NOTIFICATION intent-filter action from the receiver
+- CONTEXT.md: updated Quote Notifications description to drop the snooze reference
+
+Build and all unit tests passed. Issue #10 closed.

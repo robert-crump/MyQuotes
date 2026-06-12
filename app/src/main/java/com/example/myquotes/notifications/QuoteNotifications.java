@@ -17,10 +17,7 @@ import android.provider.Settings;
 import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
@@ -42,11 +39,9 @@ public final class QuoteNotifications {
     private static final String KEY_MIGRATED_TO_WORKMANAGER = "migrated_to_workmanager";
 
     private static final String WORK_NAME_DAILY = "daily_quote_notification";
-    private static final String WORK_NAME_SNOOZE = "snooze_quote_notification";
 
     static final String CHANNEL_ID = "daily_quote_channel";
     static final int NOTIFICATION_ID = 1001;
-    static final String ACTION_SNOOZE = "com.example.myquotes.SNOOZE_NOTIFICATION";
 
     public static final String EXTRA_QUOTE_ID = "quote_id";
     public static final int REQUEST_CODE_POST_NOTIFICATIONS = 100;
@@ -73,24 +68,6 @@ public final class QuoteNotifications {
         } else {
             cancelScheduledWork(context);
         }
-    }
-
-    public static void snooze(Context context, int quoteId, int delayMinutes) {
-        Data inputData = new Data.Builder()
-                .putInt(EXTRA_QUOTE_ID, quoteId)
-                .build();
-
-        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(DailyQuoteWorker.class)
-                .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
-                .setInputData(inputData)
-                .build();
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-                WORK_NAME_SNOOZE,
-                ExistingWorkPolicy.REPLACE,
-                workRequest
-        );
-        Log.d(TAG, "Snoozed quote #" + quoteId + " for " + delayMinutes + " minutes");
     }
 
     public static void requestPostNotificationsPermission(Activity activity) {
@@ -147,7 +124,6 @@ public final class QuoteNotifications {
     private static void cancelScheduledWork(Context context) {
         WorkManager workManager = WorkManager.getInstance(context);
         workManager.cancelUniqueWork(WORK_NAME_DAILY);
-        workManager.cancelUniqueWork(WORK_NAME_SNOOZE);
         Log.d(TAG, "Cancelled all scheduled notifications");
     }
 
@@ -193,10 +169,6 @@ public final class QuoteNotifications {
                         context, 0, intent,
                         PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
                 if (daily != null) { alarmManager.cancel(daily); daily.cancel(); }
-                PendingIntent snooze = PendingIntent.getBroadcast(
-                        context, 2, intent,
-                        PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-                if (snooze != null) { alarmManager.cancel(snooze); snooze.cancel(); }
             }
             Log.d(TAG, "Migrated from AlarmManager to WorkManager");
         } catch (Exception e) {
