@@ -5,7 +5,9 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="?android:attr/colorBackground"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
 
     <!-- Toolbar -->
     <androidx.appcompat.widget.Toolbar
@@ -30,24 +32,33 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="16dp">
 
             <!-- Author Input -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="20dp"
                 android:hint="Author *"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                app:boxBackgroundColor="@android:color/transparent"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_author"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="12dp"
                     android:inputType="textCapWords"
                     android:maxLines="1"
                     android:imeOptions="actionNext"
-                    android:textColor="?android:attr/textColorPrimary" />
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -55,18 +66,24 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="20dp"
                 android:hint="Source"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                app:boxBackgroundColor="@android:color/transparent"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_source"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="12dp"
                     android:inputType="textCapSentences"
                     android:maxLines="1"
                     android:imeOptions="actionNext"
-                    android:textColor="?android:attr/textColorPrimary" />
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -74,16 +91,22 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="20dp"
                 android:hint="Category"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                app:boxBackgroundColor="@android:color/transparent"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.ExposedDropdownMenu">
 
                 <AutoCompleteTextView
                     android:id="@+id/edit_text_category"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="12dp"
                     android:inputType="none"
-                    android:textColor="?android:attr/textColorPrimary" />
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="15sp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -91,21 +114,27 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="8dp"
                 android:hint="Quote *"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                app:boxBackgroundColor="@android:color/transparent"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_quote"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="12dp"
                     android:gravity="top|start"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:minLines="6"
-                    android:maxLines="20"
-                    android:scrollbars="vertical"
                     android:imeOptions="actionDone"
-                    android:textColor="?android:attr/textColorPrimary" />
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="20"
+                    android:minLines="6"
+                    android:scrollbars="vertical"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="14sp" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -113,7 +142,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="* Required fields"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textColor="@android:color/darker_gray"
                 android:layout_marginTop="4dp" />
 
@@ -121,32 +150,44 @@
 
     </ScrollView>
 
-    <!-- Action Buttons -->
+    <!-- Action Buttons — full-width stacked -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="end"
+        android:orientation="vertical"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="16dp"
         android:background="?attr/colorSurface"
         android:elevation="4dp">
 
         <Button
-            android:id="@+id/button_dismiss"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Dismiss"
-            android:onClick="dismissButtonOnClick"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_marginEnd="8dp"/>
-
-        <Button
             android:id="@+id/button_save"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Save"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:paddingTop="13dp"
+            android:paddingBottom="13dp"
+            android:layout_marginBottom="8dp"
             android:onClick="saveButtonOnClick"
-            style="@style/Widget.MaterialComponents.Button"/>
+            app:cornerRadius="16dp"
+            style="@style/Widget.MaterialComponents.Button" />
+
+        <Button
+            android:id="@+id/button_dismiss"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dismiss"
+            android:textAllCaps="false"
+            android:textSize="14sp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:onClick="dismissButtonOnClick"
+            app:cornerRadius="16dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
 
     </LinearLayout>
 

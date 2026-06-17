@@ -7,7 +7,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ListPopupWindow;
 import android.widget.Toast;
@@ -34,6 +34,7 @@ public class AddEditActivity extends AppCompatActivity {
     private ListPopupWindow sourcePopup;
     private int quoteId = -1;
     private boolean isEditMode = false;
+    private boolean isLoadingQuote = false;
 
     private static final String[] CATEGORIES = {
             "Achtsamkeit und Meditation",
@@ -72,7 +73,6 @@ public class AddEditActivity extends AppCompatActivity {
         editTextSource = findViewById(R.id.edit_text_source);
         editTextCategory = findViewById(R.id.edit_text_category);
 
-        // Setup Category Dropdown
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
                 this,
                 android.R.layout.simple_dropdown_item_1line,
@@ -81,42 +81,21 @@ public class AddEditActivity extends AppCompatActivity {
         editTextCategory.setAdapter(adapter);
         editTextCategory.setDropDownHeight(600);
 
-        // Dismiss keyboard and show dropdown when category field is focused
         editTextCategory.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                android.view.inputmethod.InputMethodManager imm =
-                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                }
-                // Zeige Dropdown
-                editTextCategory.showDropDown();
-            }
+            if (hasFocus) showCategoryPicker(v);
         });
 
-        // On category selection: move focus to the quote field
         editTextCategory.setOnItemClickListener((parent, view, position, id) -> {
-            // Short delay for better UX
             editTextCategory.postDelayed(() -> {
                 editTextQuote.requestFocus();
-                android.view.inputmethod.InputMethodManager imm =
-                        (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
-                    imm.showSoftInput(editTextQuote, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                    imm.showSoftInput(editTextQuote, InputMethodManager.SHOW_IMPLICIT);
                 }
             }, 100);
         });
 
-        editTextCategory.setOnClickListener(v -> {
-            android.view.inputmethod.InputMethodManager imm =
-                    (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-            }
-            editTextCategory.showDropDown();
-        });
-
-        editTextAuthor.requestFocus();
+        editTextCategory.setOnClickListener(this::showCategoryPicker);
 
         setupAuthorSuggestions();
         setupSourceSuggestions();
@@ -142,6 +121,7 @@ public class AddEditActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
+                if (isLoadingQuote) return;
                 String input = s.toString().trim();
                 if (input.length() < 2) {
                     authorPopup.dismiss();
@@ -185,6 +165,7 @@ public class AddEditActivity extends AppCompatActivity {
 
             @Override
             public void afterTextChanged(Editable s) {
+                if (isLoadingQuote) return;
                 String input = s.toString().trim();
                 if (input.length() < 2) {
                     sourcePopup.dismiss();
@@ -208,6 +189,14 @@ public class AddEditActivity extends AppCompatActivity {
         editTextSource.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) sourcePopup.dismiss();
         });
+    }
+
+    private void showCategoryPicker(View v) {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        }
+        editTextCategory.showDropDown();
     }
 
     private int calcPopupHeight(int suggestionCount, boolean hasDivider) {
@@ -242,10 +231,12 @@ public class AddEditActivity extends AppCompatActivity {
     private void loadQuote(int id) {
         Quote quote = quoteCollection.findById(id);
         if (quote != null) {
+            isLoadingQuote = true;
             editTextAuthor.setText(quote.getAuthor());
             editTextQuote.setText(quote.getQuoteText());
             editTextSource.setText(quote.getSource());
             editTextCategory.setText(quote.getCategory());
+            isLoadingQuote = false;
             Log.d(TAG, "Loaded quote #" + id);
         } else {
             Log.w(TAG, "Quote not found: " + id);
@@ -309,7 +300,6 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     public void dismissButtonOnClick(View view) {
-        Toast.makeText(this, "Changes discarded", Toast.LENGTH_SHORT).show();
         finish();
     }
 }

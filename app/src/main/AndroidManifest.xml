@@ -31,7 +31,8 @@
         <activity
             android:name=".AddEditActivity"
             android:label="Add/Edit Quote"
-            android:theme="@style/Theme.MyQuotes.NoActionBar"/>
+            android:theme="@style/Theme.MyQuotes.NoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustNothing"/>
 
         <activity
             android:name=".StatisticsActivity"
@@ -66,6 +67,9 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <meta-data
+            android:name="preloaded_fonts"
+            android:resource="@array/preloaded_fonts" />
 
     </application>
 </manifest>
