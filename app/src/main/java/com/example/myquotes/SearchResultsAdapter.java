@@ -82,26 +82,11 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
         }
 
         private String getSnippet(String text, String query) {
-            if (query.isEmpty()) {
-                int maxLength = 100;
-                if (text.length() <= maxLength) {
-                    return text;
-                } else {
-                    return text.substring(0, maxLength) + "...";
-                }
-            }
-
-            int index = text.toLowerCase().indexOf(query.toLowerCase());
+            int index = query.isEmpty() ? -1 : text.toLowerCase().indexOf(query.toLowerCase());
             if (index == -1) {
-                int maxLength = 100;
-                if (text.length() <= maxLength) {
-                    return text;
-                } else {
-                    return text.substring(0, maxLength) + "...";
-                }
+                return text.length() <= 100 ? text : text.substring(0, 100) + "...";
             }
 
-            // Zeige Kontext um den Suchbegriff
             int start = Math.max(0, index - 40);
             int end = Math.min(text.length(), index + query.length() + 60);
 

@@ -2,7 +2,6 @@ package com.example.myquotes;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
@@ -11,12 +10,9 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
 
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 import com.example.myquotes.notifications.QuoteNotifications;
-
-import java.util.ArrayList;
 
 import java.io.BufferedReader;
 import java.io.InputStream;

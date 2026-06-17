@@ -99,12 +99,7 @@ public class CsvLoader {
 
             // Category is optional (column 4)
             if (fields.size() >= 4) {
-                String category = cleanCsvField(fields.get(3));
-                quote.setCategory(category);
-
-                if (!category.isEmpty()) {
-                    Log.d(TAG, "Quote #" + id + " - Category: '" + category + "'");
-                }
+                quote.setCategory(cleanCsvField(fields.get(3)));
             } else {
                 quote.setCategory("");
             }
@@ -121,20 +116,12 @@ public class CsvLoader {
 
         field = field.trim();
 
-        // Remove surrounding quotes
         if (field.startsWith("\"") && field.endsWith("\"") && field.length() >= 2) {
             field = field.substring(1, field.length() - 1);
         }
 
-        // Unescape doubled quotes ("" → ")
         field = field.replace("\"\"", "\"");
 
-        field = field.trim();
-
-        if (field.isEmpty()) {
-            return "";
-        }
-
-        return field;
+        return field.trim();
     }
 }

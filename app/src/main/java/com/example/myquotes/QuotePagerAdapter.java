@@ -88,7 +88,7 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             textAuthor.setText(quote.getAuthor());
 
             // Source visibility
-            if (quote.getSource() != null && !quote.getSource().isEmpty()) {
+            if (!quote.getSource().isEmpty()) {
                 textSource.setText(quote.getSource());
                 textSource.setVisibility(View.VISIBLE);
             } else {
@@ -96,19 +96,16 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             }
 
             // Category visibility
-            if (quote.getCategory() != null && !quote.getCategory().isEmpty()) {
+            if (!quote.getCategory().isEmpty()) {
                 textCategory.setText(quote.getCategory());
                 textCategory.setVisibility(View.VISIBLE);
             } else {
                 textCategory.setVisibility(View.GONE);
             }
 
-            // Favorite Icon
-            if (quote.isFavorite()) {
-                buttonFavorite.setImageResource(R.drawable.ic_favorite_heart_filled);
-            } else {
-                buttonFavorite.setImageResource(R.drawable.ic_favorite_heart);
-            }
+            buttonFavorite.setImageResource(quote.isFavorite()
+                    ? R.drawable.ic_favorite_heart_filled
+                    : R.drawable.ic_favorite_heart);
 
             // Click Listeners
             buttonFavorite.setOnClickListener(v -> listener.onToggleFavorite(quote));

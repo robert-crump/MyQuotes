@@ -3,7 +3,6 @@ package com.example.myquotes;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Build;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -18,7 +17,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myquotes.notifications.QuoteNotifications;
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
 import java.util.ArrayList;
@@ -49,8 +47,6 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     private boolean filterSourceEnabled = true;
     private boolean filterCategoryEnabled = true;
 
-    // Current search query, kept for result highlighting
-    private String currentSearchQuery = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -187,25 +183,25 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     }
 
     private void setupFilterButtons() {
-        setupChip(filterQuote, filterQuoteEnabled, () -> {
+        setupChip(filterQuote, () -> {
             filterQuoteEnabled = !filterQuoteEnabled;
             updateFilterButtonStates();
             performSearch(searchEditText.getText().toString());
         });
 
-        setupChip(filterAuthor, filterAuthorEnabled, () -> {
+        setupChip(filterAuthor, () -> {
             filterAuthorEnabled = !filterAuthorEnabled;
             updateFilterButtonStates();
             performSearch(searchEditText.getText().toString());
         });
 
-        setupChip(filterSource, filterSourceEnabled, () -> {
+        setupChip(filterSource, () -> {
             filterSourceEnabled = !filterSourceEnabled;
             updateFilterButtonStates();
             performSearch(searchEditText.getText().toString());
         });
 
-        setupChip(filterCategory, filterCategoryEnabled, () -> {
+        setupChip(filterCategory, () -> {
             filterCategoryEnabled = !filterCategoryEnabled;
             updateFilterButtonStates();
             performSearch(searchEditText.getText().toString());
@@ -214,9 +210,9 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         updateFilterButtonStates();
     }
 
-    private void setupChip(com.google.android.material.chip.Chip chip, boolean isEnabled, Runnable onToggle) {
+    private void setupChip(com.google.android.material.chip.Chip chip, Runnable onToggle) {
         chip.setOnClickListener(v -> onToggle.run());
-        chip.setCheckable(false); // Deaktiviere das Standard-Checkbox-Verhalten
+        chip.setCheckable(false);
     }
 
     private void updateFilterButtonStates() {
@@ -267,8 +263,6 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
             return;
         }
 
-        currentSearchQuery = searchQuery;
-
         if (searchQuery.length() < MIN_QUERY_LENGTH) {
             adapter.updateResults(results, "");
             updateResultCount(0);
@@ -287,8 +281,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
             if (filterSourceEnabled && quote.getSource().toLowerCase().contains(searchQuery)) {
                 matches = true;
             }
-            if (filterCategoryEnabled && quote.getCategory() != null &&
-                    quote.getCategory().toLowerCase().contains(searchQuery)) {
+            if (filterCategoryEnabled && quote.getCategory().toLowerCase().contains(searchQuery)) {
                 matches = true;
             }
 
@@ -299,7 +292,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
 
         Log.d(TAG, "Search for '" + searchQuery + "' found " + results.size() + " results");
 
-        adapter.updateResults(results, currentSearchQuery);
+        adapter.updateResults(results, searchQuery);
         updateResultCount(results.size());
     }
 

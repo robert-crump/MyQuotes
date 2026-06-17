@@ -1,9 +1,15 @@
 package com.example.myquotes;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.InputType;
+import android.util.Log;
 import android.view.MenuItem;
-import android.widget.Toast;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -11,6 +17,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myquotes.databinding.ActivityCategoriesBinding;
+
+import org.json.JSONArray;
+import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -77,24 +86,24 @@ public class CategoriesActivity extends AppCompatActivity {
         categories = new ArrayList<>();
 
         // 1. Load saved categories from SharedPreferences
-        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String savedCategoriesJson = prefs.getString(KEY_CATEGORIES, "[]");
         try {
-            org.json.JSONArray jsonArray = new org.json.JSONArray(savedCategoriesJson);
+            JSONArray jsonArray = new JSONArray(savedCategoriesJson);
             for (int i = 0; i < jsonArray.length(); i++) {
                 String category = jsonArray.getString(i);
                 if (!categories.contains(category)) {
                     categories.add(category);
                 }
             }
-        } catch (org.json.JSONException e) {
-            android.util.Log.e(TAG, "Error loading saved categories", e);
+        } catch (JSONException e) {
+            Log.e(TAG, "Error loading saved categories", e);
         }
 
         // 2. Collect any additional categories from the quotes themselves
         for (Quote quote : allQuotes) {
             String category = quote.getCategory();
-            if (category != null && !category.trim().isEmpty() && !categories.contains(category)) {
+            if (!category.trim().isEmpty() && !categories.contains(category)) {
                 categories.add(category);
             }
         }
@@ -105,30 +114,30 @@ public class CategoriesActivity extends AppCompatActivity {
         // 4. Update adapter
         adapter.updateCategories(categories);
 
-        android.util.Log.d(TAG, "Loaded " + categories.size() + " categories");
+        Log.d(TAG, "Loaded " + categories.size() + " categories");
     }
 
     private void saveCategoriesToPreferences() {
-        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        org.json.JSONArray jsonArray = new org.json.JSONArray();
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        JSONArray jsonArray = new JSONArray();
 
         for (String category : categories) {
             jsonArray.put(category);
         }
 
         prefs.edit().putString(KEY_CATEGORIES, jsonArray.toString()).apply();
-        android.util.Log.d(TAG, "Saved " + categories.size() + " categories to preferences");
+        Log.d(TAG, "Saved " + categories.size() + " categories to preferences");
     }
 
     private void showAddCategoryDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
+        EditText input = new EditText(this);
         input.setHint("Category name");
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
 
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
-        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
         );
         int marginHorizontal = (int) (20 * getResources().getDisplayMetrics().density);
         params.leftMargin = marginHorizontal;
@@ -154,7 +163,7 @@ public class CategoriesActivity extends AppCompatActivity {
                 .create();
 
         dialog.getWindow().setSoftInputMode(
-                android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
         );
 
         dialog.show();
@@ -163,31 +172,26 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void addCategory(String categoryName) {
-        android.util.Log.d("CategoriesActivity", "Adding category: " + categoryName);
-        android.util.Log.d("CategoriesActivity", "Before add - size: " + categories.size());
-
         categories.add(categoryName);
         Collections.sort(categories);
-
-        android.util.Log.d("CategoriesActivity", "After add - size: " + categories.size());
 
         categories = new ArrayList<>(categories);
         adapter.updateCategories(categories);
         saveCategoriesToPreferences();
 
-        android.util.Log.d("CategoriesActivity", "Categories: " + categories);
+        Log.d(TAG, "Added category: " + categoryName);
     }
 
     private void showRenameCategoryDialog(String oldName) {
-        android.widget.EditText input = new android.widget.EditText(this);
+        EditText input = new EditText(this);
         input.setText(oldName);
         input.setSelectAllOnFocus(true);
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
 
-        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
-        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
         );
         int marginHorizontal = (int) (20 * getResources().getDisplayMetrics().density); // 20dp Margin
         params.leftMargin = marginHorizontal;
@@ -213,7 +217,7 @@ public class CategoriesActivity extends AppCompatActivity {
                 .create();
 
         dialog.getWindow().setSoftInputMode(
-                android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
         );
 
         dialog.show();
@@ -243,7 +247,7 @@ public class CategoriesActivity extends AppCompatActivity {
             saveCategoriesToPreferences();
         }
 
-        android.util.Log.d("CategoriesActivity", "Renamed category in " + updatedCount + " quotes");
+        Log.d(TAG, "Renamed category in " + updatedCount + " quotes");
     }
 
     private void showDeleteCategoryDialog(String categoryName) {
@@ -285,7 +289,7 @@ public class CategoriesActivity extends AppCompatActivity {
         adapter.updateCategories(categories);
         saveCategoriesToPreferences();
 
-        android.util.Log.d("CategoriesActivity", "Removed category from " + updatedCount + " quotes");
+        Log.d(TAG, "Removed category from " + updatedCount + " quotes");
     }
 
     @Override

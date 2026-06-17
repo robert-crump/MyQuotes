@@ -73,7 +73,7 @@ public class FavoritesActivity extends AppCompatActivity {
 
             @Override
             public void onCategoryClick(Quote quote) {
-                if (quote != null && quote.getCategory() != null && !quote.getCategory().isEmpty()) {
+                if (quote != null && !quote.getCategory().isEmpty()) {
                     Intent intent = new Intent(FavoritesActivity.this, SearchActivity.class);
                     intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getCategory());
                     intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "category");
@@ -164,12 +164,12 @@ public class FavoritesActivity extends AppCompatActivity {
                 shareText += " (" + quote.getSource() + ")";
             }
 
-            android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("text/plain");
-            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, shareText);
-            shareIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, "Quote from My Quotes");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Quote from My Quotes");
 
-            startActivity(android.content.Intent.createChooser(shareIntent, "Share quote via"));
+            startActivity(Intent.createChooser(shareIntent, "Share quote via"));
         }
     }
 

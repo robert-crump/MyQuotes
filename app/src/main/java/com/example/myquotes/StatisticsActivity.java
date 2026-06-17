@@ -103,7 +103,7 @@ public class StatisticsActivity extends AppCompatActivity {
 
         for (Quote quote : quotes) {
             String category = quote.getCategory();
-            if (category != null && !category.isEmpty()) {
+            if (!category.isEmpty()) {
                 categoryCounts.put(category, categoryCounts.getOrDefault(category, 0) + 1);
             } else {
                 noCategoryCount++;

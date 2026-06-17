@@ -10,13 +10,11 @@ public class Quote {
     private String category;
 
     private boolean isFavorite = false;
-    private long favoritedAt = 0L;    // Timestamp when marked as favorite
-    private long lastShown = 0L;      // Timestamp of last display
-    private int timesShown = 0;       // Number of times displayed
+    private long favoritedAt = 0L;
+    private long lastShown = 0L;
+    private int timesShown = 0;
 
-    // Konstruktoren
     public Quote() {
-        // Default constructor
     }
 
     public Quote(Integer id, String author, String quoteText, String source) {
@@ -55,11 +53,7 @@ public class Quote {
 
     public void toggleFavorite() {
         this.isFavorite = !this.isFavorite;
-        if (this.isFavorite) {
-            this.favoritedAt = System.currentTimeMillis();
-        } else {
-            this.favoritedAt = 0L;
-        }
+        this.favoritedAt = this.isFavorite ? System.currentTimeMillis() : 0L;
     }
 
     public void recordView() {

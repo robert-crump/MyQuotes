@@ -28,7 +28,6 @@ public class MainActivity extends AppCompatActivity {
     private ReadingSession readingSession;
     private Quote currentQuote;
 
-    private boolean quotesLoaded = false;
     private boolean isFirstDeckLoad = true;
     private int pendingQuoteId = -1;
     private boolean isFabHidden = false;
@@ -221,7 +220,6 @@ public class MainActivity extends AppCompatActivity {
     private void loadQuotesIfNeeded() {
         // If QuoteCollection already has quotes (e.g. after config change), skip reload.
         if (!quoteCollection.getCurrentList().isEmpty()) {
-            quotesLoaded = true;
             return;
         }
 
@@ -231,7 +229,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Loading quotes from persistent storage...");
             List<Quote> quotes = prefs.loadQuotes();
             if (quotes != null && !quotes.isEmpty()) {
-                quotesLoaded = true;
                 quoteCollection.setList(quotes);
                 quoteCollection.trimFields();
                 Log.d(TAG, "Loaded " + quotes.size() + " quotes from storage");
@@ -239,13 +236,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (prefs.isFirstLaunch() || !prefs.isInitialCsvLoaded()) {
-            Log.d(TAG, "First launch detected, loading from CSV...");
-            loadQuotesFromCsv();
-        } else {
-            Log.d(TAG, "No quotes in collection, falling back to CSV...");
-            loadQuotesFromCsv();
-        }
+        Log.d(TAG, "Loading from CSV...");
+        loadQuotesFromCsv();
     }
 
     private void loadQuotesFromCsv() {
@@ -260,7 +252,6 @@ public class MainActivity extends AppCompatActivity {
 
             runOnUiThread(() -> {
                 if (quotes != null && !quotes.isEmpty()) {
-                    quotesLoaded = true;
                     quoteCollection.setList(quotes);
                     quoteCollection.trimFields();
 
@@ -313,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void searchByCategory(Quote quote) {
-        if (quote != null && quote.getCategory() != null && !quote.getCategory().isEmpty()) {
+        if (quote != null && !quote.getCategory().isEmpty()) {
             Intent intent = new Intent(this, SearchActivity.class);
             intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getCategory());
             intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "category");
@@ -419,8 +410,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    }
 }

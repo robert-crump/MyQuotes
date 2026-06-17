@@ -64,17 +64,8 @@ public class QuoteCollection {
     }
 
     public void deleteById(int id) {
-        List<Quote> quotes = getCurrentList();
-        List<Quote> updated = new ArrayList<>();
-        boolean removed = false;
-        for (Quote quote : quotes) {
-            if (quote.getId() != id) {
-                updated.add(quote);
-            } else {
-                removed = true;
-            }
-        }
-        if (removed) {
+        List<Quote> updated = getCurrentList();
+        if (updated.removeIf(q -> q.getId() == id)) {
             liveQuoteList.setValue(updated);
             saveToPreferences(updated);
             Log.d(TAG, "Deleted quote with ID: " + id);
