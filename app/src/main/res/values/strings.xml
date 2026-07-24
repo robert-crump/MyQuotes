@@ -49,4 +49,13 @@
     <!-- Daily quote notification -->
     <string name="daily_quote_title">Daily Quote</string>
     <string name="daily_quote_title_with_author">Daily Quote — %s</string>
+
+    <!-- Local auto-backup -->
+    <string name="switch_local_backup">Auto-backup to local folder</string>
+    <string name="local_backup_never">Last backup: Never</string>
+    <string name="local_backup_last_format">Last backup: %s</string>
+    <string name="local_backup_enabled_toast">Auto-backup enabled</string>
+    <string name="local_backup_disabled_toast">Auto-backup disabled</string>
+    <string name="local_backup_failed_title">Backup failed</string>
+    <string name="local_backup_failed_message">Automatic backup to your local folder failed. Check Settings.</string>
 </resources>

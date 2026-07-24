@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.notifications.QuoteNotifications;
 
 public class MyApplication extends Application {
@@ -22,6 +23,7 @@ public class MyApplication extends Application {
         applyTheme();
         quoteCollection = new QuoteCollection(this);
         QuoteNotifications.initialize(this);
+        LocalBackup.initialize(this);
     }
 
     public static MyApplication getInstance() {

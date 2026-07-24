@@ -23,3 +23,5 @@
 ## Subsystems
 
 **Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the boot-reschedule BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.
+
+**Local Auto-backup** — daily background backup of the quote collection to a user-chosen local folder. A single facade (`com.example.myquotes.backup.LocalBackup`) owns the WorkManager scheduling, the persisted SAF folder permission, the failure notification channel, and the enabled/last-backup-time/last-backup-hash state. The write path (`QuoteExporter.writeToUri`) is shared with the manual export flow in `SettingsActivity`. `LocalBackupWorker` skips writing when the collection is unchanged since the last successful backup (compared via a SHA-256 hash of the encoded quotes).

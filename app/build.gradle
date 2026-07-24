@@ -48,6 +48,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-livedata:2.9.4'
     implementation 'androidx.viewpager2:viewpager2:1.1.0'
     implementation 'androidx.work:work-runtime:2.11.1'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'

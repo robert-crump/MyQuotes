@@ -68,3 +68,18 @@ Implemented:
 - strings.xml: added daily_quote_title and daily_quote_title_with_author string resources
 
 Build and all unit tests passed. Issue #11 closed.
+
+2026-07-24 — Issue #13: Local daily auto-backup
+
+Implemented:
+- QuoteExporter.java (new) — extracted the encode+write-to-Uri logic out of SettingsActivity.exportQuotesToJson into a static writeToUri(Context, Uri, List<Quote>) helper, opened with mode "wt" so overwrites truncate correctly on SAF providers; SettingsActivity's manual export now calls this too, so there's a single write path shared by manual export and auto-backup
+- backup/LocalBackup.java (new) — facade (same pattern as QuoteNotifications): enabled flag, persisted backup-folder Uri (via takePersistableUriPermission), last-backup-time/last-backup-hash SharedPreferences, WorkManager daily scheduling (enqueueUniquePeriodicWork, 24h, UPDATE policy), a dedicated "backup_failure_channel" notification channel, and notifyBackupFailed()
+- backup/LocalBackupWorker.java (new) — Worker: loads quotes from QuotePreferences (not QuoteCollection, same race-avoidance as DailyQuoteWorker), SHA-256-hashes the encoded quotes and skips the write if unchanged since last successful backup, resolves the folder via DocumentFile.fromTreeUri, finds-or-creates a fixed-name "MyQuotes-backup.json" (overwritten in place — timestamped rotation is #15's job), writes via QuoteExporter, records success (time+hash) or posts a failure notification and returns Result.failure()
+- MyApplication.java — calls LocalBackup.initialize(this) alongside QuoteNotifications.initialize(this)
+- activity_settings.xml — added "Auto-backup to local folder" switch + "Last backup: ..." text under the Database card
+- SettingsActivity.java — wired the switch: first enable launches ACTION_OPEN_DOCUMENT_TREE (with persistable read/write flags) via a new ActivityResultLauncher; on pick, persists the folder + enables; subsequent enables (folder already chosen) skip the picker; disable cancels the job but keeps the folder permission; declining the picker reverts the switch with no crash; onResume() refreshes the last-backup text so it reflects backups that ran while Settings wasn't open
+- strings.xml — added switch/toast/notification strings for the new feature
+- build.gradle — added androidx.documentfile:documentfile:1.0.1 (needed for DocumentFile-based folder writes)
+- CONTEXT.md — documented the new Local Auto-backup subsystem
+
+Build and all unit tests passed. Issue #13 closed.

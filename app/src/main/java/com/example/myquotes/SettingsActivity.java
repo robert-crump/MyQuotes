@@ -11,13 +11,14 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 import com.example.myquotes.notifications.QuoteNotifications;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -31,6 +32,8 @@ public class SettingsActivity extends AppCompatActivity {
 
     private ActivityResultLauncher<Intent> exportLauncher;
     private ActivityResultLauncher<Intent> importLauncher;
+    private ActivityResultLauncher<Intent> backupFolderLauncher;
+    private android.widget.TextView lastBackupTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +75,26 @@ public class SettingsActivity extends AppCompatActivity {
                 }
         );
 
+        SwitchMaterial switchLocalBackup = findViewById(R.id.switch_local_backup);
+        lastBackupTextView = findViewById(R.id.text_last_backup);
+        updateLastBackupText();
+
+        backupFolderLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    Uri treeUri = (result.getResultCode() == RESULT_OK && result.getData() != null)
+                            ? result.getData().getData() : null;
+                    if (treeUri != null) {
+                        LocalBackup.setFolder(this, treeUri);
+                        LocalBackup.setEnabled(this, true);
+                        updateLastBackupText();
+                        Toast.makeText(this, R.string.local_backup_enabled_toast, Toast.LENGTH_SHORT).show();
+                    } else {
+                        switchLocalBackup.setChecked(false);
+                    }
+                }
+        );
+
         // Setup buttons
         Button btnExport = findViewById(R.id.btn_export);
         Button btnImport = findViewById(R.id.btn_import);
@@ -105,6 +128,30 @@ public class SettingsActivity extends AppCompatActivity {
             QuoteNotifications.setEnabled(this, isChecked);
         });
 
+        // Setup Local Auto-backup Switch
+
+        // Set initial state
+        switchLocalBackup.setChecked(LocalBackup.isEnabled(this));
+
+        // Set listener
+        switchLocalBackup.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                if (LocalBackup.hasFolderSelected(this)) {
+                    LocalBackup.setEnabled(this, true);
+                    Toast.makeText(this, R.string.local_backup_enabled_toast, Toast.LENGTH_SHORT).show();
+                } else {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    backupFolderLauncher.launch(intent);
+                }
+            } else {
+                LocalBackup.setEnabled(this, false);
+                Toast.makeText(this, R.string.local_backup_disabled_toast, Toast.LENGTH_SHORT).show();
+            }
+        });
+
         // Setup Theme RadioGroup
         android.widget.RadioGroup radioGroupTheme = findViewById(R.id.radio_group_theme);
         android.widget.RadioButton radioLight = findViewById(R.id.radio_theme_light);
@@ -133,6 +180,23 @@ public class SettingsActivity extends AppCompatActivity {
             }
             MyApplication.getInstance().setThemeMode(newMode);
         });
+    }
+
+    private void updateLastBackupText() {
+        long lastBackupTime = LocalBackup.getLastBackupTime(this);
+        if (lastBackupTime == 0) {
+            lastBackupTextView.setText(R.string.local_backup_never);
+        } else {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
+            lastBackupTextView.setText(
+                    getString(R.string.local_backup_last_format, sdf.format(new Date(lastBackupTime))));
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateLastBackupText();
     }
 
     private void startExport() {
@@ -167,19 +231,13 @@ public class SettingsActivity extends AppCompatActivity {
                     return;
                 }
 
-                String json = QuoteCodec.encodePretty(quotes);
+                QuoteExporter.writeToUri(this, uri, quotes);
 
-                OutputStream outputStream = getContentResolver().openOutputStream(uri);
-                if (outputStream != null) {
-                    outputStream.write(json.getBytes(StandardCharsets.UTF_8));
-                    outputStream.close();
-
-                    final int count = quotes.size();
-                    runOnUiThread(() ->
-                            Toast.makeText(this, count + " quotes exported", Toast.LENGTH_SHORT).show()
-                    );
-                    Log.d(TAG, "Successfully exported " + quotes.size() + " quotes");
-                }
+                final int count = quotes.size();
+                runOnUiThread(() ->
+                        Toast.makeText(this, count + " quotes exported", Toast.LENGTH_SHORT).show()
+                );
+                Log.d(TAG, "Successfully exported " + quotes.size() + " quotes");
             } catch (Exception e) {
                 Log.e(TAG, "Export failed", e);
                 runOnUiThread(() ->
