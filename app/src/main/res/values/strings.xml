@@ -45,4 +45,8 @@
     <string name="bg_permission_message">Please enable unrestricted background access so daily notifications are delivered reliably.</string>
     <string name="bg_permission_ok">OK</string>
     <string name="bg_permission_ignore">Ignore</string>
+
+    <!-- Daily quote notification -->
+    <string name="daily_quote_title">Daily Quote</string>
+    <string name="daily_quote_title_with_author">Daily Quote — %s</string>
 </resources>

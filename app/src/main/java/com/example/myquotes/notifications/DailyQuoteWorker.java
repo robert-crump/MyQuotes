@@ -4,6 +4,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -63,16 +64,18 @@ public class DailyQuoteWorker extends Worker {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         String quoteText = selectedQuote.getQuoteText();
-        if (quoteText.length() > 150) {
-            quoteText = quoteText.substring(0, 147) + "...";
-        }
+        String author = selectedQuote.getAuthor();
+
+        String title = TextUtils.isEmpty(author)
+                ? context.getString(R.string.daily_quote_title)
+                : context.getString(R.string.daily_quote_title_with_author, author);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, QuoteNotifications.CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_quotation_24dp)
-                .setContentTitle("Quote of the Day")
-                .setContentText(quoteText)
+                .setContentTitle(title)
+                .setContentText(QuoteTextUtils.truncate(quoteText, 150))
                 .setStyle(new NotificationCompat.BigTextStyle()
-                        .bigText(quoteText + "\n\n— " + selectedQuote.getAuthor()))
+                        .bigText(QuoteTextUtils.truncate(quoteText, 300)))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(openPendingIntent)
                 .setAutoCancel(true);

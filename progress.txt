@@ -58,3 +58,13 @@ Implemented:
 - CONTEXT.md: updated Quote Notifications description to drop the snooze reference
 
 Build and all unit tests passed. Issue #10 closed.
+
+2026-07-24 — Issue #11: Notification: Improve preview
+
+Implemented:
+- QuoteTextUtils.java (new, notifications package) — truncate(text, limit): if under limit, no-op; else cuts at the last sentence-ending punctuation (./!/?) within the limit, packing in as many complete sentences as fit; falls back to the last word boundary if no punctuation is found; falls back to a hard cut if no punctuation or space is found. Appends " (...)" whenever text is cut.
+- QuoteTextUtilsTest.java (new) — 6 unit tests: under-limit no-op, exact-limit no-op, single sentence cut, multi-sentence packing, word-boundary fallback, hard-cut fallback
+- DailyQuoteWorker.java: showQuoteNotification now truncates the collapsed preview to 150 chars and the expanded BigTextStyle body to 300 chars via QuoteTextUtils (both quote-text only, no author). Notification title is now "Daily Quote — {author}" (or "Daily Quote" if author is blank) instead of the static "Quote of the Day"; author line removed from the expanded body since the title now carries it.
+- strings.xml: added daily_quote_title and daily_quote_title_with_author string resources
+
+Build and all unit tests passed. Issue #11 closed.
