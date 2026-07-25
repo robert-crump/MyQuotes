@@ -109,3 +109,7 @@ Implemented:
 Note: this is auth plumbing only (per the issue) - no Drive reads/writes. The Credential Manager + Authorization API consent flow needs a real Google account and Play Services to exercise end-to-end; verified via compile + unit tests only, live sign-in flow needs manual on-device verification.
 
 Build and all unit tests passed. Issue #16 closed.
+
+On-device follow-up (same day): live testing surfaced two real bugs, both fixed and committed after #16 was closed.
+- SettingsActivity.java (8d72c91) — the failure/cancel paths called switchDriveBackup.setChecked(false) directly, which re-triggered the switch's own OnCheckedChangeListener and ran the disconnect branch, showing a misleading "Disconnected from Google Drive" toast instead of the real error. Fixed by detaching the listener while reverting the switch (new setDriveSwitchChecked helper + driveSwitchListener field).
+- Root cause of the actual auth failure (GetCredentialCustomException [28444] "Developer console is not set up correctly", diagnosed via adb logcat): local.properties' drive.oauth.client.id was the Android-type OAuth client from #14 (package name + SHA-1), but GetGoogleIdOption.setServerClientId() requires a Web application-type client instead. User created a Web client in Cloud Console and swapped it into local.properties (not committed - gitignored). Confirmed working end-to-end on device: account chooser -> consent -> "Connected as Robert".
