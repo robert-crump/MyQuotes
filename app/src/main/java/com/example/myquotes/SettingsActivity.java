@@ -1,19 +1,25 @@
 package com.example.myquotes;
 
+import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
+import com.example.myquotes.drive.DriveAuth;
 import com.example.myquotes.notifications.QuoteNotifications;
+import com.google.android.gms.common.api.ApiException;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.io.BufferedReader;
@@ -33,7 +39,13 @@ public class SettingsActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> exportLauncher;
     private ActivityResultLauncher<Intent> importLauncher;
     private ActivityResultLauncher<Intent> backupFolderLauncher;
+    private ActivityResultLauncher<IntentSenderRequest> driveAuthorizationLauncher;
     private android.widget.TextView lastBackupTextView;
+
+    private SwitchMaterial switchDriveBackup;
+    private TextView driveAccountTextView;
+    private Button btnDriveDisconnect;
+    private String pendingDriveEmail;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,6 +164,52 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        // Setup Google Drive Switch
+        switchDriveBackup = findViewById(R.id.switch_drive_backup);
+        driveAccountTextView = findViewById(R.id.text_drive_account);
+        btnDriveDisconnect = findViewById(R.id.btn_drive_disconnect);
+
+        driveAuthorizationLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartIntentSenderForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        try {
+                            DriveAuth.completeAuthorizationResult(this, result.getData());
+                            DriveAuth.markConnected(this, pendingDriveEmail);
+                            updateDriveConnectionUi();
+                            Toast.makeText(this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
+                        } catch (ApiException e) {
+                            Log.w(TAG, "Drive authorization consent failed", e);
+                            switchDriveBackup.setChecked(false);
+                            Toast.makeText(this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        switchDriveBackup.setChecked(false);
+                    }
+                    pendingDriveEmail = null;
+                }
+        );
+
+        switchDriveBackup.setChecked(DriveAuth.isEnabled(this));
+        updateDriveConnectionUi();
+
+        switchDriveBackup.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                startDriveConnect();
+            } else {
+                DriveAuth.disconnect(this);
+                updateDriveConnectionUi();
+                Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        btnDriveDisconnect.setOnClickListener(v -> {
+            DriveAuth.disconnect(this);
+            switchDriveBackup.setChecked(false);
+            updateDriveConnectionUi();
+            Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
+        });
+
         // Setup Theme RadioGroup
         android.widget.RadioGroup radioGroupTheme = findViewById(R.id.radio_group_theme);
         android.widget.RadioButton radioLight = findViewById(R.id.radio_theme_light);
@@ -197,6 +255,61 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateLastBackupText();
+    }
+
+    private void startDriveConnect() {
+        DriveAuth.signIn(this, new DriveAuth.AccountCallback() {
+            @Override
+            public void onSuccess(String accountEmail) {
+                pendingDriveEmail = accountEmail;
+                DriveAuth.authorizeDriveAccess(SettingsActivity.this, new DriveAuth.AuthorizationCallback() {
+                    @Override
+                    public void onGranted() {
+                        DriveAuth.markConnected(SettingsActivity.this, pendingDriveEmail);
+                        pendingDriveEmail = null;
+                        updateDriveConnectionUi();
+                        Toast.makeText(SettingsActivity.this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onResolutionRequired(PendingIntent pendingIntent) {
+                        IntentSender intentSender = pendingIntent.getIntentSender();
+                        driveAuthorizationLauncher.launch(new IntentSenderRequest.Builder(intentSender).build());
+                    }
+
+                    @Override
+                    public void onFailed(Exception e) {
+                        Log.w(TAG, "Drive authorization failed", e);
+                        pendingDriveEmail = null;
+                        switchDriveBackup.setChecked(false);
+                        Toast.makeText(SettingsActivity.this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+            @Override
+            public void onCancelled() {
+                switchDriveBackup.setChecked(false);
+            }
+
+            @Override
+            public void onFailed(Exception e) {
+                Log.w(TAG, "Google sign-in failed", e);
+                switchDriveBackup.setChecked(false);
+                Toast.makeText(SettingsActivity.this, R.string.drive_sign_in_failed_toast, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void updateDriveConnectionUi() {
+        String email = DriveAuth.getConnectedAccountEmail(this);
+        if (DriveAuth.isEnabled(this) && email != null) {
+            driveAccountTextView.setText(getString(R.string.drive_connected_as_format, email));
+            btnDriveDisconnect.setVisibility(android.view.View.VISIBLE);
+        } else {
+            driveAccountTextView.setText(R.string.drive_not_connected);
+            btnDriveDisconnect.setVisibility(android.view.View.GONE);
+        }
     }
 
     private void startExport() {

@@ -58,4 +58,13 @@
     <string name="local_backup_disabled_toast">Auto-backup disabled</string>
     <string name="local_backup_failed_title">Backup failed</string>
     <string name="local_backup_failed_message">Automatic backup to your local folder failed. Check Settings.</string>
+
+    <string name="switch_drive_backup">Auto-backup to Google Drive</string>
+    <string name="drive_not_connected">Not connected</string>
+    <string name="drive_connected_as_format">Connected as %s</string>
+    <string name="drive_disconnect">Disconnect</string>
+    <string name="drive_connected_toast">Connected to Google Drive</string>
+    <string name="drive_disconnected_toast">Disconnected from Google Drive</string>
+    <string name="drive_sign_in_failed_toast">Google sign-in failed</string>
+    <string name="drive_authorization_failed_toast">Google Drive authorization failed</string>
 </resources>

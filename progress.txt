@@ -95,3 +95,17 @@ Implemented:
 - BackupRetentionTest.java (new) — 6 unit tests: under cap, exactly at cap, one over cap, well over cap, 60-simulated-day convergence to exactly 9 (always the 9 most recent), short-history convergence to fewer than 9
 
 Build and all unit tests passed. Issue #15 closed.
+
+2026-07-25 — Issue #16: Google Drive sign-in & connection status
+
+Implemented:
+- app/build.gradle — added androidx.credentials:credentials:1.5.0, androidx.credentials:credentials-play-services-auth:1.5.0 (both resolve to 1.6.0-beta01 via a transitive constraint), com.google.android.libraries.identity.googleid:googleid:1.2.0, com.google.android.gms:play-services-auth:21.6.0
+- drive/DriveAuth.java (new) — facade (same pattern as LocalBackup/QuoteNotifications): enabled + connected-account-email SharedPreferences; signIn(Activity, AccountCallback) shows the Credential Manager account chooser (GetGoogleIdOption, filterByAuthorizedAccounts=false) and resolves the signed-in account's email from the returned GoogleIdTokenCredential; authorizeDriveAccess(Activity, AuthorizationCallback) requests the drive.file scope via the Authorization API (Identity.getAuthorizationClient) and reports either immediate grant or a consent PendingIntent; completeAuthorizationResult(Context, Intent) finalizes that consent from an ActivityResult; markConnected/disconnect persist or clear the enabled+account state, disconnect also calls CredentialManager.clearCredentialStateAsync
+- SettingsActivity.java — added a driveAuthorizationLauncher (ActivityResultContracts.StartIntentSenderForResult) for the consent UI; new Drive switch orchestrates signIn -> authorizeDriveAccess -> (launch consent UI if required) -> markConnected, reverting the switch to off on cancel/failure at any step; disconnect (switch-off or the new Disconnect button) clears state immediately with no crash
+- activity_settings.xml — new "Google Drive" card: switch_drive_backup switch, text_drive_account status line ("Not connected" / "Connected as {email}"), btn_drive_disconnect (hidden unless connected)
+- strings.xml — added switch/status/toast strings for the Drive card
+- CONTEXT.md — documented the new Google Drive auth subsystem
+
+Note: this is auth plumbing only (per the issue) - no Drive reads/writes. The Credential Manager + Authorization API consent flow needs a real Google account and Play Services to exercise end-to-end; verified via compile + unit tests only, live sign-in flow needs manual on-device verification.
+
+Build and all unit tests passed. Issue #16 closed.
