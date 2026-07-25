@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,6 +44,7 @@ public class SettingsActivity extends AppCompatActivity {
     private android.widget.TextView lastBackupTextView;
 
     private SwitchMaterial switchDriveBackup;
+    private CompoundButton.OnCheckedChangeListener driveSwitchListener;
     private TextView driveAccountTextView;
     private Button btnDriveDisconnect;
     private String pendingDriveEmail;
@@ -180,11 +182,11 @@ public class SettingsActivity extends AppCompatActivity {
                             Toast.makeText(this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
                         } catch (ApiException e) {
                             Log.w(TAG, "Drive authorization consent failed", e);
-                            switchDriveBackup.setChecked(false);
+                            setDriveSwitchChecked(false);
                             Toast.makeText(this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
                         }
                     } else {
-                        switchDriveBackup.setChecked(false);
+                        setDriveSwitchChecked(false);
                     }
                     pendingDriveEmail = null;
                 }
@@ -193,7 +195,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchDriveBackup.setChecked(DriveAuth.isEnabled(this));
         updateDriveConnectionUi();
 
-        switchDriveBackup.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        driveSwitchListener = (buttonView, isChecked) -> {
             if (isChecked) {
                 startDriveConnect();
             } else {
@@ -201,11 +203,12 @@ public class SettingsActivity extends AppCompatActivity {
                 updateDriveConnectionUi();
                 Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
             }
-        });
+        };
+        switchDriveBackup.setOnCheckedChangeListener(driveSwitchListener);
 
         btnDriveDisconnect.setOnClickListener(v -> {
             DriveAuth.disconnect(this);
-            switchDriveBackup.setChecked(false);
+            setDriveSwitchChecked(false);
             updateDriveConnectionUi();
             Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
         });
@@ -281,7 +284,7 @@ public class SettingsActivity extends AppCompatActivity {
                     public void onFailed(Exception e) {
                         Log.w(TAG, "Drive authorization failed", e);
                         pendingDriveEmail = null;
-                        switchDriveBackup.setChecked(false);
+                        setDriveSwitchChecked(false);
                         Toast.makeText(SettingsActivity.this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -289,16 +292,23 @@ public class SettingsActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled() {
-                switchDriveBackup.setChecked(false);
+                setDriveSwitchChecked(false);
             }
 
             @Override
             public void onFailed(Exception e) {
                 Log.w(TAG, "Google sign-in failed", e);
-                switchDriveBackup.setChecked(false);
+                setDriveSwitchChecked(false);
                 Toast.makeText(SettingsActivity.this, R.string.drive_sign_in_failed_toast, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** Sets the switch's checked state without re-triggering driveSwitchListener's connect/disconnect side effects. */
+    private void setDriveSwitchChecked(boolean checked) {
+        switchDriveBackup.setOnCheckedChangeListener(null);
+        switchDriveBackup.setChecked(checked);
+        switchDriveBackup.setOnCheckedChangeListener(driveSwitchListener);
     }
 
     private void updateDriveConnectionUi() {
