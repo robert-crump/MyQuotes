@@ -83,3 +83,15 @@ Implemented:
 - CONTEXT.md — documented the new Local Auto-backup subsystem
 
 Build and all unit tests passed. Issue #13 closed.
+
+2026-07-25 — Issue #15: Local backup tiered retention
+
+Implemented:
+- backup/BackupFilename.java (new) — forTimestamp(millis)/parseTimestamp(filename) pure helpers for the "yyMMdd-HHmm MyQuotes.json" naming convention (same pattern as manual export); parseTimestamp returns null for anything that doesn't match, so unrelated files in the backup folder are ignored during pruning
+- backup/BackupRetention.java (new) — pure, generic selectForDeletion(List<T>, Comparator<T>): once a destination holds more than TOTAL_COUNT (9 = 7 daily + 1 weekly + 1 monthly), returns everything past the 9 most recent for deletion. No dedicated weekly/monthly writes exist; those tiers are just whichever backups rank 8th/9th by recency, naturally refilled as older ones age out of the 7-slot daily window each run
+- backup/LocalBackupWorker.java — now writes each backup under a fresh BackupFilename.forTimestamp(now) instead of overwriting a fixed "MyQuotes-backup.json"; after a successful write, pruneOldBackups() lists the folder's DocumentFiles, keeps only ones matching the backup filename pattern, and deletes whatever BackupRetention.selectForDeletion flags
+- CONTEXT.md — updated the Local Auto-backup subsystem description to cover timestamped filenames and tiered retention
+- BackupFilenameTest.java (new) — 5 unit tests: format round-trip, self-parse, rejects unrelated/malformed filenames, rejects null
+- BackupRetentionTest.java (new) — 6 unit tests: under cap, exactly at cap, one over cap, well over cap, 60-simulated-day convergence to exactly 9 (always the 9 most recent), short-history convergence to fewer than 9
+
+Build and all unit tests passed. Issue #15 closed.

@@ -18,12 +18,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 // Must be public: WorkManager instantiates it via reflection.
 public class LocalBackupWorker extends Worker {
     private static final String TAG = "LocalBackupWorker";
-    private static final String BACKUP_FILENAME = "MyQuotes-backup.json";
 
     public LocalBackupWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -65,22 +68,43 @@ public class LocalBackupWorker extends Worker {
                 throw new IOException("Backup folder is not accessible");
             }
 
-            DocumentFile file = folder.findFile(BACKUP_FILENAME);
-            if (file == null) {
-                file = folder.createFile("application/json", BACKUP_FILENAME);
-            }
+            String filename = BackupFilename.forTimestamp(System.currentTimeMillis());
+            DocumentFile file = folder.createFile("application/json", filename);
             if (file == null) {
                 throw new IOException("Could not create backup file");
             }
 
             QuoteExporter.writeToUri(context, file.getUri(), quotes);
+            pruneOldBackups(folder);
             LocalBackup.recordSuccessfulBackup(context, hash);
-            Log.d(TAG, "Backup written: " + BACKUP_FILENAME);
+            Log.d(TAG, "Backup written: " + filename);
             return Result.success();
         } catch (Exception e) {
             Log.e(TAG, "Backup failed", e);
             LocalBackup.notifyBackupFailed(context);
             return Result.failure();
+        }
+    }
+
+    /** Enforces the 7-daily + 1-weekly + 1-monthly cap by deleting the oldest excess backups. */
+    private static void pruneOldBackups(DocumentFile folder) {
+        DocumentFile[] children = folder.listFiles();
+        if (children == null) return;
+
+        Map<DocumentFile, Long> timestamps = new HashMap<>();
+        List<DocumentFile> backups = new ArrayList<>();
+        for (DocumentFile child : children) {
+            Long timestamp = BackupFilename.parseTimestamp(child.getName());
+            if (timestamp != null) {
+                backups.add(child);
+                timestamps.put(child, timestamp);
+            }
+        }
+
+        List<DocumentFile> toDelete = BackupRetention.selectForDeletion(
+                backups, Comparator.comparingLong(timestamps::get));
+        for (DocumentFile file : toDelete) {
+            file.delete();
         }
     }
 
