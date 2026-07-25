@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 import com.example.myquotes.drive.DriveAuth;
+import com.example.myquotes.drive.DriveBackup;
 import com.example.myquotes.notifications.QuoteNotifications;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -46,6 +47,7 @@ public class SettingsActivity extends AppCompatActivity {
     private SwitchMaterial switchDriveBackup;
     private CompoundButton.OnCheckedChangeListener driveSwitchListener;
     private TextView driveAccountTextView;
+    private TextView driveLastBackupTextView;
     private Button btnDriveDisconnect;
     private String pendingDriveEmail;
 
@@ -169,7 +171,9 @@ public class SettingsActivity extends AppCompatActivity {
         // Setup Google Drive Switch
         switchDriveBackup = findViewById(R.id.switch_drive_backup);
         driveAccountTextView = findViewById(R.id.text_drive_account);
+        driveLastBackupTextView = findViewById(R.id.text_drive_last_backup);
         btnDriveDisconnect = findViewById(R.id.btn_drive_disconnect);
+        updateDriveLastBackupText();
 
         driveAuthorizationLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartIntentSenderForResult(),
@@ -178,6 +182,7 @@ public class SettingsActivity extends AppCompatActivity {
                         try {
                             DriveAuth.completeAuthorizationResult(this, result.getData());
                             DriveAuth.markConnected(this, pendingDriveEmail);
+                            DriveBackup.scheduleDailyBackup(this);
                             updateDriveConnectionUi();
                             Toast.makeText(this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
                         } catch (ApiException e) {
@@ -200,6 +205,7 @@ public class SettingsActivity extends AppCompatActivity {
                 startDriveConnect();
             } else {
                 DriveAuth.disconnect(this);
+                DriveBackup.cancelScheduledWork(this);
                 updateDriveConnectionUi();
                 Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
             }
@@ -208,6 +214,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         btnDriveDisconnect.setOnClickListener(v -> {
             DriveAuth.disconnect(this);
+            DriveBackup.cancelScheduledWork(this);
             setDriveSwitchChecked(false);
             updateDriveConnectionUi();
             Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
@@ -258,6 +265,18 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateLastBackupText();
+        updateDriveLastBackupText();
+    }
+
+    private void updateDriveLastBackupText() {
+        long lastBackupTime = DriveBackup.getLastBackupTime(this);
+        if (lastBackupTime == 0) {
+            driveLastBackupTextView.setText(R.string.drive_backup_never);
+        } else {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
+            driveLastBackupTextView.setText(
+                    getString(R.string.drive_backup_last_format, sdf.format(new Date(lastBackupTime))));
+        }
     }
 
     private void startDriveConnect() {
@@ -269,6 +288,7 @@ public class SettingsActivity extends AppCompatActivity {
                     @Override
                     public void onGranted() {
                         DriveAuth.markConnected(SettingsActivity.this, pendingDriveEmail);
+                        DriveBackup.scheduleDailyBackup(SettingsActivity.this);
                         pendingDriveEmail = null;
                         updateDriveConnectionUi();
                         Toast.makeText(SettingsActivity.this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();

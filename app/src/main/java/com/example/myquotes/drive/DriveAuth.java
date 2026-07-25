@@ -1,5 +1,6 @@
 package com.example.myquotes.drive;
 
+import android.accounts.Account;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -25,10 +26,12 @@ import com.google.android.gms.auth.api.identity.AuthorizationResult;
 import com.google.android.gms.auth.api.identity.Identity;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.Scope;
+import com.google.android.gms.tasks.Tasks;
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Public facade for Google Drive auth plumbing. All other modules talk to this class only; the
@@ -152,6 +155,31 @@ public final class DriveAuth {
     /** Finishes step 2 after the consent UI returns successfully. Throws if consent was denied. */
     public static AuthorizationResult completeAuthorizationResult(Context context, Intent data) throws ApiException {
         return Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data);
+    }
+
+    /**
+     * Silently re-authorizes the previously granted drive.file scope and returns a fresh access
+     * token, for use from a background WorkManager job where there's no UI to drive a consent
+     * flow. Throws if the grant is no longer valid (e.g. revoked) - the caller should surface
+     * that as a failure rather than attempt to resolve it, since resolving requires an Activity.
+     */
+    static String getAccessToken(Context context) throws Exception {
+        AuthorizationRequest.Builder requestBuilder = AuthorizationRequest.builder()
+                .setRequestedScopes(Collections.singletonList(new Scope(DRIVE_FILE_SCOPE)));
+
+        String email = getConnectedAccountEmail(context);
+        if (email != null) {
+            requestBuilder.setAccount(new Account(email, "com.google"));
+        }
+
+        AuthorizationResult result = Tasks.await(
+                Identity.getAuthorizationClient(context).authorize(requestBuilder.build()),
+                30, TimeUnit.SECONDS);
+
+        if (result.hasResolution()) {
+            throw new IllegalStateException("Drive access needs to be reconnected in Settings");
+        }
+        return result.getAccessToken();
     }
 
     /** Persists the connected account and turns the feature on. Call once authorization succeeds. */

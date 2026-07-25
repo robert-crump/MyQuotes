@@ -300,6 +300,15 @@
                         android:text="@string/drive_not_connected"
                         android:textSize="12sp"
                         android:textColor="?android:attr/textColorSecondary"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/text_drive_last_backup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/drive_backup_never"
+                        android:textSize="12sp"
+                        android:textColor="?android:attr/textColorSecondary"
                         android:layout_marginBottom="12dp" />
 
                     <Button

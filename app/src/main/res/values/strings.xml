@@ -67,4 +67,10 @@
     <string name="drive_disconnected_toast">Disconnected from Google Drive</string>
     <string name="drive_sign_in_failed_toast">Google sign-in failed</string>
     <string name="drive_authorization_failed_toast">Google Drive authorization failed</string>
+
+    <!-- Drive auto-backup -->
+    <string name="drive_backup_never">Last Drive backup: Never</string>
+    <string name="drive_backup_last_format">Last Drive backup: %s</string>
+    <string name="drive_backup_failed_title">Drive backup failed</string>
+    <string name="drive_backup_failed_message">Automatic backup to Google Drive failed. Check Settings.</string>
 </resources>

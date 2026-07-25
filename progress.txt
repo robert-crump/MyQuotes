@@ -1,14 +1,19 @@
-2026-05-23 — Issue #3: Add QuoteCodec module and migrate QuotePreferences to use it
+2026-07-25 — Issue #17: Google Drive daily auto-backup with tiered retention
 
 Implemented:
-- QuoteCodecException.java — checked exception for top-level parse failures
-- QuoteCodec.java — encode/encodePretty/decode with v1 envelope; legacy bare-array decode
-- QuotePreferences.java — saveQuotes/loadQuotes now delegate to QuoteCodec
-- app/build.gradle — added testImplementation 'org.json:json:20231013' and testOptions.returnDefaultValues true
-- gradle-wrapper.properties — upgraded Gradle 8.13 → 9.0 (Java 25 support)
-- QuoteCodecTest.java — 7 unit tests: roundtrip, envelope shape, legacy array, malformed JSON, missing id skip, empty list, encodePretty indent
+- backup/BackupFilename.java, backup/BackupRetention.java — widened from package-private to public so the Drive destination (different package) can reuse the same timestamped-filename convention and 9-file retention logic established for local backups in #15; no behavior change
+- drive/DriveRestClient.java (new) — hand-rolled HttpURLConnection client for the handful of Drive REST API v3 calls needed (find-or-create folder by name/mimeType query, multipart upload, list files in a folder, delete); avoids pulling in the full google-api-client stack for this small a surface. All calls authenticate via a passed-in bearer access token
+- drive/DriveAuth.java — added package-private getAccessToken(Context): re-runs the Authorization API's authorize() for the drive.file scope with no UI (Tasks.await, 30s timeout), scoped to the connected account via android.accounts.Account; since consent was already granted interactively in #16, Play services returns a fresh token with hasResolution()=false. Throws if resolution is required again (e.g. consent revoked), which the worker surfaces as a failure rather than trying to resolve without an Activity
+- drive/DriveBackup.java (new) — facade (same pattern as LocalBackup): owns WorkManager scheduling (24h periodic, Constraints.NetworkType.CONNECTED so it runs on any network, not Wi-Fi only), the drive_backup_failure_channel notification channel, and last-backup-time/hash SharedPreferences. scheduleDailyBackup/cancelScheduledWork are called by SettingsActivity right alongside DriveAuth.markConnected/disconnect (Drive backup piggybacks on the existing connect toggle from #16 rather than adding a second switch); initialize() re-schedules on app start if already connected
+- drive/DriveBackupWorker.java (new) — Worker: loads quotes from QuotePreferences (same race-avoidance as LocalBackupWorker), skips if DriveAuth isn't connected or the SHA-256 hash of the encoded quotes matches the last successful Drive backup, mints an access token, finds-or-creates a single app-owned "MyQuotes Backups" folder under My Drive, uploads a timestamped file (BackupFilename), then prunes the folder via BackupRetention against the folder's file listing. Any failure (auth revoked, network, API error) posts a notification and returns Result.failure() without touching the local backup job's state
+- SettingsActivity.java — added text_drive_last_backup status line + updateDriveLastBackupText(), refreshed in onCreate/onResume like the local backup text; wired DriveBackup.scheduleDailyBackup/cancelScheduledWork into the three connect/disconnect paths (consent-UI success, immediate-grant success, switch-off, disconnect button)
+- activity_settings.xml — added text_drive_last_backup under the Drive card's account status line
+- MyApplication.java — calls DriveBackup.initialize(this) alongside LocalBackup.initialize(this)
+- AndroidManifest.xml — added INTERNET permission (Drive REST calls are the app's first outbound network traffic; ACCESS_NETWORK_STATE for the WorkManager network constraint already came in transitively via work-runtime)
+- strings.xml — added drive_backup_never/last_format/failed_title/failed_message
+- CONTEXT.md — documented the new Google Drive auto-backup subsystem and updated the Google Drive auth entry to mention getAccessToken
 
-All 7 tests passed. Issue #3 closed.
+Build and all unit tests passed. Issue #17 closed.
 
 2026-05-23 — Issues #4 and #5: Migrate SettingsActivity export/import to QuoteCodec
 

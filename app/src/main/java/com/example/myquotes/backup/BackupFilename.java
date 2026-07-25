@@ -7,15 +7,16 @@ import java.util.Locale;
 
 /**
  * Generates and parses the timestamped filenames used for auto-backup files, matching the
- * manual-export naming convention ("yyMMdd-HHmm MyQuotes.json").
+ * manual-export naming convention ("yyMMdd-HHmm MyQuotes.json"). Shared across backup
+ * destinations (local folder, Google Drive).
  */
-final class BackupFilename {
+public final class BackupFilename {
     private static final String PATTERN = "yyMMdd-HHmm";
     private static final String SUFFIX = " MyQuotes.json";
 
     private BackupFilename() {}
 
-    static String forTimestamp(long epochMillis) {
+    public static String forTimestamp(long epochMillis) {
         return format().format(new Date(epochMillis)) + SUFFIX;
     }
 
@@ -23,7 +24,7 @@ final class BackupFilename {
      * Returns the backup's timestamp in millis, or null if {@code filename} doesn't match the
      * expected pattern (e.g. an unrelated file sitting in the backup folder).
      */
-    static Long parseTimestamp(String filename) {
+    public static Long parseTimestamp(String filename) {
         if (filename == null || !filename.endsWith(SUFFIX)) return null;
 
         String prefix = filename.substring(0, filename.length() - SUFFIX.length());
