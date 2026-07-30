@@ -52,8 +52,8 @@
 
     <!-- Local auto-backup -->
     <string name="switch_local_backup">Auto-backup to local folder</string>
-    <string name="local_backup_never">Last backup: Never</string>
-    <string name="local_backup_last_format">Last backup: %s</string>
+    <string name="local_backup_never">Last change backed up: Never</string>
+    <string name="local_backup_last_format">Last change backed up: %s</string>
     <string name="local_backup_enabled_toast">Auto-backup enabled</string>
     <string name="local_backup_disabled_toast">Auto-backup disabled</string>
     <string name="local_backup_failed_title">Backup failed</string>
@@ -69,8 +69,8 @@
     <string name="drive_authorization_failed_toast">Google Drive authorization failed</string>
 
     <!-- Drive auto-backup -->
-    <string name="drive_backup_never">Last Drive backup: Never</string>
-    <string name="drive_backup_last_format">Last Drive backup: %s</string>
+    <string name="drive_backup_never">Last change backed up to Drive: Never</string>
+    <string name="drive_backup_last_format">Last change backed up to Drive: %s</string>
     <string name="drive_backup_failed_title">Drive backup failed</string>
     <string name="drive_backup_failed_message">Automatic backup to Google Drive failed. Check Settings.</string>
 </resources>

@@ -118,3 +118,17 @@ Build and all unit tests passed. Issue #16 closed.
 On-device follow-up (same day): live testing surfaced two real bugs, both fixed and committed after #16 was closed.
 - SettingsActivity.java (8d72c91) — the failure/cancel paths called switchDriveBackup.setChecked(false) directly, which re-triggered the switch's own OnCheckedChangeListener and ran the disconnect branch, showing a misleading "Disconnected from Google Drive" toast instead of the real error. Fixed by detaching the listener while reverting the switch (new setDriveSwitchChecked helper + driveSwitchListener field).
 - Root cause of the actual auth failure (GetCredentialCustomException [28444] "Developer console is not set up correctly", diagnosed via adb logcat): local.properties' drive.oauth.client.id was the Android-type OAuth client from #14 (package name + SHA-1), but GetGoogleIdOption.setServerClientId() requires a Web application-type client instead. User created a Web client in Cloud Console and swapped it into local.properties (not committed - gitignored). Confirmed working end-to-end on device: account chooser -> consent -> "Connected as Robert".
+
+2026-07-30 — Issue #18: Google Drive backup "not working" (Settings timestamp looked stale)
+
+Diagnosed via adb: dumpsys jobscheduler confirmed the drive_daily_backup periodic WorkManager job was correctly scheduled with CONNECTIVITY satisfied (only TIMING_DELAY pending, i.e. just waiting for its next window) — no LocalBackupWorker job existed since local auto-backup was off, so no cross-check was available there. Since the periodic job couldn't be force-run via `adb shell cmd jobscheduler run` on this device (job id from dumpsys wasn't accepted), added a temporary debug "Backup now" button to Settings that enqueues a OneTimeWorkRequest for DriveBackupWorker directly, to observe a run on demand via logcat.
+
+First tap: logcat showed "No changes since last Drive backup, skipping" / Worker result SUCCESS — confirmed DriveBackupWorker.doWork()'s hash-skip path (shared with LocalBackupWorker) was firing exactly as designed: unchanged quote content since the last successful upload means recordSuccessfulBackup() never runs, so the "Last backup" timestamp doesn't advance even though the job is running successfully every day. Second tap, after adding a quote in the app: logcat showed "Drive backup written: 260730-1523 MyQuotes.json" — confirmed the full auth -> hash -> upload -> retention path works end-to-end.
+
+Root cause was not a code bug in the backup pipeline; it was a UX gap in the Settings label ("Last backup: ..." reads as "last time the job ran" but actually means "last time content changed AND got uploaded"), which is indistinguishable at a glance from "job never ran" or "job silently failing." No fix needed for the failure case since no failure occurred — the label just needed clearer wording.
+
+Implemented:
+- strings.xml — reworded local_backup_never/local_backup_last_format from "Last backup: ..." to "Last change backed up: ..." and drive_backup_never/drive_backup_last_format from "Last Drive backup: ..." to "Last change backed up to Drive: ..." (both share the identical hash-skip semantics, so both got the reword)
+- Temporary debug button and its wiring in activity_settings.xml / SettingsActivity.java were removed after diagnosis was confirmed; not part of the final diff
+
+Build and all unit tests passed. Issue #18 closed.
