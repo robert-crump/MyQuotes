@@ -50,6 +50,7 @@
         <!-- Status bar -->
         <item name="android:statusBarColor">@color/purple_primary_variant</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="statusBarScrimColor">@color/purple_primary_variant</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/dark_background</item>

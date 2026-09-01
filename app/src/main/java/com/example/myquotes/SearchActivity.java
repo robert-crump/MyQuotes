@@ -54,7 +54,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         setContentView(R.layout.activity_search);
 
         Toolbar toolbar = findViewById(R.id.toolbar);
-        EdgeToEdgeUtils.apply(this, toolbar);
+        EdgeToEdgeUtils.apply(this, findViewById(R.id.status_bar_scrim));
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Search");

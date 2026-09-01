@@ -58,7 +58,7 @@ public class AddEditActivity extends AppCompatActivity {
 
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar);
-        EdgeToEdgeUtils.apply(this, toolbar);
+        EdgeToEdgeUtils.apply(this, findViewById(R.id.status_bar_scrim));
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
     }

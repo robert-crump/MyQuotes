@@ -43,7 +43,7 @@ public class CategoriesActivity extends AppCompatActivity {
 
         binding = ActivityCategoriesBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeUtils.apply(this, binding.toolbar);
+        EdgeToEdgeUtils.apply(this, binding.statusBarScrim);
 
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {

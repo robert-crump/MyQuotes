@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeUtils.apply(this, binding.toolbar);
+        EdgeToEdgeUtils.apply(this, binding.statusBarScrim);
 
         searchActivityLauncher = registerForActivityResult(
                 new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),

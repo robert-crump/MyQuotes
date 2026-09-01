@@ -28,7 +28,7 @@ public class FavoritesActivity extends AppCompatActivity {
 
         binding = ActivityFavoritesBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeUtils.apply(this, binding.toolbar);
+        EdgeToEdgeUtils.apply(this, binding.statusBarScrim);
 
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {

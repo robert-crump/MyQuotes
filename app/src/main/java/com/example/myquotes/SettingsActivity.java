@@ -57,7 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         binding = ActivitySettingsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeUtils.apply(this, binding.toolbar);
+        EdgeToEdgeUtils.apply(this, binding.statusBarScrim);
 
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {

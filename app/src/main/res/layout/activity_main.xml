@@ -13,13 +13,20 @@
         android:background="?android:attr/colorBackground"
         android:orientation="vertical">
 
+        <!-- Status bar scrim: sized to the status bar inset height at runtime -->
+        <View
+            android:id="@+id/status_bar_scrim"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_alignParentTop="true"
+            android:background="?attr/statusBarScrimColor" />
+
         <!-- Toolbar at top -->
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="?attr/actionBarSize"
-            android:layout_alignParentTop="true"
+            android:layout_height="?attr/actionBarSize"
+            android:layout_below="@id/status_bar_scrim"
             android:background="?attr/colorPrimary"
             android:elevation="4dp"
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
