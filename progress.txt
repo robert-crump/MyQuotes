@@ -1,3 +1,16 @@
+2026-09-01 — Issue #20: Status bar shows white instead of themed pink (targetSdk 35 edge-to-edge)
+
+Surfaced during on-device verification of #19, but not caused by it — root cause traced back to the `5f88eb5` MD3 migration commit. `app/build.gradle` sets targetSdk 35 (Android 15), and starting on API 35 the platform enforces edge-to-edge and ignores android:statusBarColor/navigationBarColor entirely. themes.xml still set statusBarColor to pink_primary_dark, and every activity layout had android:fitsSystemWindows="true" (added in 5f88eb5), which only pads content down below the status bar rather than painting anything behind it — so with the color attribute ignored, the status bar area went transparent and showed the plain white android:colorBackground behind it instead of pink.
+
+Implemented:
+- EdgeToEdgeUtils.java (new) — static apply(Activity, View toolbar) helper: calls WindowCompat.setDecorFitsSystemWindows(window, false), then attaches OnApplyWindowInsetsListener to the toolbar (grows its top padding by the status bar inset so its colorPrimary background paints behind the transparent status bar while title/icons stay clear of it) and to the activity's content root, found via ((ViewGroup) findViewById(android.R.id.content)).getChildAt(0) (pads left/right/bottom by the system bar insets so nothing sits under the nav bar or a side cutout; top padding is left alone since the toolbar already accounts for it).
+- Removed android:fitsSystemWindows="true" from all 7 activity root layouts (activity_main, activity_add_edit_quote, activity_categories, activity_favorites, activity_settings, activity_statistics, activity_search) — superseded by the insets listeners.
+- Called EdgeToEdgeUtils.apply(this, toolbar) right after setContentView/toolbar lookup in all 7 activities (MainActivity, SettingsActivity, CategoriesActivity, FavoritesActivity, AddEditActivity, StatisticsActivity, SearchActivity).
+
+On-device follow-up (same session, before #20 was pushed): the fix above caused a second regression — every Toolbar had a fixed android:layout_height="?attr/actionBarSize" (~56dp), so growing its top padding by the status bar inset ate into that fixed height instead of adding to it, squeezing the title/overflow-menu into whatever was left (overflow icon became invisible, content looked shoved up). Fixed by changing all 7 Toolbars from android:layout_height="?attr/actionBarSize" to android:layout_height="wrap_content" + android:minHeight="?attr/actionBarSize", so the inset padding grows the toolbar's total height instead of compressing its content area (the standard pattern for an edge-to-edge app bar). Folded into the same commit/entry since #20 hadn't been pushed yet.
+
+Build and all unit tests passed. On-device verification deferred to the user per their request. Issue #20 closed.
+
 2026-09-01 — Issue #19: Replace custom border-drawable tags with real Material3 Chip components
 
 Implemented:
@@ -55,15 +68,3 @@ Build and all unit tests passed. Issue #16 closed.
 On-device follow-up (same day): live testing surfaced two real bugs, both fixed and committed after #16 was closed.
 - SettingsActivity.java (8d72c91) — the failure/cancel paths called switchDriveBackup.setChecked(false) directly, which re-triggered the switch's own OnCheckedChangeListener and ran the disconnect branch, showing a misleading "Disconnected from Google Drive" toast instead of the real error. Fixed by detaching the listener while reverting the switch (new setDriveSwitchChecked helper + driveSwitchListener field).
 - Root cause of the actual auth failure (GetCredentialCustomException [28444] "Developer console is not set up correctly", diagnosed via adb logcat): local.properties' drive.oauth.client.id was the Android-type OAuth client from #14 (package name + SHA-1), but GetGoogleIdOption.setServerClientId() requires a Web application-type client instead. User created a Web client in Cloud Console and swapped it into local.properties (not committed - gitignored). Confirmed working end-to-end on device: account chooser -> consent -> "Connected as Robert".
-
-2026-07-25 — Issue #15: Local backup tiered retention
-
-Implemented:
-- backup/BackupFilename.java (new) — forTimestamp(millis)/parseTimestamp(filename) pure helpers for the "yyMMdd-HHmm MyQuotes.json" naming convention (same pattern as manual export); parseTimestamp returns null for anything that doesn't match, so unrelated files in the backup folder are ignored during pruning
-- backup/BackupRetention.java (new) — pure, generic selectForDeletion(List<T>, Comparator<T>): once a destination holds more than TOTAL_COUNT (9 = 7 daily + 1 weekly + 1 monthly), returns everything past the 9 most recent for deletion. No dedicated weekly/monthly writes exist; those tiers are just whichever backups rank 8th/9th by recency, naturally refilled as older ones age out of the 7-slot daily window each run
-- backup/LocalBackupWorker.java — now writes each backup under a fresh BackupFilename.forTimestamp(now) instead of overwriting a fixed "MyQuotes-backup.json"; after a successful write, pruneOldBackups() lists the folder's DocumentFiles, keeps only ones matching the backup filename pattern, and deletes whatever BackupRetention.selectForDeletion flags
-- CONTEXT.md — updated the Local Auto-backup subsystem description to cover timestamped filenames and tiered retention
-- BackupFilenameTest.java (new) — 5 unit tests: format round-trip, self-parse, rejects unrelated/malformed filenames, rejects null
-- BackupRetentionTest.java (new) — 6 unit tests: under cap, exactly at cap, one over cap, well over cap, 60-simulated-day convergence to exactly 9 (always the 9 most recent), short-history convergence to fewer than 9
-
-Build and all unit tests passed. Issue #15 closed.
