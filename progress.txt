@@ -1,3 +1,26 @@
+2026-09-01 — Issue #19: Replace custom border-drawable tags with real Material3 Chip components
+
+Implemented:
+- item_quote_page.xml — text_author, text_source, text_category converted from plain TextViews with android:background="@drawable/border_*" to com.google.android.material.chip.Chip (style="@style/Widget.Material3.Chip.Assist"), android:checkable="false" so a tap can't toggle a checked visual state. text_author keeps its filled look via app:chipBackgroundColor="?attr/colorPrimaryContainer" + app:chipStrokeWidth="0dp" (was border_author's solid colorPrimaryContainer fill); text_source/text_category keep their outlined look via app:chipBackgroundColor="transparent" + app:chipStrokeColor="?attr/colorOutlineVariant" + app:chipStrokeWidth="1dp" (was border_source's transparent+stroke). android:ellipsize="end" added since Chip doesn't truncate long text by default the way the old TextViews visually just got cut off.
+- QuotePagerAdapter.java — textAuthor/textSource/textCategory fields retyped from TextView to com.google.android.material.chip.Chip; setText/setVisibility/setOnClickListener calls unchanged since Chip is TextView-compatible for all of these. Click-to-filter behavior (onAuthorClick/onSourceClick/onCategoryClick) unaffected since checkable=false means only the wired click listener fires, no separate checked-state toggle.
+- Deleted border_author.xml, border_source.xml (both now unreferenced), border_category.xml and chip_background_deselected.xml (confirmed dead code — zero references anywhere in the codebase before this change too, chip_background_deselected.xml still referenced the pre-MD3 @color/purple_primary).
+
+Build and all unit tests passed. On-device verification of the click-to-filter behavior deferred to the user per their request. Issue #19 closed.
+
+2026-07-30 — Issue #18: Google Drive backup "not working" (Settings timestamp looked stale)
+
+Diagnosed via adb: dumpsys jobscheduler confirmed the drive_daily_backup periodic WorkManager job was correctly scheduled with CONNECTIVITY satisfied (only TIMING_DELAY pending, i.e. just waiting for its next window) — no LocalBackupWorker job existed since local auto-backup was off, so no cross-check was available there. Since the periodic job couldn't be force-run via `adb shell cmd jobscheduler run` on this device (job id from dumpsys wasn't accepted), added a temporary debug "Backup now" button to Settings that enqueues a OneTimeWorkRequest for DriveBackupWorker directly, to observe a run on demand via logcat.
+
+First tap: logcat showed "No changes since last Drive backup, skipping" / Worker result SUCCESS — confirmed DriveBackupWorker.doWork()'s hash-skip path (shared with LocalBackupWorker) was firing exactly as designed: unchanged quote content since the last successful upload means recordSuccessfulBackup() never runs, so the "Last backup" timestamp doesn't advance even though the job is running successfully every day. Second tap, after adding a quote in the app: logcat showed "Drive backup written: 260730-1523 MyQuotes.json" — confirmed the full auth -> hash -> upload -> retention path works end-to-end.
+
+Root cause was not a code bug in the backup pipeline; it was a UX gap in the Settings label ("Last backup: ..." reads as "last time the job ran" but actually means "last time content changed AND got uploaded"), which is indistinguishable at a glance from "job never ran" or "job silently failing." No fix needed for the failure case since no failure occurred — the label just needed clearer wording.
+
+Implemented:
+- strings.xml — reworded local_backup_never/local_backup_last_format from "Last backup: ..." to "Last change backed up: ..." and drive_backup_never/drive_backup_last_format from "Last Drive backup: ..." to "Last change backed up to Drive: ..." (both share the identical hash-skip semantics, so both got the reword)
+- Temporary debug button and its wiring in activity_settings.xml / SettingsActivity.java were removed after diagnosis was confirmed; not part of the final diff
+
+Build and all unit tests passed. Issue #18 closed.
+
 2026-07-25 — Issue #17: Google Drive daily auto-backup with tiered retention
 
 Implemented:
@@ -14,92 +37,6 @@ Implemented:
 - CONTEXT.md — documented the new Google Drive auto-backup subsystem and updated the Google Drive auth entry to mention getAccessToken
 
 Build and all unit tests passed. Issue #17 closed.
-
-2026-05-23 — Issues #4 and #5: Migrate SettingsActivity export/import to QuoteCodec
-
-Implemented:
-- exportQuotesToJson: replaced inline JSONArray/JSONObject build with QuoteCodec.encodePretty(quotes)
-- importQuotesFromJson: replaced inline JSONArray/JSONObject parsing with QuoteCodec.decode(json); upsert-by-id merge loop unchanged
-- Catch block: QuoteCodecException → "Invalid JSON format"; other Exception → "Import failed: $msg"
-- Removed org.json imports (JSONArray, JSONException, JSONObject) from SettingsActivity
-
-Build and all unit tests passed. Issues #4 and #5 closed.
-
-2026-06-04 — Issue #1: Author name field capitalizes every word
-
-Implemented:
-- activity_add_edit_quote.xml: changed android:inputType on edit_text_author from textCapSentences to textCapWords
-
-Issue #1 closed.
-
-2026-06-04 — Issue #7: Stay in AddEditQuote activity after saving new quote
-
-Implemented:
-- AddEditActivity.java: in add mode, saveButtonOnClick now calls clearForm() instead of finish()
-- Added clearForm(): clears all four fields and returns focus to the author field
-- Edit mode behavior unchanged: still calls finish() after saving
-
-Issue #7 closed.
-
-2026-06-04 — Issue #2: Add quote: Auto-suggest author and source
-
-Implemented:
-- SourceSuggestions.java — value object with authorSources/otherSources lists and hasSplit()
-- SuggestionProvider.java — pure Java filtering/ranking; authors ranked by tier (exact→prefix→contains) with quote-count tiebreak; sources sorted alphabetically within each section
-- SuggestionAdapter.java — BaseAdapter for ListPopupWindow with TYPE_ITEM/TYPE_DIVIDER view types; divider rows non-selectable
-- res/layout/item_suggestion.xml — 48dp suggestion row with selectableItemBackground
-- res/layout/item_suggestion_divider.xml — 1dp listDivider separator
-- AddEditActivity.java — wired TextWatchers (2-char threshold) on author and source fields; author popup auto-advances focus to source on selection; source popup reads author field live for context; popup height capped at 4 visible items; both popups dismissed on clearForm()
-
-Build passed. Issue #2 closed.
-
-2026-06-12 — Issue #10: Daily notification: Remove snooze functionality
-
-Implemented:
-- QuoteNotifications.java: removed snooze(), WORK_NAME_SNOOZE, ACTION_SNOOZE; cancelScheduledWork no longer cancels snooze work; AlarmManager migration no longer cancels the old snooze PendingIntent
-- QuoteNotificationReceiver.java: removed ACTION_SNOOZE handling, now only handles BOOT_COMPLETED re-schedule
-- DailyQuoteWorker.java: removed snooze notification action button and the specific-quote-id branch (always picks a random quote now)
-- AndroidManifest.xml: removed SNOOZE_NOTIFICATION intent-filter action from the receiver
-- CONTEXT.md: updated Quote Notifications description to drop the snooze reference
-
-Build and all unit tests passed. Issue #10 closed.
-
-2026-07-24 — Issue #11: Notification: Improve preview
-
-Implemented:
-- QuoteTextUtils.java (new, notifications package) — truncate(text, limit): if under limit, no-op; else cuts at the last sentence-ending punctuation (./!/?) within the limit, packing in as many complete sentences as fit; falls back to the last word boundary if no punctuation is found; falls back to a hard cut if no punctuation or space is found. Appends " (...)" whenever text is cut.
-- QuoteTextUtilsTest.java (new) — 6 unit tests: under-limit no-op, exact-limit no-op, single sentence cut, multi-sentence packing, word-boundary fallback, hard-cut fallback
-- DailyQuoteWorker.java: showQuoteNotification now truncates the collapsed preview to 150 chars and the expanded BigTextStyle body to 300 chars via QuoteTextUtils (both quote-text only, no author). Notification title is now "Daily Quote — {author}" (or "Daily Quote" if author is blank) instead of the static "Quote of the Day"; author line removed from the expanded body since the title now carries it.
-- strings.xml: added daily_quote_title and daily_quote_title_with_author string resources
-
-Build and all unit tests passed. Issue #11 closed.
-
-2026-07-24 — Issue #13: Local daily auto-backup
-
-Implemented:
-- QuoteExporter.java (new) — extracted the encode+write-to-Uri logic out of SettingsActivity.exportQuotesToJson into a static writeToUri(Context, Uri, List<Quote>) helper, opened with mode "wt" so overwrites truncate correctly on SAF providers; SettingsActivity's manual export now calls this too, so there's a single write path shared by manual export and auto-backup
-- backup/LocalBackup.java (new) — facade (same pattern as QuoteNotifications): enabled flag, persisted backup-folder Uri (via takePersistableUriPermission), last-backup-time/last-backup-hash SharedPreferences, WorkManager daily scheduling (enqueueUniquePeriodicWork, 24h, UPDATE policy), a dedicated "backup_failure_channel" notification channel, and notifyBackupFailed()
-- backup/LocalBackupWorker.java (new) — Worker: loads quotes from QuotePreferences (not QuoteCollection, same race-avoidance as DailyQuoteWorker), SHA-256-hashes the encoded quotes and skips the write if unchanged since last successful backup, resolves the folder via DocumentFile.fromTreeUri, finds-or-creates a fixed-name "MyQuotes-backup.json" (overwritten in place — timestamped rotation is #15's job), writes via QuoteExporter, records success (time+hash) or posts a failure notification and returns Result.failure()
-- MyApplication.java — calls LocalBackup.initialize(this) alongside QuoteNotifications.initialize(this)
-- activity_settings.xml — added "Auto-backup to local folder" switch + "Last backup: ..." text under the Database card
-- SettingsActivity.java — wired the switch: first enable launches ACTION_OPEN_DOCUMENT_TREE (with persistable read/write flags) via a new ActivityResultLauncher; on pick, persists the folder + enables; subsequent enables (folder already chosen) skip the picker; disable cancels the job but keeps the folder permission; declining the picker reverts the switch with no crash; onResume() refreshes the last-backup text so it reflects backups that ran while Settings wasn't open
-- strings.xml — added switch/toast/notification strings for the new feature
-- build.gradle — added androidx.documentfile:documentfile:1.0.1 (needed for DocumentFile-based folder writes)
-- CONTEXT.md — documented the new Local Auto-backup subsystem
-
-Build and all unit tests passed. Issue #13 closed.
-
-2026-07-25 — Issue #15: Local backup tiered retention
-
-Implemented:
-- backup/BackupFilename.java (new) — forTimestamp(millis)/parseTimestamp(filename) pure helpers for the "yyMMdd-HHmm MyQuotes.json" naming convention (same pattern as manual export); parseTimestamp returns null for anything that doesn't match, so unrelated files in the backup folder are ignored during pruning
-- backup/BackupRetention.java (new) — pure, generic selectForDeletion(List<T>, Comparator<T>): once a destination holds more than TOTAL_COUNT (9 = 7 daily + 1 weekly + 1 monthly), returns everything past the 9 most recent for deletion. No dedicated weekly/monthly writes exist; those tiers are just whichever backups rank 8th/9th by recency, naturally refilled as older ones age out of the 7-slot daily window each run
-- backup/LocalBackupWorker.java — now writes each backup under a fresh BackupFilename.forTimestamp(now) instead of overwriting a fixed "MyQuotes-backup.json"; after a successful write, pruneOldBackups() lists the folder's DocumentFiles, keeps only ones matching the backup filename pattern, and deletes whatever BackupRetention.selectForDeletion flags
-- CONTEXT.md — updated the Local Auto-backup subsystem description to cover timestamped filenames and tiered retention
-- BackupFilenameTest.java (new) — 5 unit tests: format round-trip, self-parse, rejects unrelated/malformed filenames, rejects null
-- BackupRetentionTest.java (new) — 6 unit tests: under cap, exactly at cap, one over cap, well over cap, 60-simulated-day convergence to exactly 9 (always the 9 most recent), short-history convergence to fewer than 9
-
-Build and all unit tests passed. Issue #15 closed.
 
 2026-07-25 — Issue #16: Google Drive sign-in & connection status
 
@@ -119,16 +56,14 @@ On-device follow-up (same day): live testing surfaced two real bugs, both fixed 
 - SettingsActivity.java (8d72c91) — the failure/cancel paths called switchDriveBackup.setChecked(false) directly, which re-triggered the switch's own OnCheckedChangeListener and ran the disconnect branch, showing a misleading "Disconnected from Google Drive" toast instead of the real error. Fixed by detaching the listener while reverting the switch (new setDriveSwitchChecked helper + driveSwitchListener field).
 - Root cause of the actual auth failure (GetCredentialCustomException [28444] "Developer console is not set up correctly", diagnosed via adb logcat): local.properties' drive.oauth.client.id was the Android-type OAuth client from #14 (package name + SHA-1), but GetGoogleIdOption.setServerClientId() requires a Web application-type client instead. User created a Web client in Cloud Console and swapped it into local.properties (not committed - gitignored). Confirmed working end-to-end on device: account chooser -> consent -> "Connected as Robert".
 
-2026-07-30 — Issue #18: Google Drive backup "not working" (Settings timestamp looked stale)
-
-Diagnosed via adb: dumpsys jobscheduler confirmed the drive_daily_backup periodic WorkManager job was correctly scheduled with CONNECTIVITY satisfied (only TIMING_DELAY pending, i.e. just waiting for its next window) — no LocalBackupWorker job existed since local auto-backup was off, so no cross-check was available there. Since the periodic job couldn't be force-run via `adb shell cmd jobscheduler run` on this device (job id from dumpsys wasn't accepted), added a temporary debug "Backup now" button to Settings that enqueues a OneTimeWorkRequest for DriveBackupWorker directly, to observe a run on demand via logcat.
-
-First tap: logcat showed "No changes since last Drive backup, skipping" / Worker result SUCCESS — confirmed DriveBackupWorker.doWork()'s hash-skip path (shared with LocalBackupWorker) was firing exactly as designed: unchanged quote content since the last successful upload means recordSuccessfulBackup() never runs, so the "Last backup" timestamp doesn't advance even though the job is running successfully every day. Second tap, after adding a quote in the app: logcat showed "Drive backup written: 260730-1523 MyQuotes.json" — confirmed the full auth -> hash -> upload -> retention path works end-to-end.
-
-Root cause was not a code bug in the backup pipeline; it was a UX gap in the Settings label ("Last backup: ..." reads as "last time the job ran" but actually means "last time content changed AND got uploaded"), which is indistinguishable at a glance from "job never ran" or "job silently failing." No fix needed for the failure case since no failure occurred — the label just needed clearer wording.
+2026-07-25 — Issue #15: Local backup tiered retention
 
 Implemented:
-- strings.xml — reworded local_backup_never/local_backup_last_format from "Last backup: ..." to "Last change backed up: ..." and drive_backup_never/drive_backup_last_format from "Last Drive backup: ..." to "Last change backed up to Drive: ..." (both share the identical hash-skip semantics, so both got the reword)
-- Temporary debug button and its wiring in activity_settings.xml / SettingsActivity.java were removed after diagnosis was confirmed; not part of the final diff
+- backup/BackupFilename.java (new) — forTimestamp(millis)/parseTimestamp(filename) pure helpers for the "yyMMdd-HHmm MyQuotes.json" naming convention (same pattern as manual export); parseTimestamp returns null for anything that doesn't match, so unrelated files in the backup folder are ignored during pruning
+- backup/BackupRetention.java (new) — pure, generic selectForDeletion(List<T>, Comparator<T>): once a destination holds more than TOTAL_COUNT (9 = 7 daily + 1 weekly + 1 monthly), returns everything past the 9 most recent for deletion. No dedicated weekly/monthly writes exist; those tiers are just whichever backups rank 8th/9th by recency, naturally refilled as older ones age out of the 7-slot daily window each run
+- backup/LocalBackupWorker.java — now writes each backup under a fresh BackupFilename.forTimestamp(now) instead of overwriting a fixed "MyQuotes-backup.json"; after a successful write, pruneOldBackups() lists the folder's DocumentFiles, keeps only ones matching the backup filename pattern, and deletes whatever BackupRetention.selectForDeletion flags
+- CONTEXT.md — updated the Local Auto-backup subsystem description to cover timestamped filenames and tiered retention
+- BackupFilenameTest.java (new) — 5 unit tests: format round-trip, self-parse, rejects unrelated/malformed filenames, rejects null
+- BackupRetentionTest.java (new) — 6 unit tests: under cap, exactly at cap, one over cap, well over cap, 60-simulated-day convergence to exactly 9 (always the 9 most recent), short-history convergence to fewer than 9
 
-Build and all unit tests passed. Issue #18 closed.
+Build and all unit tests passed. Issue #15 closed.

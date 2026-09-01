@@ -9,6 +9,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.chip.Chip;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,9 +68,9 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
 
     class QuoteViewHolder extends RecyclerView.ViewHolder {
         private final TextView textQuote;
-        private final TextView textAuthor;
-        private final TextView textSource;
-        private final TextView textCategory;
+        private final Chip textAuthor;
+        private final Chip textSource;
+        private final Chip textCategory;
         private final ImageButton buttonFavorite;
         private final ImageButton buttonShare;
 
