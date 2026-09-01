@@ -32,10 +32,10 @@
             android:padding="16dp">
 
             <!-- Übersicht Card -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
+                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
                 app:cardElevation="2dp"
                 android:layout_marginBottom="16dp">
 
@@ -49,7 +49,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Overview"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -59,7 +59,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Total Quotes: 0"
-                        android:textSize="16sp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
                         android:layout_marginBottom="8dp"
                         android:textColor="?android:attr/textColorPrimary" />
 
@@ -68,18 +68,18 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Favorites: 0"
-                        android:textSize="16sp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
                         android:textColor="?android:attr/textColorPrimary" />
 
                 </LinearLayout>
 
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Top 10 Autoren CardView -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
+                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
                 app:cardElevation="2dp"
                 android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="?attr/colorSurface">
@@ -94,7 +94,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Top 10 Authors"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -107,13 +107,13 @@
 
                 </LinearLayout>
 
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Top 10 Quellen CardView -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
+                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
                 app:cardElevation="2dp"
                 android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="?attr/colorSurface">
@@ -128,7 +128,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Top 10 Sources"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -141,13 +141,13 @@
 
                 </LinearLayout>
 
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Kategorien CardView -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
+                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
                 app:cardElevation="2dp"
                 android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="?attr/colorSurface">
@@ -162,7 +162,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Categories"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
                         android:textColor="?android:attr/textColorPrimary" />
@@ -180,14 +180,14 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
                         android:text="Without category: 0"
-                        android:textSize="14sp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                         android:textStyle="italic"
                         android:textColor="?android:attr/textColorSecondary"
                         android:gravity="center" />
 
                 </LinearLayout>
 
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>

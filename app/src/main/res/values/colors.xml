@@ -30,6 +30,77 @@
     <color name="purple_primary">#BB86FC</color>
     <color name="purple_primary_variant">#9966FF</color>
 
+    <!-- ========== MD3 COLOR ROLES - LIGHT ==========
+         Tonal pairs generated from the pink_primary seed (containers/outline/surface)
+         and a teal tertiary accent; every on-X/X pair is WCAG-verified >=4.5:1
+         (>=3:1 for outline, an ui-boundary role), see progress notes for the check. -->
+    <color name="md3_light_surface">#FFFBFF</color>
+    <color name="md3_light_on_surface">#1F1A1B</color>
+    <color name="md3_light_surface_variant">#EBE5E7</color>
+    <color name="md3_light_on_surface_variant">#53464B</color>
+    <color name="md3_light_outline">#847177</color>
+    <color name="md3_light_outline_variant">#DAD2D5</color>
+    <color name="md3_light_surface_container_lowest">#FFFFFF</color>
+    <color name="md3_light_surface_container_low">#F6F4F4</color>
+    <color name="md3_light_surface_container">#F1EEEF</color>
+    <color name="md3_light_surface_container_high">#EDE9EA</color>
+    <color name="md3_light_surface_container_highest">#E8E3E5</color>
+    <color name="md3_light_inverse_surface">#363032</color>
+    <color name="md3_light_inverse_on_surface">#F3F1F2</color>
+    <color name="md3_light_inverse_primary">#F2A6C0</color>
+
+    <color name="md3_light_primary_container">#FBD0DF</color>
+    <color name="md3_light_on_primary_container">#41061A</color>
+
+    <color name="md3_light_on_secondary">#3D0015</color>
+    <color name="md3_light_secondary_container">#F5D6E1</color>
+    <color name="md3_light_on_secondary_container">#52001C</color>
+
+    <color name="md3_light_tertiary">#00A896</color>
+    <color name="md3_light_on_tertiary">#00332E</color>
+    <color name="md3_light_tertiary_container">#D7F4F1</color>
+    <color name="md3_light_on_tertiary_container">#004740</color>
+
+    <color name="md3_light_error">#B3261E</color>
+    <color name="md3_light_on_error">#FFFFFF</color>
+    <color name="md3_light_error_container">#F9DEDC</color>
+    <color name="md3_light_on_error_container">#410E0B</color>
+
+    <!-- ========== MD3 COLOR ROLES - DARK ========== -->
+    <color name="md3_dark_surface">#141014</color>
+    <color name="md3_dark_on_surface">#E7E1E2</color>
+    <color name="md3_dark_surface_variant">#4C4554</color>
+    <color name="md3_dark_on_surface_variant">#CCC8D0</color>
+    <color name="md3_dark_outline">#9891A1</color>
+    <color name="md3_dark_outline_variant">#585062</color>
+    <color name="md3_dark_surface_container_lowest">#0E0B0E</color>
+    <color name="md3_dark_surface_container_low">#232127</color>
+    <color name="md3_dark_surface_container">#2B282F</color>
+    <color name="md3_dark_surface_container_high">#38343D</color>
+    <color name="md3_dark_surface_container_highest">#443F4A</color>
+    <color name="md3_dark_inverse_surface">#E5E4E7</color>
+    <color name="md3_dark_inverse_on_surface">#333036</color>
+    <color name="md3_dark_inverse_primary">#5F24A8</color>
+
+    <!-- colorPrimary itself (#BB86FC) is a light tone, so onPrimary must be dark here -->
+    <color name="md3_dark_on_primary">#250250</color>
+    <color name="md3_dark_primary_container">#482277</color>
+    <color name="md3_dark_on_primary_container">#E4D7F4</color>
+
+    <color name="md3_dark_on_secondary">#013C37</color>
+    <color name="md3_dark_secondary_container">#206F67</color>
+    <color name="md3_dark_on_secondary_container">#D3EEEC</color>
+
+    <color name="md3_dark_tertiary">#FF9EBF</color>
+    <color name="md3_dark_on_tertiary">#470018</color>
+    <color name="md3_dark_tertiary_container">#77223F</color>
+    <color name="md3_dark_on_tertiary_container">#F1DAE2</color>
+
+    <color name="md3_dark_error">#F2B8B5</color>
+    <color name="md3_dark_on_error">#601410</color>
+    <color name="md3_dark_error_container">#8C1D18</color>
+    <color name="md3_dark_on_error_container">#F9DEDC</color>
+
     <!-- ========== SHARED COLORS ========== -->
 
     <!-- Secondary Colors -->

@@ -1,21 +1,47 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ========== LIGHT THEME (DEFAULT) ========== -->
-    <style name="Theme.MyQuotes" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.MyQuotes" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary brand color -->
         <item name="colorPrimary">@color/pink_primary</item>
-        <item name="colorPrimaryVariant">@color/pink_primary_variant</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/md3_light_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md3_light_on_primary_container</item>
+        <item name="colorPrimaryInverse">@color/md3_light_inverse_primary</item>
 
         <!-- Secondary brand color -->
         <item name="colorSecondary">@color/pink_tertiary</item>
-        <item name="colorSecondaryVariant">@color/pink_primary_dark</item>
-        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorOnSecondary">@color/md3_light_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md3_light_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md3_light_on_secondary_container</item>
+
+        <!-- Tertiary accent -->
+        <item name="colorTertiary">@color/md3_light_tertiary</item>
+        <item name="colorOnTertiary">@color/md3_light_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md3_light_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md3_light_on_tertiary_container</item>
+
+        <!-- Error -->
+        <item name="colorError">@color/md3_light_error</item>
+        <item name="colorOnError">@color/md3_light_on_error</item>
+        <item name="colorErrorContainer">@color/md3_light_error_container</item>
+        <item name="colorOnErrorContainer">@color/md3_light_on_error_container</item>
 
         <!-- Background and Surface -->
-        <item name="android:colorBackground">@color/light_background</item>
-        <item name="colorSurface">@color/light_surface</item>
-        <item name="colorOnSurface">@color/dark_text</item>
+        <item name="android:colorBackground">@color/md3_light_surface</item>
+        <item name="colorSurface">@color/md3_light_surface</item>
+        <item name="colorOnSurface">@color/md3_light_on_surface</item>
+        <item name="colorSurfaceVariant">@color/md3_light_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/md3_light_on_surface_variant</item>
+        <item name="colorOutline">@color/md3_light_outline</item>
+        <item name="colorOutlineVariant">@color/md3_light_outline_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/md3_light_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/md3_light_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/md3_light_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/md3_light_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/md3_light_surface_container_highest</item>
+        <item name="colorSurfaceInverse">@color/md3_light_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/md3_light_inverse_on_surface</item>
 
         <!-- Text colors -->
         <item name="android:textColorPrimary">@color/dark_text</item>
@@ -26,7 +52,6 @@
         <!-- Status bar -->
         <item name="android:statusBarColor">@color/pink_primary_dark</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
-        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/white</item>

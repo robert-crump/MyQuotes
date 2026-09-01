@@ -44,7 +44,7 @@
                 android:layout_marginBottom="20dp"
                 android:hint="Author *"
                 app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
+                style="@style/Widget.Material3.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_author"
@@ -58,7 +58,7 @@
                     android:maxLines="1"
                     android:imeOptions="actionNext"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="15sp" />
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -69,7 +69,7 @@
                 android:layout_marginBottom="20dp"
                 android:hint="Source"
                 app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
+                style="@style/Widget.Material3.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_source"
@@ -83,7 +83,7 @@
                     android:maxLines="1"
                     android:imeOptions="actionNext"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="15sp" />
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -94,7 +94,7 @@
                 android:layout_marginBottom="20dp"
                 android:hint="Category"
                 app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.ExposedDropdownMenu">
+                style="@style/Widget.Material3.TextInputLayout.FilledBox.ExposedDropdownMenu">
 
                 <AutoCompleteTextView
                     android:id="@+id/edit_text_category"
@@ -106,7 +106,7 @@
                     android:paddingBottom="12dp"
                     android:inputType="none"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="15sp" />
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -117,7 +117,7 @@
                 android:layout_marginBottom="8dp"
                 android:hint="Quote *"
                 app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
+                style="@style/Widget.Material3.TextInputLayout.FilledBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_quote"
@@ -134,7 +134,7 @@
                     android:minLines="6"
                     android:scrollbars="vertical"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
 
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -142,7 +142,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="* Required fields"
-                android:textSize="11sp"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                 android:textColor="@android:color/darker_gray"
                 android:layout_marginTop="4dp" />
 
@@ -168,13 +168,11 @@
             android:layout_height="wrap_content"
             android:text="Save"
             android:textAllCaps="false"
-            android:textSize="15sp"
             android:paddingTop="13dp"
             android:paddingBottom="13dp"
             android:layout_marginBottom="8dp"
             android:onClick="saveButtonOnClick"
-            app:cornerRadius="16dp"
-            style="@style/Widget.MaterialComponents.Button" />
+            style="@style/Widget.Material3.Button" />
 
         <Button
             android:id="@+id/button_dismiss"
@@ -182,12 +180,10 @@
             android:layout_height="wrap_content"
             android:text="Dismiss"
             android:textAllCaps="false"
-            android:textSize="14sp"
             android:paddingTop="9dp"
             android:paddingBottom="9dp"
             android:onClick="dismissButtonOnClick"
-            app:cornerRadius="16dp"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
+            style="@style/Widget.Material3.Button.TextButton" />
 
     </LinearLayout>
 

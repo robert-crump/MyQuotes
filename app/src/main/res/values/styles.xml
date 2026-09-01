@@ -42,18 +42,15 @@
         <item name="android:paddingBottom">8dp</item>
     </style>
 
-    <!-- FAB Shape - eckig mit abgerundeten Ecken -->
-    <style name="ShapeAppearance.MyApp.FAB" parent="">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">8dp</item>
-    </style>
+    <!-- FAB Shape - MD3 "large" corner token (16dp) -->
+    <style name="ShapeAppearance.MyApp.FAB" parent="ShapeAppearance.Material3.Corner.Large" />
 
     <!-- CardView Style -->
     <style name="CardViewStyle" parent="CardView">
         <item name="cardBackgroundColor">?attr/colorSurface</item>
-        <item name="cardCornerRadius">8dp</item>
+        <item name="cardCornerRadius">12dp</item>
         <item name="cardElevation">6dp</item>
         <item name="strokeWidth">1dp</item>
-        <item name="strokeColor">?android:attr/textColorSecondary</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
     </style>
 </resources>
