@@ -3,7 +3,9 @@ package com.example.myquotes.drive;
 import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
@@ -16,6 +18,7 @@ import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
 import com.example.myquotes.R;
+import com.example.myquotes.SettingsActivity;
 
 import java.util.concurrent.TimeUnit;
 
@@ -61,6 +64,13 @@ public final class DriveBackup {
                 .putLong(KEY_LAST_BACKUP_TIME, System.currentTimeMillis())
                 .putString(KEY_LAST_BACKUP_HASH, contentHash)
                 .apply();
+
+        // Clear any stale failure notification from an earlier run now that a backup has succeeded.
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.cancel(FAILURE_NOTIFICATION_ID);
+        }
     }
 
     /** Starts the daily upload job. Call once Drive connects (and on app start if already connected). */
@@ -106,11 +116,18 @@ public final class DriveBackup {
     }
 
     static void notifyBackupFailed(Context context) {
+        Intent settingsIntent = new Intent(context, SettingsActivity.class);
+        settingsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent settingsPendingIntent = PendingIntent.getActivity(
+                context, 0, settingsIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_quotation_24dp)
                 .setContentTitle(context.getString(R.string.drive_backup_failed_title))
                 .setContentText(context.getString(R.string.drive_backup_failed_message))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(settingsPendingIntent)
                 .setAutoCancel(true);
 
         NotificationManager notificationManager =
