@@ -51,3 +51,9 @@ Hidden behind the facade and now package-private:
 **Keep `BackgroundPermissionHelper` separate.** Battery-optimization access is only requested because WorkManager needs it to fire on time. Folding it into the notifications module reflects the real reason the permission exists and removes a one-method helper that read as "general infrastructure".
 
 **Put the receiver class in the main package.** Would have left a dangling notifications-related class outside the notifications folder. The manifest reference is a one-line change (`.notifications.QuoteNotificationReceiver`).
+
+## Amendment (2026-09-13): periodic work replaced with a self-rescheduling one-shot chain
+
+Issue #21: the daily notification went silent for three weeks, then fired the instant the app was reopened. Standard explanations were ruled out on-device (battery setting was already Unrestricted the whole time, no force-stop) — the WorkManager `PeriodicWorkRequest` itself has a known reliability gap where its internal re-arm after each cycle can silently fail to persist, and nothing short of an unrelated call to `scheduleDailyNotification` (e.g. reopening the app) would notice or recover.
+
+`scheduleDailyNotification` now enqueues a single `OneTimeWorkRequest` instead of a `PeriodicWorkRequest`, and `DailyQuoteWorker` re-arms tomorrow's occurrence itself right after each successful run. Every entry point (`initialize`, `setEnabled(true)`, boot reschedule, the worker) calls it with `ExistingWorkPolicy.KEEP` rather than the old `ExistingPeriodicWorkPolicy.UPDATE`: a pending schedule is left untouched, but if the chain ever breaks again, the next call finds nothing scheduled and self-heals instead of preserving whatever stale state caused the gap. Side effect: delivery is now a single ~4 PM target rather than the old 8 AM-4 PM flex window, since one-shot requests have no flex concept.

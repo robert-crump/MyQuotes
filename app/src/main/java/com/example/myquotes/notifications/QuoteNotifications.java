@@ -17,8 +17,8 @@ import android.provider.Settings;
 import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.PeriodicWorkRequest;
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
 
 import com.example.myquotes.R;
@@ -94,30 +94,34 @@ public final class QuoteNotifications {
                 .show();
     }
 
+    /**
+     * Self-rescheduling one-shot chain rather than a PeriodicWorkRequest (#21): WorkManager's
+     * periodic jobs have a known reliability gap where the internal re-arm after each cycle can
+     * silently fail to persist, leaving the notification dark for days or weeks with nothing to
+     * fix it short of some unrelated event re-invoking this method. DailyQuoteWorker calls this
+     * again itself right after each run to arm the next day's occurrence, and every entry point
+     * (app open, boot, the worker) uses ExistingWorkPolicy.KEEP: a pending schedule is left
+     * alone, but if the chain ever does break, the next call notices nothing is scheduled and
+     * self-heals instead of carrying forward whatever stale state broke it.
+     */
     static void scheduleDailyNotification(Context context) {
         if (!isEnabled(context)) {
             Log.d(TAG, "Notifications are disabled");
             return;
         }
 
-        // Target 4 PM delivery: WorkManager fires during the last <flex> of the period,
-        // so an 8-hour flex window ending at 4 PM produces an 8 AM-4 PM delivery window.
         long initialDelayMillis = calculateDelayTo4PM();
 
-        PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
-                DailyQuoteWorker.class,
-                24, TimeUnit.HOURS,
-                8, TimeUnit.HOURS
-        )
+        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(DailyQuoteWorker.class)
                 .setInitialDelay(initialDelayMillis, TimeUnit.MILLISECONDS)
                 .build();
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        WorkManager.getInstance(context).enqueueUniqueWork(
                 WORK_NAME_DAILY,
-                ExistingPeriodicWorkPolicy.UPDATE,
+                ExistingWorkPolicy.KEEP,
                 workRequest
         );
-        Log.d(TAG, "Scheduled daily notification targeting 4 PM (initial delay: "
+        Log.d(TAG, "Scheduled next daily notification targeting 4 PM (initial delay: "
                 + (initialDelayMillis / 1000 / 60) + " minutes)");
     }
 

@@ -51,6 +51,10 @@ public class DailyQuoteWorker extends Worker {
         Log.d(TAG, "Showing random quote #" + selectedQuote.getId());
 
         showQuoteNotification(context, selectedQuote);
+
+        // Self-rescheduling chain, not a PeriodicWorkRequest (#21) -- arm tomorrow's occurrence
+        // ourselves rather than relying on WorkManager to re-trigger this run days later unattended.
+        QuoteNotifications.scheduleDailyNotification(context);
         return Result.success();
     }
 
