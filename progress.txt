@@ -1,3 +1,9 @@
+2026-09-19 — Issue #32: CI workflow; CSV seeding removed so a fresh clone builds
+
+Removed `CsvLoader`, `MainActivity.loadQuotesIfNeeded/loadQuotesFromCsv` (and the `R.raw.zitate` reference and first-launch toast), and `QuotePreferences` (its only keys, `is_first_launch`, had no remaining users). Stored quotes still load via `MyApplication`; with nothing stored the collection is simply empty. `*.csv` stays in `.gitignore`. README: feature list now says JSON export/import, empty-start note updated, CI badge added. New `.github/workflows/android.yml` (push/PR to main, Temurin 17, setup-gradle, `chmod +x gradlew`, `compileDebugJavaWithJavac testDebugUnitTest`, test reports uploaded on failure).
+
+Build and all unit tests pass locally. Green run on GitHub and on-device empty-state check are left to the user/first push. Issue #32 closed.
+
 2026-09-19 — Issue #31: Unit tests for Quote, SuggestionProvider, SourceSuggestions
 
 New `QuoteTest` (favorite toggle/timestamp, recordView, null-as-empty getters, id-only equality/hash, constructor), `SuggestionProviderTest` (author tiers exact/prefix/contains, case-insensitivity, duplicate collapse, count-then-name order, no match; source author/other split, alphabetical order, empty author context, de-duplication) and `SourceSuggestionsTest`. Scaffold `ExampleUnitTest` removed. Short-query gating lives in AddEditActivity (min 2 chars), not the provider, so it is not tested here.
@@ -22,6 +28,3 @@ New pure `QuoteStatistics.of(List<Quote>)` returns an immutable value (total, fa
 
 Tests: new `QuoteStatisticsTest` (counts/favorites, top-10 limit, empty source, empty category, tie order, empty list). Docs: CONTEXT.md (Quote Statistics). Build and all unit tests pass. On-device verification deferred to the user. Issue #28 closed.
 
-2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
-
-New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.

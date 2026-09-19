@@ -169,7 +169,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Opened from notification with quote ID: " + pendingQuoteId);
         }
 
-        loadQuotesIfNeeded();
     }
 
     @Override
@@ -209,47 +208,6 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             Log.d(TAG, "Quote #" + quote.getId() + " favorite: " + isFavorite);
         }
-    }
-
-    // Seed-from-CSV fallback for a first launch with nothing stored; removed in #32.
-    // Stored quotes are loaded by MyApplication (QuoteCollection.loadFromStore).
-    private void loadQuotesIfNeeded() {
-        if (MyApplication.getInstance().getQuoteStore().hasStoredQuotes()) {
-            return;
-        }
-        Log.d(TAG, "Loading from CSV...");
-        loadQuotesFromCsv();
-    }
-
-    private void loadQuotesFromCsv() {
-        QuotePreferences prefs = new QuotePreferences(this);
-        final boolean isFirstLaunch = prefs.isFirstLaunch();
-
-        new Thread(() -> {
-            List<Quote> quotes = CsvLoader.loadQuotesFromRaw(
-                    MainActivity.this,
-                    R.raw.zitate
-            );
-
-            runOnUiThread(() -> {
-                if (quotes != null && !quotes.isEmpty()) {
-                    quoteCollection.setList(quotes);
-                    quoteCollection.trimFields();
-
-                    prefs.setFirstLaunchComplete();
-
-                    if (isFirstLaunch) {
-                        Toast.makeText(MainActivity.this,
-                                quotes.size() + " quotes loaded",
-                                Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    Toast.makeText(MainActivity.this,
-                            "Failed to load quotes",
-                            Toast.LENGTH_LONG).show();
-                }
-            });
-        }).start();
     }
 
     private void navigateToQuote(int quoteId) {

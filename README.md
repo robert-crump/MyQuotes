@@ -1,5 +1,7 @@
 # MyQuotes
 
+[![Android CI](https://github.com/robert-crump/MyQuotes/actions/workflows/android.yml/badge.svg)](https://github.com/robert-crump/MyQuotes/actions/workflows/android.yml)
+
 A personal Android app for managing and enjoying your quote collection.
 
 ## About
@@ -15,7 +17,7 @@ MyQuotes lets you store, browse, and organize quotes. Swipe through your collect
 - Full-text search
 - Daily quote notification (scheduled around 4 PM)
 - Usage statistics
-- Import quotes from CSV
+- Export and import your collection as JSON (Settings)
 
 ## Requirements
 
@@ -31,7 +33,7 @@ MyQuotes lets you store, browse, and organize quotes. Swipe through your collect
 2. Open the project in Android Studio.
 3. Build and run on a device or emulator running Android 14+.
 
-> **Note:** The app starts with an empty quote collection. Add quotes manually or import a CSV file via the app.
+> **Note:** The app starts with an empty quote collection. Add quotes manually or import a JSON backup via Settings.
 
 ## Built With
 
