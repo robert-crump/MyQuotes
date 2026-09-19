@@ -8,15 +8,22 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHolder> {
-    private final List<StatisticsActivity.StatItem> items;
+    private final List<StatItem> items = new ArrayList<>();
     private final QuoteQuery.Field field;
 
-    public StatItemAdapter(List<StatisticsActivity.StatItem> items, QuoteQuery.Field field) {
-        this.items = items;
+    public StatItemAdapter(QuoteQuery.Field field) {
         this.field = field;
+    }
+
+    @SuppressWarnings("NotifyDataSetChanged")
+    public void setItems(List<StatItem> newItems) {
+        items.clear();
+        items.addAll(newItems);
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -29,7 +36,7 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        StatisticsActivity.StatItem item = items.get(position);
+        StatItem item = items.get(position);
         holder.bind(item, position + 1);
     }
 
@@ -52,7 +59,7 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
                 if (position != RecyclerView.NO_POSITION) {
-                    StatisticsActivity.StatItem item = items.get(position);
+                    StatItem item = items.get(position);
 
                     android.content.Intent intent = QuoteQuery.forField(field, item.name)
                             .toIntent(itemView.getContext());
@@ -61,7 +68,7 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
             });
         }
 
-        public void bind(StatisticsActivity.StatItem item, int rank) {
+        public void bind(StatItem item, int rank) {
             textRank.setText(String.valueOf(rank));
             textName.setText(item.name);
             textCount.setText(String.valueOf(item.count));

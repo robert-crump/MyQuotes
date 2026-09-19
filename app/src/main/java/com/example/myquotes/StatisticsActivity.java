@@ -8,18 +8,18 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
 
 public class StatisticsActivity extends AppCompatActivity {
     private QuoteCollection quoteCollection;
 
     private TextView textTotalQuotes;
     private TextView textFavorites;
-    private RecyclerView recyclerTopAuthors;
-    private RecyclerView recyclerTopSources;
-    private RecyclerView recyclerCategories;
     private TextView textNoCategory;
+
+    private final StatItemAdapter authorAdapter = new StatItemAdapter(QuoteQuery.Field.AUTHOR);
+    private final StatItemAdapter sourceAdapter = new StatItemAdapter(QuoteQuery.Field.SOURCE);
+    private final StatItemAdapter categoryAdapter = new StatItemAdapter(QuoteQuery.Field.CATEGORY);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,7 +30,7 @@ public class StatisticsActivity extends AppCompatActivity {
         setupViewModel();
         setupViews();
 
-        quoteCollection.getQuoteList().observe(this, this::loadStatistics);
+        quoteCollection.getQuoteList().observe(this, this::showStatistics);
     }
 
     private void setupToolbar() {
@@ -48,94 +48,30 @@ public class StatisticsActivity extends AppCompatActivity {
     private void setupViews() {
         textTotalQuotes = findViewById(R.id.text_total_quotes);
         textFavorites = findViewById(R.id.text_favorites);
-        recyclerTopAuthors = findViewById(R.id.recycler_top_authors);
-        recyclerTopSources = findViewById(R.id.recycler_top_sources);
-        recyclerCategories = findViewById(R.id.recycler_categories);
         textNoCategory = findViewById(R.id.text_no_category);
 
-        recyclerTopAuthors.setLayoutManager(new LinearLayoutManager(this));
-        recyclerTopSources.setLayoutManager(new LinearLayoutManager(this));
-        recyclerCategories.setLayoutManager(new LinearLayoutManager(this));
+        bindList(R.id.recycler_top_authors, authorAdapter);
+        bindList(R.id.recycler_top_sources, sourceAdapter);
+        bindList(R.id.recycler_categories, categoryAdapter);
     }
 
-    private void loadStatistics(List<Quote> quotes)   {
-        if (quotes == null || quotes.isEmpty()) {
+    private void bindList(int recyclerId, StatItemAdapter adapter) {
+        RecyclerView recycler = findViewById(recyclerId);
+        recycler.setLayoutManager(new LinearLayoutManager(this));
+        recycler.setAdapter(adapter);
+    }
+
+    private void showStatistics(List<Quote> quotes) {
+        QuoteStatistics stats = QuoteStatistics.of(quotes);
+        if (stats.total == 0) {
             textTotalQuotes.setText("No quotes available");
             return;
         }
-
-        // Basis-Statistiken
-        int totalQuotes = quotes.size();
-        int favoriteCount = (int) quotes.stream().filter(Quote::isFavorite).count();
-
-        textTotalQuotes.setText("Total Quotes: " + totalQuotes);
-        textFavorites.setText("Favorites: " + favoriteCount);
-
-        // Top 10 Autoren
-        Map<String, Integer> authorCounts = new HashMap<>();
-        for (Quote quote : quotes) {
-            String author = quote.getAuthor();
-            authorCounts.put(author, authorCounts.getOrDefault(author, 0) + 1);
-        }
-
-        List<StatItem> topAuthors = authorCounts.entrySet().stream()
-                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
-                .limit(10)
-                .map(e -> new StatItem(e.getKey(), e.getValue()))
-                .collect(Collectors.toList());
-
-        // Top 10 Quellen
-        Map<String, Integer> sourceCounts = new HashMap<>();
-        for (Quote quote : quotes) {
-            String source = quote.getSource();
-            if (!source.isEmpty()) {
-                sourceCounts.put(source, sourceCounts.getOrDefault(source, 0) + 1);
-            }
-        }
-
-        List<StatItem> topSources = sourceCounts.entrySet().stream()
-                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
-                .limit(10)
-                .map(e -> new StatItem(e.getKey(), e.getValue()))
-                .collect(Collectors.toList());
-        // Kategorien-Statistik
-        Map<String, Integer> categoryCounts = new HashMap<>();
-        int noCategoryCount = 0;
-
-        for (Quote quote : quotes) {
-            String category = quote.getCategory();
-            if (!category.isEmpty()) {
-                categoryCounts.put(category, categoryCounts.getOrDefault(category, 0) + 1);
-            } else {
-                noCategoryCount++;
-            }
-        }
-
-        List<StatItem> topCategories = categoryCounts.entrySet().stream()
-                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
-                .map(e -> new StatItem(e.getKey(), e.getValue()))
-                .collect(Collectors.toList());
-
-        // Anzahl ohne Kategorie anzeigen
-        textNoCategory.setText("Without category: " + noCategoryCount);
-
-        StatItemAdapter authorAdapter = new StatItemAdapter(topAuthors, QuoteQuery.Field.AUTHOR);
-        recyclerTopAuthors.setAdapter(authorAdapter);
-
-        StatItemAdapter sourceAdapter = new StatItemAdapter(topSources, QuoteQuery.Field.SOURCE);
-        recyclerTopSources.setAdapter(sourceAdapter);
-
-        StatItemAdapter categoryAdapter = new StatItemAdapter(topCategories, QuoteQuery.Field.CATEGORY);
-        recyclerCategories.setAdapter(categoryAdapter);
-    }
-
-    public static class StatItem {
-        public final String name;
-        public final int count;
-
-        public StatItem(String name, int count) {
-            this.name = name;
-            this.count = count;
-        }
+        textTotalQuotes.setText("Total Quotes: " + stats.total);
+        textFavorites.setText("Favorites: " + stats.favoriteCount);
+        textNoCategory.setText("Without category: " + stats.withoutCategoryCount);
+        authorAdapter.setItems(stats.topAuthors);
+        sourceAdapter.setItems(stats.topSources);
+        categoryAdapter.setItems(stats.categories);
     }
 }

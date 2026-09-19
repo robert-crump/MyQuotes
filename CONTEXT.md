@@ -30,6 +30,8 @@
 
 ## Subsystems
 
+**Quote Statistics** — `QuoteStatistics.of(quotes)` (pure) is the one place the Statistics screen's numbers are computed: totals, favorites, top-10 authors/sources, category histogram, without-category count. Ties rank by count then name. `StatisticsActivity` only binds the result to views and three long-lived `StatItemAdapter`s.
+
 **Quote text rendering** — `QuoteTextRenderer` (pure) is the one place a Quote becomes text: the share format and the daily-notification title/body (with the 150/300 truncation limits). `QuoteSharer` starts the chooser for both pager screens.
 
 **Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the boot-reschedule BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.
