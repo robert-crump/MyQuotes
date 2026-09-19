@@ -1,3 +1,9 @@
+2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
+
+New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
+
+Tests: new `QuoteImporterTest` (pretty round-trip, malformed JSON, legacy bare array, stream failure). Build and all unit tests pass. On-device verification deferred to the user. Issue #29 closed.
+
 2026-09-19 — Issue #28: Quote Statistics module — aggregation out of StatisticsActivity, StatItem un-nested
 
 New pure `QuoteStatistics.of(List<Quote>)` returns an immutable value (total, favoriteCount, topAuthors[10], topSources[10, empty excluded], categories[all, empty excluded], withoutCategoryCount). One private `rank` helper replaces the three count-sort-limit stanzas; ties now sort by count desc then name asc (deterministic). `StatItem` is a top-level class; `StatItemAdapter` no longer references `StatisticsActivity`, takes only its `QuoteQuery.Field`, and has `setItems`. `StatisticsActivity` creates the three adapters once and updates them in place per emission; empty list still shows "No quotes available".
@@ -26,12 +32,3 @@ Screens: `CategoriesActivity` lost all SharedPreferences/JSON code and the casca
 
 Tests: new `CategoriesTest` (union, blank/null as none, add, rename and delete each one emission + one save, live re-emit) with `InMemoryCategoryStore`. Docs: CONTEXT.md (Category, Category set). On-device verification deferred to the user. Issue #25 closed.
 
-2026-09-19 — Issue #24: Quote Store seam — testable Quote Collection and Reading Session; fix edit and last-delete data loss
-
-New `QuoteStore` interface (load / save incl. empty / hasStoredQuotes) with `SharedPreferencesQuoteStore` (same `QuotePrefs/quotes_json`, so existing users load unchanged) and a test-source `InMemoryQuoteStore`. `QuoteCollection(QuoteStore)` no longer takes a Context; `MyApplication.onCreate` builds store + collection and calls `loadFromStore()` (includes trimFields). `ReadingSession(QuoteCollection)` is supplied by a `ViewModelProvider.Factory` in `MainActivity`. `DailyQuoteWorker` and `BackupWorker` read `MyApplication.getQuoteStore().load()`; both "NOT QuoteCollection" comments are gone. `QuotePreferences` shrank to the first-launch flag only (dead `last_sync_time` / `initial_csv_loaded` keys and the three quote methods removed).
-
-Bugs closed: `QuoteCollection.edit(id, author, text, source, category)` copies favorite/favoritedAt/timesShown/lastShown from the stored quote (AddEditActivity uses it); empty lists are now persisted, so deleting the last quote or importing an empty file survives restart. `toggleFavorite(id)` now returns the new state and is the only favorite path (MainActivity and FavoritesActivity use it).
-
-Left for #32: the CSV seeding fallback still lives in `MainActivity.loadQuotesIfNeeded`/`loadQuotesFromCsv`, now reached only when the store has never stored anything. (Issue text said "no Activity loads quotes"; that holds for stored quotes, the CSV seed is the remainder #32 deletes.) Note: a corrupt stored blob now loads as empty rather than falling through to the CSV.
-
-Tests: new `QuoteCollectionTest` (7) and `ReadingSessionTest` (6) with `androidx.arch.core:core-testing`. Docs: CONTEXT.md (Quote Store, Collection entry), ADR-001 update. Build and all unit tests pass. On-device verification deferred to the user. Issue #24 closed.

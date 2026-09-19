@@ -16,6 +16,7 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.myquotes.backup.BackupFilename;
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 import com.example.myquotes.drive.DriveAuth;
@@ -24,19 +25,18 @@ import com.example.myquotes.notifications.QuoteNotifications;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SettingsActivity extends AppCompatActivity {
     private static final String TAG = "SettingsActivity";
     private ActivitySettingsBinding binding;
     private QuoteCollection quoteCollection;
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
 
     private ActivityResultLauncher<Intent> exportLauncher;
     private ActivityResultLauncher<Intent> importLauncher;
@@ -253,10 +253,19 @@ public class SettingsActivity extends AppCompatActivity {
         if (lastBackupTime == 0) {
             lastBackupTextView.setText(R.string.local_backup_never);
         } else {
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
-            lastBackupTextView.setText(
-                    getString(R.string.local_backup_last_format, sdf.format(new Date(lastBackupTime))));
+            lastBackupTextView.setText(formatLastBackup(R.string.local_backup_last_format, lastBackupTime));
         }
+    }
+
+    private String formatLastBackup(int formatRes, long timeMillis) {
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
+        return getString(formatRes, sdf.format(new Date(timeMillis)));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        ioExecutor.shutdown();
     }
 
     @Override
@@ -271,9 +280,7 @@ public class SettingsActivity extends AppCompatActivity {
         if (lastBackupTime == 0) {
             driveLastBackupTextView.setText(R.string.drive_backup_never);
         } else {
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault());
-            driveLastBackupTextView.setText(
-                    getString(R.string.drive_backup_last_format, sdf.format(new Date(lastBackupTime))));
+            driveLastBackupTextView.setText(formatLastBackup(R.string.drive_backup_last_format, lastBackupTime));
         }
     }
 
@@ -340,9 +347,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void startExport() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd-HHmm", Locale.getDefault());
-        String timestamp = sdf.format(new Date());
-        String filename = timestamp + " MyQuotes.json";
+        String filename = BackupFilename.forTimestamp(System.currentTimeMillis());
 
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -361,7 +366,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void exportQuotesToJson(Uri uri) {
-        new Thread(() -> {
+        ioExecutor.execute(() -> {
             try {
                 List<Quote> quotes = quoteCollection.getQuoteList().getValue();
                 if (quotes == null || quotes.isEmpty()) {
@@ -384,30 +389,13 @@ public class SettingsActivity extends AppCompatActivity {
                         Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
                 );
             }
-        }).start();
+        });
     }
 
     private void importQuotesFromJson(Uri uri) {
-        new Thread(() -> {
+        ioExecutor.execute(() -> {
             try {
-                InputStream inputStream = getContentResolver().openInputStream(uri);
-                if (inputStream == null) {
-                    runOnUiThread(() ->
-                            Toast.makeText(this, "Could not open file", Toast.LENGTH_SHORT).show()
-                    );
-                    return;
-                }
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-                StringBuilder jsonString = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    jsonString.append(line);
-                }
-                reader.close();
-                inputStream.close();
-
-                List<Quote> importedQuotes = QuoteCodec.decode(jsonString.toString());
+                List<Quote> importedQuotes = QuoteImporter.readFromUri(this, uri);
 
                 final int totalQuotes = importedQuotes.size();
                 runOnUiThread(() -> {
@@ -429,7 +417,7 @@ public class SettingsActivity extends AppCompatActivity {
                         Toast.makeText(this, "Import failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
                 );
             }
-        }).start();
+        });
     }
 
     @Override
