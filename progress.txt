@@ -11,3 +11,17 @@ Defect found and fixed: `SourceSuggestions.hasSplit()` returned true whenever au
 No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.
 
 2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
+
+New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
+
+Tests: new `QuoteImporterTest` (pretty round-trip, malformed JSON, legacy bare array, stream failure). Build and all unit tests pass. On-device verification deferred to the user. Issue #29 closed.
+
+2026-09-19 — Issue #28: Quote Statistics module — aggregation out of StatisticsActivity, StatItem un-nested
+
+New pure `QuoteStatistics.of(List<Quote>)` returns an immutable value (total, favoriteCount, topAuthors[10], topSources[10, empty excluded], categories[all, empty excluded], withoutCategoryCount). One private `rank` helper replaces the three count-sort-limit stanzas; ties now sort by count desc then name asc (deterministic). `StatItem` is a top-level class; `StatItemAdapter` no longer references `StatisticsActivity`, takes only its `QuoteQuery.Field`, and has `setItems`. `StatisticsActivity` creates the three adapters once and updates them in place per emission; empty list still shows "No quotes available".
+
+Tests: new `QuoteStatisticsTest` (counts/favorites, top-10 limit, empty source, empty category, tie order, empty list). Docs: CONTEXT.md (Quote Statistics). Build and all unit tests pass. On-device verification deferred to the user. Issue #28 closed.
+
+2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
+
+New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.
