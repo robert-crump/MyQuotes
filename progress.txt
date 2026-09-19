@@ -1,7 +1,5 @@
 2026-09-19 — Issue #33: Drive backup no longer skipped after reconnecting with a different account
 
-`BackupState.clear` forgets hash and last-backup time; `DriveBackup.disconnect` and `connect` both call it (Drive files untouched), and `connect` already arms the chain with an immediate run, which now always uploads. `BackupRun.run` now calls `checkAvailable()` first and skips an unchanged hash only if the destination still lists a backup file; a missing (re-created) folder or empty new account gets a fresh upload. Side effect: unchanged-content runs now hit the destination (one list call) instead of being network-free; applies to local SAF too. New `BackupRunTest` case for matching hash with empty destination. Build and all unit tests pass. On-device account-switch check left to the user. Issue #33 closed.
-
 2026-09-19 — Issue #32: CI workflow; CSV seeding removed so a fresh clone builds
 
 Removed `CsvLoader`, `MainActivity.loadQuotesIfNeeded/loadQuotesFromCsv` (and the `R.raw.zitate` reference and first-launch toast), and `QuotePreferences` (its only keys, `is_first_launch`, had no remaining users). Stored quotes still load via `MyApplication`; with nothing stored the collection is simply empty. `*.csv` stays in `.gitignore`. README: feature list now says JSON export/import, empty-start note updated, CI badge added. New `.github/workflows/android.yml` (push/PR to main, Temurin 17, setup-gradle, `chmod +x gradlew`, `compileDebugJavaWithJavac testDebugUnitTest`, test reports uploaded on failure).
@@ -9,3 +7,19 @@ Removed `CsvLoader`, `MainActivity.loadQuotesIfNeeded/loadQuotesFromCsv` (and th
 Build and all unit tests pass locally. Green run on GitHub and on-device empty-state check are left to the user/first push. Issue #32 closed.
 
 2026-09-19 — Issue #31: Unit tests for Quote, SuggestionProvider, SourceSuggestions
+
+New `QuoteTest` (favorite toggle/timestamp, recordView, null-as-empty getters, id-only equality/hash, constructor), `SuggestionProviderTest` (author tiers exact/prefix/contains, case-insensitivity, duplicate collapse, count-then-name order, no match; source author/other split, alphabetical order, empty author context, de-duplication) and `SourceSuggestionsTest`. Scaffold `ExampleUnitTest` removed. Short-query gating lives in AddEditActivity (min 2 chars), not the provider, so it is not tested here.
+
+Defect found and fixed: `SourceSuggestions.hasSplit()` returned true whenever author sources existed, even with no other sources, so the adapter added a dangling divider row. It now requires both lists non-empty. Build and all unit tests pass. Issue #31 closed.
+
+2026-09-19 — Issue #30: Notifications enabled flag — permission rule moved into the facade, Settings switch refreshes on resume
+
+`QuoteNotifications.onPermissionResult(context, requestCode, grantResults)` now owns "permission granted, therefore enable": returns null for a foreign request code, else whether notifications are enabled (granting calls `setEnabled(true)`). `MainActivity.onRequestPermissionsResult` only delegates and toasts. `SettingsActivity` keeps the daily switch and its listener as fields and re-syncs the switch in `onResume` via `setDailyNotificationChecked` (listener detached/reattached, same pattern as the Drive switch), so a permission grant on the main screen shows up in Settings. The facade is the only class touching the flag's SharedPreferences.
+
+No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.
+
+2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
+
+New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
+
+Tests: new `QuoteImporterTest` (pretty round-trip, malformed JSON, legacy bare array, stream failure). Build and all unit tests pass. On-device verification deferred to the user. Issue #29 closed.
