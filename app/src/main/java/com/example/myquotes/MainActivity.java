@@ -288,14 +288,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == QuoteNotifications.REQUEST_CODE_POST_NOTIFICATIONS) {
-            if (grantResults.length > 0 &&
-                    grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                QuoteNotifications.setEnabled(this, true);
-                Toast.makeText(this, "Notifications enabled", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Notification permission denied", Toast.LENGTH_SHORT).show();
-            }
+        Boolean enabled = QuoteNotifications.onPermissionResult(this, requestCode, grantResults);
+        if (enabled != null) {
+            Toast.makeText(this, enabled ? "Notifications enabled" : "Notification permission denied",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 

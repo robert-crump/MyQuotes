@@ -1,3 +1,9 @@
+2026-09-19 — Issue #30: Notifications enabled flag — permission rule moved into the facade, Settings switch refreshes on resume
+
+`QuoteNotifications.onPermissionResult(context, requestCode, grantResults)` now owns "permission granted, therefore enable": returns null for a foreign request code, else whether notifications are enabled (granting calls `setEnabled(true)`). `MainActivity.onRequestPermissionsResult` only delegates and toasts. `SettingsActivity` keeps the daily switch and its listener as fields and re-syncs the switch in `onResume` via `setDailyNotificationChecked` (listener detached/reattached, same pattern as the Drive switch), so a permission grant on the main screen shows up in Settings. The facade is the only class touching the flag's SharedPreferences.
+
+No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.
+
 2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
 
 New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
@@ -13,22 +19,3 @@ Tests: new `QuoteStatisticsTest` (counts/favorites, top-10 limit, empty source, 
 2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
 
 New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.
-
-Tests: share text with/without/null source, title fallback, notification limits, existing truncate cases. Docs: CONTEXT.md (Quote text rendering). Build and all unit tests pass. On-device verification deferred to the user. Issue #27 closed.
-
-2026-09-19 — Issue #26: Quote Query module — typed search predicate and filter protocol
-
-New immutable `QuoteQuery` (normalized text + `EnumSet<Field>` of QUOTE_TEXT/AUTHOR/SOURCE/CATEGORY): `matches`, `filter`, `isActive` (min length 3), `snippet` (moved out of SearchResultsAdapter, double-lowercasing gone), `toggled(field)`, `withText`, and the single intent protocol `toIntent(Context)` / `fromIntent(Intent)`. The `"author"/"source"/"category"` literals, `EXTRA_FILTER_TYPE`/`EXTRA_SEARCH_QUERY`, and the decoding `switch` are gone; MainActivity (3), FavoritesActivity (3), CategoriesActivity and StatItemAdapter all build `QuoteQuery.forField(...)`. `StatItemAdapter` now takes a `QuoteQuery.Field` instead of deriving it from a display label.
-
-`SearchActivity` keeps a `QuoteQuery` as state (four booleans removed); the three pasted re-run blocks and both TextWatcher/IME/chip paths are one `rerunSearch()`. `SearchResultsAdapter.updateResults` takes a `QuoteQuery` and has no snippet logic. Behaviour unchanged: same results, chips, snippets.
-
-Tests: new `QuoteQueryTest` (per-field matching, field set, case/trim, min length, filter, snippet middle/start/end/short/no-match). Docs: CONTEXT.md (Quote Query). Build and all unit tests pass. On-device verification deferred to the user. Issue #26 closed.
-
-2026-09-19 — Issue #25: Categories module — one owner for the category set and its rename/delete cascades
-
-New `Categories` (held by `MyApplication`, over a `CategoryStore` seam with `SharedPreferencesCategoryStore` on the unchanged `CategoryPrefs/saved_categories`, so existing lists survive). Owns the union rule (saved names + names in use, blanks dropped, deduped, sorted), `all()/add/rename/delete/countQuotes`, and a MediatorLiveData of the set that re-emits on saved-name or quote changes. `QuoteCollection.replaceCategory(old, new)` rewrites all matching quotes with one emission and one save; rename/delete use it (previously N updates each). `Quote.setCategory(null)` now stores "", so delete leaves "" like everywhere else.
-
-Screens: `CategoriesActivity` lost all SharedPreferences/JSON code and the cascade loops (observes the module); `AddEditActivity` fills its dropdown from the live set and the hardcoded six-entry array is gone (behaviour change: those six names only show if saved or in use). Statistics/Search untouched.
-
-Tests: new `CategoriesTest` (union, blank/null as none, add, rename and delete each one emission + one save, live re-emit) with `InMemoryCategoryStore`. Docs: CONTEXT.md (Category, Category set). On-device verification deferred to the user. Issue #25 closed.
-

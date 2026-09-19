@@ -46,6 +46,8 @@ public class SettingsActivity extends AppCompatActivity {
 
     private SwitchMaterial switchDriveBackup;
     private CompoundButton.OnCheckedChangeListener driveSwitchListener;
+    private SwitchMaterial switchDailyNotification;
+    private CompoundButton.OnCheckedChangeListener dailyNotificationListener;
     private TextView driveAccountTextView;
     private TextView driveLastBackupTextView;
     private Button btnDriveDisconnect;
@@ -128,14 +130,13 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         // Setup Daily Notification Switch
-        com.google.android.material.switchmaterial.SwitchMaterial switchDailyNotification =
-                findViewById(R.id.switch_daily_notification);
+        switchDailyNotification = findViewById(R.id.switch_daily_notification);
 
         // Set initial state
         switchDailyNotification.setChecked(QuoteNotifications.isEnabled(this));
 
         // Set listener
-        switchDailyNotification.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        dailyNotificationListener = (buttonView, isChecked) -> {
             if (isChecked) {
                 Toast.makeText(this, "Daily notifications enabled", Toast.LENGTH_SHORT).show();
             } else {
@@ -143,7 +144,8 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             QuoteNotifications.setEnabled(this, isChecked);
-        });
+        };
+        switchDailyNotification.setOnCheckedChangeListener(dailyNotificationListener);
 
         // Setup Local Auto-backup Switch
 
@@ -271,8 +273,16 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        setDailyNotificationChecked(QuoteNotifications.isEnabled(this));
         updateLastBackupText();
         updateDriveLastBackupText();
+    }
+
+    /** Reflects the flag without firing dailyNotificationListener (which would toast and re-write it). */
+    private void setDailyNotificationChecked(boolean checked) {
+        switchDailyNotification.setOnCheckedChangeListener(null);
+        switchDailyNotification.setChecked(checked);
+        switchDailyNotification.setOnCheckedChangeListener(dailyNotificationListener);
     }
 
     private void updateDriveLastBackupText() {

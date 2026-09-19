@@ -77,6 +77,19 @@ public final class QuoteNotifications {
                 REQUEST_CODE_POST_NOTIFICATIONS);
     }
 
+    /**
+     * Applies the "permission granted, therefore enable" rule for a {@code POST_NOTIFICATIONS}
+     * request. Returns null if the request code is not ours, otherwise whether notifications
+     * are now enabled (false = denied, so the caller can tell the user).
+     */
+    public static Boolean onPermissionResult(Context context, int requestCode, int[] grantResults) {
+        if (requestCode != REQUEST_CODE_POST_NOTIFICATIONS) return null;
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (granted) setEnabled(context, true);
+        return granted;
+    }
+
     public static void promptBackgroundPermissionIfNeeded(Activity activity) {
         PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
         if (powerManager != null && powerManager.isIgnoringBatteryOptimizations(activity.getPackageName())) {
