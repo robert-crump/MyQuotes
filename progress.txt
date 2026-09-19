@@ -1,3 +1,13 @@
+2026-09-19 — Issue #24: Quote Store seam — testable Quote Collection and Reading Session; fix edit and last-delete data loss
+
+New `QuoteStore` interface (load / save incl. empty / hasStoredQuotes) with `SharedPreferencesQuoteStore` (same `QuotePrefs/quotes_json`, so existing users load unchanged) and a test-source `InMemoryQuoteStore`. `QuoteCollection(QuoteStore)` no longer takes a Context; `MyApplication.onCreate` builds store + collection and calls `loadFromStore()` (includes trimFields). `ReadingSession(QuoteCollection)` is supplied by a `ViewModelProvider.Factory` in `MainActivity`. `DailyQuoteWorker` and `BackupWorker` read `MyApplication.getQuoteStore().load()`; both "NOT QuoteCollection" comments are gone. `QuotePreferences` shrank to the first-launch flag only (dead `last_sync_time` / `initial_csv_loaded` keys and the three quote methods removed).
+
+Bugs closed: `QuoteCollection.edit(id, author, text, source, category)` copies favorite/favoritedAt/timesShown/lastShown from the stored quote (AddEditActivity uses it); empty lists are now persisted, so deleting the last quote or importing an empty file survives restart. `toggleFavorite(id)` now returns the new state and is the only favorite path (MainActivity and FavoritesActivity use it).
+
+Left for #32: the CSV seeding fallback still lives in `MainActivity.loadQuotesIfNeeded`/`loadQuotesFromCsv`, now reached only when the store has never stored anything. (Issue text said "no Activity loads quotes"; that holds for stored quotes, the CSV seed is the remainder #32 deletes.) Note: a corrupt stored blob now loads as empty rather than falling through to the CSV.
+
+Tests: new `QuoteCollectionTest` (7) and `ReadingSessionTest` (6) with `androidx.arch.core:core-testing`. Docs: CONTEXT.md (Quote Store, Collection entry), ADR-001 update. Build and all unit tests pass. On-device verification deferred to the user. Issue #24 closed.
+
 2026-09-19 — Issue #23: Backup Destination seam — one backup run for local and Drive
 
 Collapsed the two copy-pasted backup subsystems into one module. New: `BackupDestination` (interface) with `SafDestination` / `drive.DriveDestination` adapters; `BackupRun` (no Android state: encode pretty, hash the written bytes, skip if unchanged, write timestamped file, prune via BackupRetention, return SKIPPED_UNCHANGED / WRITTEN(hash) / FAILED(cause)); `BackupTarget` (per-destination constants; pref file names, channel ids and notification ids 1002/1003 unchanged); `BackupState`, `BackupNotifications`, `BackupScheduler`, and a single `BackupWorker` that picks the destination from input data. `LocalBackup` and `DriveBackup` shrank to thin facades; `LocalBackupWorker`/`DriveBackupWorker` deleted. `DriveBackup.connect(email)` / `disconnect()` fold the DriveAuth flag and the schedule together, so `SettingsActivity` makes one call per transition (four hand-paired sites gone; `DriveAuth.markConnected/disconnect` are now package-private).
@@ -41,17 +51,3 @@ Implemented:
 - Deleted border_author.xml, border_source.xml (both now unreferenced), border_category.xml and chip_background_deselected.xml (confirmed dead code — zero references anywhere in the codebase before this change too, chip_background_deselected.xml still referenced the pre-MD3 @color/purple_primary).
 
 Build and all unit tests passed. On-device verification of the click-to-filter behavior deferred to the user per their request. Issue #19 closed.
-
-2026-07-30 — Issue #18: Google Drive backup "not working" (Settings timestamp looked stale)
-
-Diagnosed via adb: dumpsys jobscheduler confirmed the drive_daily_backup periodic WorkManager job was correctly scheduled with CONNECTIVITY satisfied (only TIMING_DELAY pending, i.e. just waiting for its next window) — no LocalBackupWorker job existed since local auto-backup was off, so no cross-check was available there. Since the periodic job couldn't be force-run via `adb shell cmd jobscheduler run` on this device (job id from dumpsys wasn't accepted), added a temporary debug "Backup now" button to Settings that enqueues a OneTimeWorkRequest for DriveBackupWorker directly, to observe a run on demand via logcat.
-
-First tap: logcat showed "No changes since last Drive backup, skipping" / Worker result SUCCESS — confirmed DriveBackupWorker.doWork()'s hash-skip path (shared with LocalBackupWorker) was firing exactly as designed: unchanged quote content since the last successful upload means recordSuccessfulBackup() never runs, so the "Last backup" timestamp doesn't advance even though the job is running successfully every day. Second tap, after adding a quote in the app: logcat showed "Drive backup written: 260730-1523 MyQuotes.json" — confirmed the full auth -> hash -> upload -> retention path works end-to-end.
-
-Root cause was not a code bug in the backup pipeline; it was a UX gap in the Settings label ("Last backup: ..." reads as "last time the job ran" but actually means "last time content changed AND got uploaded"), which is indistinguishable at a glance from "job never ran" or "job silently failing." No fix needed for the failure case since no failure occurred — the label just needed clearer wording.
-
-Implemented:
-- strings.xml — reworded local_backup_never/local_backup_last_format from "Last backup: ..." to "Last change backed up: ..." and drive_backup_never/drive_backup_last_format from "Last Drive backup: ..." to "Last change backed up to Drive: ..." (both share the identical hash-skip semantics, so both got the reword)
-- Temporary debug button and its wiring in activity_settings.xml / SettingsActivity.java were removed after diagnosis was confirmed; not part of the final diff
-
-Build and all unit tests passed. Issue #18 closed.

@@ -25,3 +25,7 @@
 **Keep QuoteCollection as a ViewModel** — unnecessary; it has no UI lifecycle concerns. Plain object with `MutableLiveData` is sufficient and removes `ViewModelProvider` boilerplate.
 
 **ReadingSession as application-scoped singleton** — wrong scope. The session belongs to `MainActivity`'s lifecycle. Scoping it to the application would mean a stale session after the Activity is recreated.
+
+## Update (#24)
+
+The testability consequence is now realized. `QuoteCollection` is constructed over a `QuoteStore` (no `Context`) and `ReadingSession` over a `QuoteCollection`, so `QuoteCollectionTest` and `ReadingSessionTest` exercise deck reconciliation on the JVM by mutating the collection over an in-memory store.

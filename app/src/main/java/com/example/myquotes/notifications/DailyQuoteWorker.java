@@ -14,7 +14,7 @@ import androidx.work.WorkerParameters;
 
 import com.example.myquotes.MainActivity;
 import com.example.myquotes.Quote;
-import com.example.myquotes.QuotePreferences;
+import com.example.myquotes.MyApplication;
 import com.example.myquotes.R;
 
 import java.util.List;
@@ -38,11 +38,9 @@ public class DailyQuoteWorker extends Worker {
             return Result.success();
         }
 
-        // Load quotes directly from SharedPreferences (NOT QuoteCollection -- fixes race condition)
-        QuotePreferences prefs = new QuotePreferences(context);
-        List<Quote> quotes = prefs.loadQuotes();
+        List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
 
-        if (quotes == null || quotes.isEmpty()) {
+        if (quotes.isEmpty()) {
             Log.w(TAG, "No quotes available, retrying later");
             return Result.retry();
         }

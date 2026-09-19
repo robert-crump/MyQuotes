@@ -133,10 +133,10 @@ public class FavoritesActivity extends AppCompatActivity {
 
     private void toggleFavorite(Quote quote) {
         if (quote != null) {
-            quoteCollection.toggleFavorite(quote.getId());
+            boolean isFavorite = quoteCollection.toggleFavorite(quote.getId());
 
             // Remove from list when un-favorited
-            if (!quote.isFavorite()) {
+            if (!isFavorite) {
                 int currentPosition = viewPager.getCurrentItem();
                 favoriteQuotes.remove(currentPosition);
                 pagerAdapter.setQuotes(favoriteQuotes);
@@ -152,7 +152,7 @@ public class FavoritesActivity extends AppCompatActivity {
             }
 
             Log.d(TAG, "Toggled favorite for quote #" + quote.getId() +
-                    ", is favorite: " + quote.isFavorite());
+                    ", is favorite: " + isFavorite);
         }
     }
 

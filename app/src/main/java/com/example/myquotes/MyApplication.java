@@ -11,6 +11,7 @@ import com.example.myquotes.notifications.QuoteNotifications;
 
 public class MyApplication extends Application {
     private static MyApplication instance;
+    private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
 
     private static final String PREFS_NAME = "AppSettings";
@@ -22,7 +23,9 @@ public class MyApplication extends Application {
         instance = this;
 
         applyTheme();
-        quoteCollection = new QuoteCollection(this);
+        quoteStore = new SharedPreferencesQuoteStore(this);
+        quoteCollection = new QuoteCollection(quoteStore);
+        quoteCollection.loadFromStore();
         QuoteNotifications.initialize(this);
         LocalBackup.initialize(this);
         DriveBackup.initialize(this);
@@ -30,6 +33,10 @@ public class MyApplication extends Application {
 
     public static MyApplication getInstance() {
         return instance;
+    }
+
+    public QuoteStore getQuoteStore() {
+        return quoteStore;
     }
 
     public QuoteCollection getQuoteCollection() {

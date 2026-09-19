@@ -8,7 +8,7 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
 import com.example.myquotes.Quote;
-import com.example.myquotes.QuotePreferences;
+import com.example.myquotes.MyApplication;
 import com.example.myquotes.drive.DriveBackup;
 
 import java.util.List;
@@ -38,9 +38,8 @@ public class BackupWorker extends Worker {
             return Result.success();
         }
 
-        // Load quotes directly from SharedPreferences (NOT QuoteCollection -- avoids a startup race).
-        List<Quote> quotes = new QuotePreferences(context).loadQuotes();
-        if (quotes != null && !quotes.isEmpty()) {
+        List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
+        if (!quotes.isEmpty()) {
             BackupRun.Outcome outcome = BackupRun.run(quotes,
                     BackupState.lastHash(context, target), destination, System.currentTimeMillis());
             switch (outcome.kind) {

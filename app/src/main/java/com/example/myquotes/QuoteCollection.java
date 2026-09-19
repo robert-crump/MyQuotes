@@ -1,6 +1,5 @@
 package com.example.myquotes;
 
-import android.content.Context;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
@@ -14,10 +13,21 @@ public class QuoteCollection {
     private static final String TAG = "QuoteCollection";
 
     private final MutableLiveData<List<Quote>> liveQuoteList = new MutableLiveData<>(new ArrayList<>());
-    private final Context applicationContext;
+    private final QuoteStore store;
 
-    public QuoteCollection(Context context) {
-        this.applicationContext = context.getApplicationContext();
+    public QuoteCollection(QuoteStore store) {
+        this.store = store;
+    }
+
+    // ========== BOOTSTRAP ==========
+
+    // Loads the stored quotes into the collection. Called once from MyApplication.onCreate.
+    public void loadFromStore() {
+        List<Quote> stored = store.load();
+        if (!stored.isEmpty()) {
+            liveQuoteList.setValue(stored);
+            trimFields();
+        }
     }
 
     // ========== OBSERVATION ==========
@@ -39,7 +49,7 @@ public class QuoteCollection {
         List<Quote> updated = new ArrayList<>(current);
         updated.add(quote);
         liveQuoteList.setValue(updated);
-        saveToPreferences(updated);
+        save(updated);
         Log.d(TAG, "Added quote with ID: " + quote.getId());
     }
 
@@ -55,7 +65,7 @@ public class QuoteCollection {
             if (updated.get(i).getId().equals(updatedQuote.getId())) {
                 updated.set(i, updatedQuote);
                 liveQuoteList.setValue(updated);
-                saveToPreferences(updated);
+                save(updated);
                 Log.d(TAG, "Updated quote with ID: " + updatedQuote.getId());
                 return;
             }
@@ -63,11 +73,27 @@ public class QuoteCollection {
         Log.w(TAG, "Quote with ID " + updatedQuote.getId() + " not found");
     }
 
+    // Replaces the editable fields, keeping favorite and view state.
+    public void edit(int id, String author, String text, String source, String category) {
+        Quote stored = findById(id);
+        if (stored == null) {
+            Log.w(TAG, "Quote with ID " + id + " not found");
+            return;
+        }
+        Quote edited = new Quote(id, author, text, source);
+        edited.setCategory(category);
+        edited.setFavorite(stored.isFavorite());
+        edited.setFavoritedAt(stored.getFavoritedAt());
+        edited.setTimesShown(stored.getTimesShown());
+        edited.setLastShown(stored.getLastShown());
+        update(edited);
+    }
+
     public void deleteById(int id) {
         List<Quote> updated = getCurrentList();
         if (updated.removeIf(q -> q.getId() == id)) {
             liveQuoteList.setValue(updated);
-            saveToPreferences(updated);
+            save(updated);
             Log.d(TAG, "Deleted quote with ID: " + id);
         } else {
             Log.w(TAG, "Quote with ID " + id + " not found");
@@ -77,7 +103,7 @@ public class QuoteCollection {
     public void setList(List<Quote> quotes) {
         if (quotes == null) quotes = new ArrayList<>();
         liveQuoteList.setValue(quotes);
-        saveToPreferences(quotes);
+        save(quotes);
         Log.d(TAG, "Set quote list: " + quotes.size() + " quotes");
     }
 
@@ -91,7 +117,7 @@ public class QuoteCollection {
         for (Quote q : quotes) {
             if (q.getId() == quoteId) {
                 q.recordView();
-                saveToPreferences(quotes);
+                save(quotes);
                 return;
             }
         }
@@ -114,14 +140,16 @@ public class QuoteCollection {
         return favorites;
     }
 
-    public void toggleFavorite(int quoteId) {
+    // The only favorite path. Returns the new favorite state (false if the quote is unknown).
+    public boolean toggleFavorite(int quoteId) {
         Quote quote = findById(quoteId);
         if (quote == null) {
             Log.w(TAG, "Cannot toggle favorite - quote not found: " + quoteId);
-            return;
+            return false;
         }
         quote.toggleFavorite();
         update(quote);
+        return quote.isFavorite();
     }
 
     public void trimFields() {
@@ -147,7 +175,7 @@ public class QuoteCollection {
         }
         if (changed) {
             liveQuoteList.setValue(quotes);
-            saveToPreferences(quotes);
+            save(quotes);
             Log.d(TAG, "Trimmed trailing spaces from quote fields");
         }
     }
@@ -159,9 +187,7 @@ public class QuoteCollection {
         return quotes != null ? new ArrayList<>(quotes) : new ArrayList<>();
     }
 
-    private void saveToPreferences(List<Quote> quotes) {
-        if (quotes != null && !quotes.isEmpty()) {
-            new QuotePreferences(applicationContext).saveQuotes(quotes);
-        }
+    private void save(List<Quote> quotes) {
+        store.save(quotes);
     }
 }

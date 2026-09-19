@@ -254,8 +254,8 @@ public class AddEditActivity extends AppCompatActivity {
         Quote quote = createQuoteFromInput();
 
         if (isEditMode) {
-            quote.setId(quoteId);
-            quoteCollection.update(quote);
+            quoteCollection.edit(quoteId, quote.getAuthor(), quote.getQuoteText(),
+                    quote.getSource(), quote.getCategory());
             Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
             finish();
         } else {

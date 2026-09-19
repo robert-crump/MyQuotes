@@ -9,6 +9,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myquotes.databinding.ActivityMainBinding;
@@ -62,7 +64,14 @@ public class MainActivity extends AppCompatActivity {
         QuoteNotifications.requestPostNotificationsPermission(this);
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
-        readingSession = new ViewModelProvider(this).get(ReadingSession.class);
+        readingSession = new ViewModelProvider(this, new ViewModelProvider.Factory() {
+            @NonNull
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
+                return (T) new ReadingSession(quoteCollection);
+            }
+        }).get(ReadingSession.class);
 
         viewPager = findViewById(R.id.quotes_viewpager);
         pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
@@ -210,33 +219,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void toggleFavorite(Quote quote) {
         if (quote != null) {
-            quote.toggleFavorite();
-            quoteCollection.update(quote);
-            String message = quote.isFavorite() ? "Added to favorites" : "Removed from favorites";
+            boolean isFavorite = quoteCollection.toggleFavorite(quote.getId());
+            String message = isFavorite ? "Added to favorites" : "Removed from favorites";
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "Quote #" + quote.getId() + " favorite: " + quote.isFavorite());
+            Log.d(TAG, "Quote #" + quote.getId() + " favorite: " + isFavorite);
         }
     }
 
+    // Seed-from-CSV fallback for a first launch with nothing stored; removed in #32.
+    // Stored quotes are loaded by MyApplication (QuoteCollection.loadFromStore).
     private void loadQuotesIfNeeded() {
-        // If QuoteCollection already has quotes (e.g. after config change), skip reload.
-        if (!quoteCollection.getCurrentList().isEmpty()) {
+        if (MyApplication.getInstance().getQuoteStore().hasStoredQuotes()) {
             return;
         }
-
-        QuotePreferences prefs = new QuotePreferences(this);
-
-        if (prefs.hasPersistedQuotes()) {
-            Log.d(TAG, "Loading quotes from persistent storage...");
-            List<Quote> quotes = prefs.loadQuotes();
-            if (quotes != null && !quotes.isEmpty()) {
-                quoteCollection.setList(quotes);
-                quoteCollection.trimFields();
-                Log.d(TAG, "Loaded " + quotes.size() + " quotes from storage");
-                return;
-            }
-        }
-
         Log.d(TAG, "Loading from CSV...");
         loadQuotesFromCsv();
     }
@@ -256,8 +251,6 @@ public class MainActivity extends AppCompatActivity {
                     quoteCollection.setList(quotes);
                     quoteCollection.trimFields();
 
-                    prefs.saveQuotes(quotes);
-                    prefs.setInitialCsvLoaded(true);
                     prefs.setFirstLaunchComplete();
 
                     if (isFirstLaunch) {

@@ -23,8 +23,8 @@ public class ReadingSession extends ViewModel {
 
     private final Observer<List<Quote>> collectionObserver = this::onCollectionChanged;
 
-    public ReadingSession() {
-        collection = MyApplication.getInstance().getQuoteCollection();
+    public ReadingSession(QuoteCollection collection) {
+        this.collection = collection;
         collection.getQuoteList().observeForever(collectionObserver);
     }
 
