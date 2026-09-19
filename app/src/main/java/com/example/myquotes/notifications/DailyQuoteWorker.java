@@ -54,7 +54,7 @@ public class DailyQuoteWorker extends Worker {
 
         // Self-rescheduling chain, not a PeriodicWorkRequest (#21) -- arm tomorrow's occurrence
         // ourselves rather than relying on WorkManager to re-trigger this run days later unattended.
-        QuoteNotifications.scheduleDailyNotification(context);
+        QuoteNotifications.rearmAfterRun(context);
         return Result.success();
     }
 

@@ -17,14 +17,11 @@ import android.provider.Settings;
 import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.OneTimeWorkRequest;
-import androidx.work.WorkManager;
 
 import com.example.myquotes.R;
+import com.example.myquotes.scheduling.WorkChain;
 
 import java.util.Calendar;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Public facade for the notification subsystem. All other modules talk to this class only;
@@ -95,14 +92,9 @@ public final class QuoteNotifications {
     }
 
     /**
-     * Self-rescheduling one-shot chain rather than a PeriodicWorkRequest (#21): WorkManager's
-     * periodic jobs have a known reliability gap where the internal re-arm after each cycle can
-     * silently fail to persist, leaving the notification dark for days or weeks with nothing to
-     * fix it short of some unrelated event re-invoking this method. DailyQuoteWorker calls this
-     * again itself right after each run to arm the next day's occurrence, and every entry point
-     * (app open, boot, the worker) uses ExistingWorkPolicy.KEEP: a pending schedule is left
-     * alone, but if the chain ever does break, the next call notices nothing is scheduled and
-     * self-heals instead of carrying forward whatever stale state broke it.
+     * Arms the daily notification as a {@link WorkChain} (ADR-002 amendment, #21): a pending
+     * schedule is left alone, a missing one is healed. Called from every entry point (app open,
+     * boot, enable); {@link DailyQuoteWorker} re-arms itself via {@link #rearmAfterRun}.
      */
     static void scheduleDailyNotification(Context context) {
         if (!isEnabled(context)) {
@@ -111,23 +103,20 @@ public final class QuoteNotifications {
         }
 
         long initialDelayMillis = calculateDelayTo4PM();
-
-        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(DailyQuoteWorker.class)
-                .setInitialDelay(initialDelayMillis, TimeUnit.MILLISECONDS)
-                .build();
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-                WORK_NAME_DAILY,
-                ExistingWorkPolicy.KEEP,
-                workRequest
-        );
+        WorkChain.arm(context, WORK_NAME_DAILY, DailyQuoteWorker.class, initialDelayMillis, null, null);
         Log.d(TAG, "Scheduled next daily notification targeting 4 PM (initial delay: "
                 + (initialDelayMillis / 1000 / 60) + " minutes)");
     }
 
+    /** Called by the worker after each run to arm tomorrow's occurrence behind the running one. */
+    static void rearmAfterRun(Context context) {
+        if (!isEnabled(context)) return;
+        WorkChain.rearmFromWorker(context, WORK_NAME_DAILY, DailyQuoteWorker.class,
+                calculateDelayTo4PM(), null, null);
+    }
+
     private static void cancelScheduledWork(Context context) {
-        WorkManager workManager = WorkManager.getInstance(context);
-        workManager.cancelUniqueWork(WORK_NAME_DAILY);
+        WorkChain.cancel(context, WORK_NAME_DAILY);
         Log.d(TAG, "Cancelled all scheduled notifications");
     }
 

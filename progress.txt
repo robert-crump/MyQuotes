@@ -1,3 +1,13 @@
+2026-09-19 — Issue #23: Backup Destination seam — one backup run for local and Drive
+
+Collapsed the two copy-pasted backup subsystems into one module. New: `BackupDestination` (interface) with `SafDestination` / `drive.DriveDestination` adapters; `BackupRun` (no Android state: encode pretty, hash the written bytes, skip if unchanged, write timestamped file, prune via BackupRetention, return SKIPPED_UNCHANGED / WRITTEN(hash) / FAILED(cause)); `BackupTarget` (per-destination constants; pref file names, channel ids and notification ids 1002/1003 unchanged); `BackupState`, `BackupNotifications`, `BackupScheduler`, and a single `BackupWorker` that picks the destination from input data. `LocalBackup` and `DriveBackup` shrank to thin facades; `LocalBackupWorker`/`DriveBackupWorker` deleted. `DriveBackup.connect(email)` / `disconnect()` fold the DriveAuth flag and the schedule together, so `SettingsActivity` makes one call per transition (four hand-paired sites gone; `DriveAuth.markConnected/disconnect` are now package-private).
+
+Defects closed: local and Drive now write identical pretty-printed bytes and the stored hash is over those bytes (first run after upgrade writes one extra backup because the old stored hash was of the compact string). Backups moved from PeriodicWorkRequest+UPDATE to the self-rescheduling one-shot chain via a new shared `scheduling.WorkChain`, which `QuoteNotifications` now uses too; old periodic jobs are cancelled on startup and the chains use new work names (`backup_local`, `backup_drive`), Drive keeps NetworkType.CONNECTED.
+
+Found while doing this: the #21 fix re-armed from inside `doWork()` with `ExistingWorkPolicy.KEEP`, but the running request still counts as unfinished work under that name, so KEEP is a no-op there and the chain only healed on the next app open. `WorkChain.rearmFromWorker` uses `APPEND_OR_REPLACE` (worker must return success or the appended successor is cancelled), and `DailyQuoteWorker` uses it too. Reasoned from WorkManager's documented semantics, NOT verified on device. Behaviour change: a failed backup run now posts the notification, re-arms, and returns success instead of Result.failure().
+
+Tests: new `BackupRunTest` (skip on unchanged hash, filename parses back to clock timestamp, recorded hash equals hash of received bytes, prune converges on 9 over 15 simulated days, write failure -> FAILED with no hash). Docs: CONTEXT.md (Backup Destination, Backup run, Auto-backup replace the two subsystem entries), ADR-003. Build and all unit tests pass. On-device verification deferred to the user. Issue #23 closed.
+
 2026-09-13 — Issue #21: Daily quote notification silent for weeks, then fired instantly on app open
 
 Diagnosed by elimination rather than logs (no device access): the two usual stock-Android causes for "background work goes silent until the app is reopened" were both ruled out via the user — battery setting was already "Unrestricted" the whole three weeks (rules out Doze/App Standby Bucket throttling), and the app was not force-stopped (rules out the OS cancelling all scheduled work until next manual launch). Device is a Pixel, so no OEM-specific battery manager (e.g. Samsung's separate Sleeping Apps list) is in play either.
@@ -45,38 +55,3 @@ Implemented:
 - Temporary debug button and its wiring in activity_settings.xml / SettingsActivity.java were removed after diagnosis was confirmed; not part of the final diff
 
 Build and all unit tests passed. Issue #18 closed.
-
-2026-07-25 — Issue #17: Google Drive daily auto-backup with tiered retention
-
-Implemented:
-- backup/BackupFilename.java, backup/BackupRetention.java — widened from package-private to public so the Drive destination (different package) can reuse the same timestamped-filename convention and 9-file retention logic established for local backups in #15; no behavior change
-- drive/DriveRestClient.java (new) — hand-rolled HttpURLConnection client for the handful of Drive REST API v3 calls needed (find-or-create folder by name/mimeType query, multipart upload, list files in a folder, delete); avoids pulling in the full google-api-client stack for this small a surface. All calls authenticate via a passed-in bearer access token
-- drive/DriveAuth.java — added package-private getAccessToken(Context): re-runs the Authorization API's authorize() for the drive.file scope with no UI (Tasks.await, 30s timeout), scoped to the connected account via android.accounts.Account; since consent was already granted interactively in #16, Play services returns a fresh token with hasResolution()=false. Throws if resolution is required again (e.g. consent revoked), which the worker surfaces as a failure rather than trying to resolve without an Activity
-- drive/DriveBackup.java (new) — facade (same pattern as LocalBackup): owns WorkManager scheduling (24h periodic, Constraints.NetworkType.CONNECTED so it runs on any network, not Wi-Fi only), the drive_backup_failure_channel notification channel, and last-backup-time/hash SharedPreferences. scheduleDailyBackup/cancelScheduledWork are called by SettingsActivity right alongside DriveAuth.markConnected/disconnect (Drive backup piggybacks on the existing connect toggle from #16 rather than adding a second switch); initialize() re-schedules on app start if already connected
-- drive/DriveBackupWorker.java (new) — Worker: loads quotes from QuotePreferences (same race-avoidance as LocalBackupWorker), skips if DriveAuth isn't connected or the SHA-256 hash of the encoded quotes matches the last successful Drive backup, mints an access token, finds-or-creates a single app-owned "MyQuotes Backups" folder under My Drive, uploads a timestamped file (BackupFilename), then prunes the folder via BackupRetention against the folder's file listing. Any failure (auth revoked, network, API error) posts a notification and returns Result.failure() without touching the local backup job's state
-- SettingsActivity.java — added text_drive_last_backup status line + updateDriveLastBackupText(), refreshed in onCreate/onResume like the local backup text; wired DriveBackup.scheduleDailyBackup/cancelScheduledWork into the three connect/disconnect paths (consent-UI success, immediate-grant success, switch-off, disconnect button)
-- activity_settings.xml — added text_drive_last_backup under the Drive card's account status line
-- MyApplication.java — calls DriveBackup.initialize(this) alongside LocalBackup.initialize(this)
-- AndroidManifest.xml — added INTERNET permission (Drive REST calls are the app's first outbound network traffic; ACCESS_NETWORK_STATE for the WorkManager network constraint already came in transitively via work-runtime)
-- strings.xml — added drive_backup_never/last_format/failed_title/failed_message
-- CONTEXT.md — documented the new Google Drive auto-backup subsystem and updated the Google Drive auth entry to mention getAccessToken
-
-Build and all unit tests passed. Issue #17 closed.
-
-2026-07-25 — Issue #16: Google Drive sign-in & connection status
-
-Implemented:
-- app/build.gradle — added androidx.credentials:credentials:1.5.0, androidx.credentials:credentials-play-services-auth:1.5.0 (both resolve to 1.6.0-beta01 via a transitive constraint), com.google.android.libraries.identity.googleid:googleid:1.2.0, com.google.android.gms:play-services-auth:21.6.0
-- drive/DriveAuth.java (new) — facade (same pattern as LocalBackup/QuoteNotifications): enabled + connected-account-email SharedPreferences; signIn(Activity, AccountCallback) shows the Credential Manager account chooser (GetGoogleIdOption, filterByAuthorizedAccounts=false) and resolves the signed-in account's email from the returned GoogleIdTokenCredential; authorizeDriveAccess(Activity, AuthorizationCallback) requests the drive.file scope via the Authorization API (Identity.getAuthorizationClient) and reports either immediate grant or a consent PendingIntent; completeAuthorizationResult(Context, Intent) finalizes that consent from an ActivityResult; markConnected/disconnect persist or clear the enabled+account state, disconnect also calls CredentialManager.clearCredentialStateAsync
-- SettingsActivity.java — added a driveAuthorizationLauncher (ActivityResultContracts.StartIntentSenderForResult) for the consent UI; new Drive switch orchestrates signIn -> authorizeDriveAccess -> (launch consent UI if required) -> markConnected, reverting the switch to off on cancel/failure at any step; disconnect (switch-off or the new Disconnect button) clears state immediately with no crash
-- activity_settings.xml — new "Google Drive" card: switch_drive_backup switch, text_drive_account status line ("Not connected" / "Connected as {email}"), btn_drive_disconnect (hidden unless connected)
-- strings.xml — added switch/status/toast strings for the Drive card
-- CONTEXT.md — documented the new Google Drive auth subsystem
-
-Note: this is auth plumbing only (per the issue) - no Drive reads/writes. The Credential Manager + Authorization API consent flow needs a real Google account and Play Services to exercise end-to-end; verified via compile + unit tests only, live sign-in flow needs manual on-device verification.
-
-Build and all unit tests passed. Issue #16 closed.
-
-On-device follow-up (same day): live testing surfaced two real bugs, both fixed and committed after #16 was closed.
-- SettingsActivity.java (8d72c91) — the failure/cancel paths called switchDriveBackup.setChecked(false) directly, which re-triggered the switch's own OnCheckedChangeListener and ran the disconnect branch, showing a misleading "Disconnected from Google Drive" toast instead of the real error. Fixed by detaching the listener while reverting the switch (new setDriveSwitchChecked helper + driveSwitchListener field).
-- Root cause of the actual auth failure (GetCredentialCustomException [28444] "Developer console is not set up correctly", diagnosed via adb logcat): local.properties' drive.oauth.client.id was the Android-type OAuth client from #14 (package name + SHA-1), but GetGoogleIdOption.setServerClientId() requires a Web application-type client instead. User created a Web client in Cloud Console and swapped it into local.properties (not committed - gitignored). Confirmed working end-to-end on device: account chooser -> consent -> "Connected as Robert".

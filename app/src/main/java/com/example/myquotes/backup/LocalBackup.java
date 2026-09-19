@@ -1,52 +1,28 @@
 package com.example.myquotes.backup;
 
 import android.app.Application;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.os.Build;
-import android.util.Log;
-
-import androidx.core.app.NotificationCompat;
-import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
-
-import com.example.myquotes.R;
-import com.example.myquotes.SettingsActivity;
-
-import java.util.concurrent.TimeUnit;
 
 /**
- * Public facade for the local auto-backup subsystem. All other modules talk to this class only;
- * the WorkManager worker, the persisted folder Uri, the failure notification channel, and the
- * enabled/last-backup SharedPreferences are internal details.
+ * Facade for the local-folder {@link BackupDestination}: owns the enabled flag and the persisted
+ * SAF folder permission. The run, schedule, state and failure notification are the shared Backup
+ * module's.
  */
 public final class LocalBackup {
-    private static final String TAG = "LocalBackup";
-
-    private static final String PREFS_NAME = "LocalBackupPrefs";
+    private static final BackupTarget TARGET = BackupTarget.LOCAL;
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_FOLDER_URI = "folder_uri";
-    private static final String KEY_LAST_BACKUP_TIME = "last_backup_time";
-    private static final String KEY_LAST_BACKUP_HASH = "last_backup_hash";
-
-    private static final String WORK_NAME_DAILY_BACKUP = "local_daily_backup";
-
-    static final String CHANNEL_ID = "backup_failure_channel";
-    static final int FAILURE_NOTIFICATION_ID = 1002;
 
     private LocalBackup() {}
 
-    /** Wire up the failure notification channel and re-schedule if enabled. */
+    /** Wire up the failure notification channel and re-arm if enabled. */
     public static void initialize(Application app) {
-        createChannel(app);
+        BackupScheduler.prepare(app, TARGET);
         if (isEnabled(app)) {
-            scheduleDailyBackup(app);
+            BackupScheduler.arm(app, TARGET);
         }
     }
 
@@ -57,9 +33,9 @@ public final class LocalBackup {
     public static void setEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply();
         if (enabled) {
-            scheduleDailyBackup(context);
+            BackupScheduler.arm(context, TARGET);
         } else {
-            cancelScheduledWork(context);
+            BackupScheduler.cancel(context, TARGET);
         }
     }
 
@@ -74,94 +50,19 @@ public final class LocalBackup {
         prefs(context).edit().putString(KEY_FOLDER_URI, treeUri.toString()).apply();
     }
 
-    static Uri getFolderUri(Context context) {
-        String uriString = prefs(context).getString(KEY_FOLDER_URI, null);
-        return uriString != null ? Uri.parse(uriString) : null;
-    }
-
     /** Millis since epoch of the last successful backup, or 0 if there has never been one. */
     public static long getLastBackupTime(Context context) {
-        return prefs(context).getLong(KEY_LAST_BACKUP_TIME, 0);
+        return BackupState.lastTime(context, TARGET);
     }
 
-    static String getLastBackupHash(Context context) {
-        return prefs(context).getString(KEY_LAST_BACKUP_HASH, null);
-    }
-
-    static void recordSuccessfulBackup(Context context, String contentHash) {
-        prefs(context).edit()
-                .putLong(KEY_LAST_BACKUP_TIME, System.currentTimeMillis())
-                .putString(KEY_LAST_BACKUP_HASH, contentHash)
-                .apply();
-
-        // Clear any stale failure notification from an earlier run now that a backup has succeeded.
-        NotificationManager notificationManager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) {
-            notificationManager.cancel(FAILURE_NOTIFICATION_ID);
-        }
-    }
-
-    static void scheduleDailyBackup(Context context) {
-        if (!isEnabled(context)) {
-            Log.d(TAG, "Auto-backup is disabled");
-            return;
-        }
-
-        PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
-                LocalBackupWorker.class,
-                24, TimeUnit.HOURS
-        ).build();
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME_DAILY_BACKUP,
-                ExistingPeriodicWorkPolicy.UPDATE,
-                workRequest
-        );
-        Log.d(TAG, "Scheduled daily local backup");
-    }
-
-    private static void cancelScheduledWork(Context context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME_DAILY_BACKUP);
-        Log.d(TAG, "Cancelled scheduled local backup");
+    /** The destination to back up to, or null if disabled or no folder was chosen. */
+    static BackupDestination destinationIfReady(Context context) {
+        String uriString = prefs(context).getString(KEY_FOLDER_URI, null);
+        if (!isEnabled(context) || uriString == null) return null;
+        return new SafDestination(context, Uri.parse(uriString));
     }
 
     private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-    }
-
-    private static void createChannel(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, "Backup Alerts", NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription("Alerts when an automatic quote backup fails");
-
-        NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
-        if (notificationManager != null) {
-            notificationManager.createNotificationChannel(channel);
-        }
-    }
-
-    static void notifyBackupFailed(Context context) {
-        Intent settingsIntent = new Intent(context, SettingsActivity.class);
-        settingsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent settingsPendingIntent = PendingIntent.getActivity(
-                context, 0, settingsIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_quotation_24dp)
-                .setContentTitle(context.getString(R.string.local_backup_failed_title))
-                .setContentText(context.getString(R.string.local_backup_failed_message))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setContentIntent(settingsPendingIntent)
-                .setAutoCancel(true);
-
-        NotificationManager notificationManager =
-                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) {
-            notificationManager.notify(FAILURE_NOTIFICATION_ID, builder.build());
-        }
+        return BackupState.prefs(context, TARGET);
     }
 }

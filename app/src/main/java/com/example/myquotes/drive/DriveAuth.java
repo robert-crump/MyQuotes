@@ -183,7 +183,7 @@ public final class DriveAuth {
     }
 
     /** Persists the connected account and turns the feature on. Call once authorization succeeds. */
-    public static void markConnected(Context context, String accountEmail) {
+    static void markConnected(Context context, String accountEmail) {
         prefs(context).edit()
                 .putBoolean(KEY_ENABLED, true)
                 .putString(KEY_ACCOUNT_EMAIL, accountEmail)
@@ -191,7 +191,7 @@ public final class DriveAuth {
     }
 
     /** Signs out, clears the connected account, and turns the feature off. */
-    public static void disconnect(Context context) {
+    static void disconnect(Context context) {
         prefs(context).edit()
                 .putBoolean(KEY_ENABLED, false)
                 .remove(KEY_ACCOUNT_EMAIL)

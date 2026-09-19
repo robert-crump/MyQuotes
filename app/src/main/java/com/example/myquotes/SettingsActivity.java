@@ -182,8 +182,7 @@ public class SettingsActivity extends AppCompatActivity {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                         try {
                             DriveAuth.completeAuthorizationResult(this, result.getData());
-                            DriveAuth.markConnected(this, pendingDriveEmail);
-                            DriveBackup.scheduleDailyBackup(this);
+                            DriveBackup.connect(this, pendingDriveEmail);
                             updateDriveConnectionUi();
                             Toast.makeText(this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
                         } catch (ApiException e) {
@@ -205,8 +204,7 @@ public class SettingsActivity extends AppCompatActivity {
             if (isChecked) {
                 startDriveConnect();
             } else {
-                DriveAuth.disconnect(this);
-                DriveBackup.cancelScheduledWork(this);
+                DriveBackup.disconnect(this);
                 updateDriveConnectionUi();
                 Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
             }
@@ -214,8 +212,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchDriveBackup.setOnCheckedChangeListener(driveSwitchListener);
 
         btnDriveDisconnect.setOnClickListener(v -> {
-            DriveAuth.disconnect(this);
-            DriveBackup.cancelScheduledWork(this);
+            DriveBackup.disconnect(this);
             setDriveSwitchChecked(false);
             updateDriveConnectionUi();
             Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
@@ -288,8 +285,7 @@ public class SettingsActivity extends AppCompatActivity {
                 DriveAuth.authorizeDriveAccess(SettingsActivity.this, new DriveAuth.AuthorizationCallback() {
                     @Override
                     public void onGranted() {
-                        DriveAuth.markConnected(SettingsActivity.this, pendingDriveEmail);
-                        DriveBackup.scheduleDailyBackup(SettingsActivity.this);
+                        DriveBackup.connect(SettingsActivity.this, pendingDriveEmail);
                         pendingDriveEmail = null;
                         updateDriveConnectionUi();
                         Toast.makeText(SettingsActivity.this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
