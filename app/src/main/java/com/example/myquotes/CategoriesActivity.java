@@ -1,10 +1,8 @@
 package com.example.myquotes;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;
-import android.util.Log;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -18,22 +16,12 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.myquotes.databinding.ActivityCategoriesBinding;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 public class CategoriesActivity extends AppCompatActivity {
-    private static final String TAG = "CategoriesActivity";
-    private static final String PREFS_NAME = "CategoryPrefs";
-    private static final String KEY_CATEGORIES = "saved_categories";
-
     private ActivityCategoriesBinding binding;
-    private QuoteCollection quoteCollection;
+    private Categories categories;
     private CategoriesAdapter adapter;
-    private List<String> categories;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,7 +39,7 @@ public class CategoriesActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        quoteCollection = MyApplication.getInstance().getQuoteCollection();
+        categories = MyApplication.getInstance().getCategories();
 
         // Setup RecyclerView
         RecyclerView recyclerView = binding.categoriesRecyclerView;
@@ -78,56 +66,7 @@ public class CategoriesActivity extends AppCompatActivity {
         // Setup FAB
         binding.fabAddCategory.setOnClickListener(v -> showAddCategoryDialog());
 
-        // Load categories
-        loadCategories();
-    }
-
-    private void loadCategories() {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        categories = new ArrayList<>();
-
-        // 1. Load saved categories from SharedPreferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String savedCategoriesJson = prefs.getString(KEY_CATEGORIES, "[]");
-        try {
-            JSONArray jsonArray = new JSONArray(savedCategoriesJson);
-            for (int i = 0; i < jsonArray.length(); i++) {
-                String category = jsonArray.getString(i);
-                if (!categories.contains(category)) {
-                    categories.add(category);
-                }
-            }
-        } catch (JSONException e) {
-            Log.e(TAG, "Error loading saved categories", e);
-        }
-
-        // 2. Collect any additional categories from the quotes themselves
-        for (Quote quote : allQuotes) {
-            String category = quote.getCategory();
-            if (!category.trim().isEmpty() && !categories.contains(category)) {
-                categories.add(category);
-            }
-        }
-
-        // 3. Sort alphabetically
-        Collections.sort(categories);
-
-        // 4. Update adapter
-        adapter.updateCategories(categories);
-
-        Log.d(TAG, "Loaded " + categories.size() + " categories");
-    }
-
-    private void saveCategoriesToPreferences() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        JSONArray jsonArray = new JSONArray();
-
-        for (String category : categories) {
-            jsonArray.put(category);
-        }
-
-        prefs.edit().putString(KEY_CATEGORIES, jsonArray.toString()).apply();
-        Log.d(TAG, "Saved " + categories.size() + " categories to preferences");
+        categories.getCategories().observe(this, adapter::updateCategories);
     }
 
     private void showAddCategoryDialog() {
@@ -155,10 +94,7 @@ public class CategoriesActivity extends AppCompatActivity {
                     if (categoryName.isEmpty()) {
                         return;
                     }
-                    if (categories.contains(categoryName)) {
-                        return;
-                    }
-                    addCategory(categoryName);
+                    categories.add(categoryName);
                 })
                 .setNegativeButton("Cancel", null)
                 .create();
@@ -170,17 +106,6 @@ public class CategoriesActivity extends AppCompatActivity {
         dialog.show();
 
         input.requestFocus();
-    }
-
-    private void addCategory(String categoryName) {
-        categories.add(categoryName);
-        Collections.sort(categories);
-
-        categories = new ArrayList<>(categories);
-        adapter.updateCategories(categories);
-        saveCategoriesToPreferences();
-
-        Log.d(TAG, "Added category: " + categoryName);
     }
 
     private void showRenameCategoryDialog(String oldName) {
@@ -209,10 +134,7 @@ public class CategoriesActivity extends AppCompatActivity {
                     if (newName.isEmpty()) {
                         return;
                     }
-                    if (newName.equals(oldName)) {
-                        return; // nothing changed
-                    }
-                    renameCategory(oldName, newName);
+                    categories.rename(oldName, newName);
                 })
                 .setNegativeButton("Cancel", null)
                 .create();
@@ -227,70 +149,16 @@ public class CategoriesActivity extends AppCompatActivity {
         input.selectAll();
     }
 
-    private void renameCategory(String oldName, String newName) {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        int updatedCount = 0;
-
-        // Update Quotes
-        for (Quote quote : allQuotes) {
-            if (oldName.equals(quote.getCategory())) {
-                quote.setCategory(newName);
-                quoteCollection.update(quote);
-                updatedCount++;
-            }
-        }
-
-        int index = categories.indexOf(oldName);
-        if (index >= 0) {
-            categories.set(index, newName);
-            Collections.sort(categories);
-            adapter.updateCategories(categories);
-            saveCategoriesToPreferences();
-        }
-
-        Log.d(TAG, "Renamed category in " + updatedCount + " quotes");
-    }
-
     private void showDeleteCategoryDialog(String categoryName) {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        int affectedQuotes = 0;
-
-        for (Quote quote : allQuotes) {
-            if (categoryName.equals(quote.getCategory())) {
-                affectedQuotes++;
-            }
-        }
-
-        final int count = affectedQuotes;
+        int count = categories.countQuotes(categoryName);
 
         new AlertDialog.Builder(this)
                 .setTitle("Delete Category")
                 .setMessage("Delete category \"" + categoryName + "\"?\n\n" +
                         "This will remove the category from " + count + " quote(s).")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    deleteCategory(categoryName);
-                })
+                .setPositiveButton("Delete", (dialog, which) -> categories.delete(categoryName))
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
-
-    private void deleteCategory(String categoryName) {
-        List<Quote> allQuotes = quoteCollection.getCurrentList();
-        int updatedCount = 0;
-
-        for (Quote quote : allQuotes) {
-            if (categoryName.equals(quote.getCategory())) {
-                quote.setCategory(null);
-                quoteCollection.update(quote);
-                updatedCount++;
-            }
-        }
-
-        categories.remove(categoryName);
-        adapter.updateCategories(categories);
-        saveCategoriesToPreferences();
-
-        Log.d(TAG, "Removed category from " + updatedCount + " quotes");
     }
 
     @Override

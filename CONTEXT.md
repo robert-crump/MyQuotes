@@ -8,6 +8,10 @@
 
 **Quote Store** — the persistence seam under the Quote Collection (`QuoteStore`): load the quote list (empty when nothing stored), save the list (including an empty one), and whether anything has ever been stored. Adapters: `SharedPreferencesQuoteStore` (`QuotePrefs/quotes_json`) in production, `InMemoryQuoteStore` in test sources. `MyApplication` builds the store and exposes it via `getQuoteStore()`; `DailyQuoteWorker` and `BackupWorker` read it by name instead of going through the Collection.
 
+**Category** — a free-text label on a Quote; the empty string means none (`Quote.setCategory` normalizes `null` to empty).
+
+**Category set** — the user-managed list of category names (persisted by `CategoryStore`, `SharedPreferencesCategoryStore` on `CategoryPrefs/saved_categories`) unioned with every category in use on a quote, deduplicated and sorted alphabetically. Owned by the `Categories` module (held by `MyApplication`), which exposes `all()`, `add`, `rename`, `delete` and a LiveData of the set. Rename and delete cascade through one batched `QuoteCollection.replaceCategory(old, new)` (one emission, one save). CategoriesActivity and the add/edit dropdown observe the set.
+
 **Reading Session** — a shuffled traversal of the Quote Collection. Tracks deck order, current position, and the currently displayed quote. Subscribes to the Quote Collection via `observeForever` and reconciles its deck reactively: new quotes append to the end, deleted quotes are removed with position adjusted, updated quotes are replaced in place. Implemented as an Android `ViewModel` scoped to `MainActivity`. Other flows (Favorites, Search results) maintain their own ordered views and do not use a Reading Session.
 
 **Deck** — the ordered list of quotes inside a Reading Session, in the order they will be presented to the user. Initially a shuffle of the full collection; mutated in place as the collection changes.

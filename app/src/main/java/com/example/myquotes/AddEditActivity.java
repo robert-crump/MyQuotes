@@ -36,15 +36,6 @@ public class AddEditActivity extends AppCompatActivity {
     private boolean isEditMode = false;
     private boolean isLoadingQuote = false;
 
-    private static final String[] CATEGORIES = {
-            "Achtsamkeit und Meditation",
-            "Führung und Zusammenarbeit",
-            "Literarische Passagen",
-            "Philosophie und Lebenssinn",
-            "Produktivität und Zeitmanagement",
-            "Psychologie und Verhalten"
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,9 +68,13 @@ public class AddEditActivity extends AppCompatActivity {
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
                 this,
                 android.R.layout.simple_dropdown_item_1line,
-                CATEGORIES
+                new java.util.ArrayList<>()
         );
         editTextCategory.setAdapter(adapter);
+        MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
+            adapter.clear();
+            adapter.addAll(names);
+        });
         editTextCategory.setDropDownHeight(600);
 
         editTextCategory.setOnFocusChangeListener((v, hasFocus) -> {

@@ -13,6 +13,7 @@ public class MyApplication extends Application {
     private static MyApplication instance;
     private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
+    private Categories categories;
 
     private static final String PREFS_NAME = "AppSettings";
     private static final String KEY_THEME_MODE = "theme_mode";
@@ -26,6 +27,7 @@ public class MyApplication extends Application {
         quoteStore = new SharedPreferencesQuoteStore(this);
         quoteCollection = new QuoteCollection(quoteStore);
         quoteCollection.loadFromStore();
+        categories = new Categories(new SharedPreferencesCategoryStore(this), quoteCollection);
         QuoteNotifications.initialize(this);
         LocalBackup.initialize(this);
         DriveBackup.initialize(this);
@@ -41,6 +43,10 @@ public class MyApplication extends Application {
 
     public QuoteCollection getQuoteCollection() {
         return quoteCollection;
+    }
+
+    public Categories getCategories() {
+        return categories;
     }
 
     public void applyTheme() {

@@ -37,7 +37,7 @@ public class Quote {
     public void setSource(String source) { this.source = source; }
 
     public String getCategory() { return category != null ? category : ""; }
-    public void setCategory(String category) { this.category = category; }
+    public void setCategory(String category) { this.category = category != null ? category : ""; }
 
     public boolean isFavorite() { return isFavorite; }
     public void setFavorite(boolean favorite) { isFavorite = favorite; }

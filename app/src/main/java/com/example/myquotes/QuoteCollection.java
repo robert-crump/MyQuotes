@@ -89,6 +89,25 @@ public class QuoteCollection {
         update(edited);
     }
 
+    // Rewrites the category on every quote that has `oldName`; `newName` may be empty (none).
+    // One emission and one save regardless of how many quotes match. Returns the match count.
+    public int replaceCategory(String oldName, String newName) {
+        List<Quote> updated = getCurrentList();
+        int count = 0;
+        for (Quote quote : updated) {
+            if (oldName.equals(quote.getCategory())) {
+                quote.setCategory(newName);
+                count++;
+            }
+        }
+        if (count > 0) {
+            liveQuoteList.setValue(updated);
+            save(updated);
+            Log.d(TAG, "Replaced category on " + count + " quotes");
+        }
+        return count;
+    }
+
     public void deleteById(int id) {
         List<Quote> updated = getCurrentList();
         if (updated.removeIf(q -> q.getId() == id)) {

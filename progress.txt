@@ -1,3 +1,11 @@
+2026-09-19 — Issue #25: Categories module — one owner for the category set and its rename/delete cascades
+
+New `Categories` (held by `MyApplication`, over a `CategoryStore` seam with `SharedPreferencesCategoryStore` on the unchanged `CategoryPrefs/saved_categories`, so existing lists survive). Owns the union rule (saved names + names in use, blanks dropped, deduped, sorted), `all()/add/rename/delete/countQuotes`, and a MediatorLiveData of the set that re-emits on saved-name or quote changes. `QuoteCollection.replaceCategory(old, new)` rewrites all matching quotes with one emission and one save; rename/delete use it (previously N updates each). `Quote.setCategory(null)` now stores "", so delete leaves "" like everywhere else.
+
+Screens: `CategoriesActivity` lost all SharedPreferences/JSON code and the cascade loops (observes the module); `AddEditActivity` fills its dropdown from the live set and the hardcoded six-entry array is gone (behaviour change: those six names only show if saved or in use). Statistics/Search untouched.
+
+Tests: new `CategoriesTest` (union, blank/null as none, add, rename and delete each one emission + one save, live re-emit) with `InMemoryCategoryStore`. Docs: CONTEXT.md (Category, Category set). On-device verification deferred to the user. Issue #25 closed.
+
 2026-09-19 — Issue #24: Quote Store seam — testable Quote Collection and Reading Session; fix edit and last-delete data loss
 
 New `QuoteStore` interface (load / save incl. empty / hasStoredQuotes) with `SharedPreferencesQuoteStore` (same `QuotePrefs/quotes_json`, so existing users load unchanged) and a test-source `InMemoryQuoteStore`. `QuoteCollection(QuoteStore)` no longer takes a Context; `MyApplication.onCreate` builds store + collection and calls `loadFromStore()` (includes trimFields). `ReadingSession(QuoteCollection)` is supplied by a `ViewModelProvider.Factory` in `MainActivity`. `DailyQuoteWorker` and `BackupWorker` read `MyApplication.getQuoteStore().load()`; both "NOT QuoteCollection" comments are gone. `QuotePreferences` shrank to the first-launch flag only (dead `last_sync_time` / `initial_csv_loaded` keys and the three quote methods removed).
@@ -43,11 +51,3 @@ On-device follow-up #2 (separate commit — the #20 commit had been pushed to or
 
 Build and all unit tests passed after each follow-up. On-device verification deferred to the user per their request. Issue #20 closed.
 
-2026-09-01 — Issue #19: Replace custom border-drawable tags with real Material3 Chip components
-
-Implemented:
-- item_quote_page.xml — text_author, text_source, text_category converted from plain TextViews with android:background="@drawable/border_*" to com.google.android.material.chip.Chip (style="@style/Widget.Material3.Chip.Assist"), android:checkable="false" so a tap can't toggle a checked visual state. text_author keeps its filled look via app:chipBackgroundColor="?attr/colorPrimaryContainer" + app:chipStrokeWidth="0dp" (was border_author's solid colorPrimaryContainer fill); text_source/text_category keep their outlined look via app:chipBackgroundColor="transparent" + app:chipStrokeColor="?attr/colorOutlineVariant" + app:chipStrokeWidth="1dp" (was border_source's transparent+stroke). android:ellipsize="end" added since Chip doesn't truncate long text by default the way the old TextViews visually just got cut off.
-- QuotePagerAdapter.java — textAuthor/textSource/textCategory fields retyped from TextView to com.google.android.material.chip.Chip; setText/setVisibility/setOnClickListener calls unchanged since Chip is TextView-compatible for all of these. Click-to-filter behavior (onAuthorClick/onSourceClick/onCategoryClick) unaffected since checkable=false means only the wired click listener fires, no separate checked-state toggle.
-- Deleted border_author.xml, border_source.xml (both now unreferenced), border_category.xml and chip_background_deselected.xml (confirmed dead code — zero references anywhere in the codebase before this change too, chip_background_deselected.xml still referenced the pre-MD3 @color/purple_primary).
-
-Build and all unit tests passed. On-device verification of the click-to-filter behavior deferred to the user per their request. Issue #19 closed.
