@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * One backup of the quote list to one {@link BackupDestination}: encode, hash the bytes that will
- * be written, skip if unchanged, write a timestamped file, prune to {@link BackupRetention}.
+ * be written, skip if unchanged and the destination still has a backup, write a timestamped file, prune to {@link BackupRetention}.
  * Deliberately free of Android state: recording the outcome is the caller's job.
  */
 public final class BackupRun {
@@ -43,11 +43,13 @@ public final class BackupRun {
             // Pretty-printed to match the manual export; the hash covers exactly these bytes.
             byte[] bytes = QuoteCodec.encodePretty(quotes).getBytes(StandardCharsets.UTF_8);
             String hash = sha256(bytes);
-            if (hash.equals(lastHash)) {
+            destination.checkAvailable();
+            // Unchanged content is only skipped while the destination still holds a backup; a
+            // new account or a hand-deleted folder gets one even though the hash matches.
+            if (hash.equals(lastHash) && hasBackups(destination)) {
                 return new Outcome(Kind.SKIPPED_UNCHANGED, null, null, null);
             }
 
-            destination.checkAvailable();
             String filename = BackupFilename.forTimestamp(nowMillis);
             destination.write(filename, bytes);
             prune(destination);
@@ -55,6 +57,13 @@ public final class BackupRun {
         } catch (Exception e) {
             return new Outcome(Kind.FAILED, null, null, e);
         }
+    }
+
+    private static boolean hasBackups(BackupDestination destination) throws Exception {
+        for (BackupDestination.Entry entry : destination.list()) {
+            if (BackupFilename.parseTimestamp(entry.name) != null) return true;
+        }
+        return false;
     }
 
     private static void prune(BackupDestination destination) throws Exception {

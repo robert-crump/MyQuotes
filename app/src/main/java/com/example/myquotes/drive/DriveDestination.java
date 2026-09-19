@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * The app-owned "MyQuotes Backups" folder under My Drive. Network and auth happen lazily in
- * {@link #checkAvailable}, so an unchanged-content run never touches the network.
+ * {@link #checkAvailable}, which creates the folder if it is missing.
  */
 final class DriveDestination implements BackupDestination {
     private static final String BACKUP_FOLDER_NAME = "MyQuotes Backups";

@@ -28,4 +28,12 @@ public final class BackupState {
                 .putString(KEY_LAST_BACKUP_HASH, hash)
                 .apply();
     }
+
+    /** Forgets the last backup, so the next run writes even if the content is unchanged. */
+    public static void clear(Context context, BackupTarget target) {
+        prefs(context, target).edit()
+                .remove(KEY_LAST_BACKUP_TIME)
+                .remove(KEY_LAST_BACKUP_HASH)
+                .apply();
+    }
 }

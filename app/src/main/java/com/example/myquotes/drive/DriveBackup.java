@@ -26,9 +26,10 @@ public final class DriveBackup {
         }
     }
 
-    /** Records the connected account and starts the daily upload chain. Call once authorization succeeds. */
+    /** Records the connected account and starts the daily upload chain, with a first upload right away. Call once authorization succeeds. */
     public static void connect(Context context, String accountEmail) {
         DriveAuth.markConnected(context, accountEmail);
+        BackupState.clear(context, TARGET); // a new account has no backup yet
         BackupScheduler.arm(context, TARGET);
     }
 
@@ -36,6 +37,7 @@ public final class DriveBackup {
     public static void disconnect(Context context) {
         DriveAuth.disconnect(context);
         BackupScheduler.cancel(context, TARGET);
+        BackupState.clear(context, TARGET); // Drive files are left alone
     }
 
     /** Millis since epoch of the last successful Drive backup, or 0 if there has never been one. */

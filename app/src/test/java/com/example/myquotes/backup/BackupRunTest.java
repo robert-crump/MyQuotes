@@ -89,6 +89,17 @@ public class BackupRunTest {
     }
 
     @Test
+    public void writesDespiteMatchingHashWhenDestinationHasNoBackups() {
+        InMemoryDestination dest = new InMemoryDestination();
+        String hash = BackupRun.run(quotes("a"), null, new InMemoryDestination(), NOW).hash;
+
+        BackupRun.Outcome outcome = BackupRun.run(quotes("a"), hash, dest, NOW + DAY);
+
+        assertEquals(BackupRun.Kind.WRITTEN, outcome.kind);
+        assertEquals(1, dest.files.size());
+    }
+
+    @Test
     public void pruneConvergesOnNineFilesOverSimulatedDays() {
         InMemoryDestination dest = new InMemoryDestination();
         String hash = null;
