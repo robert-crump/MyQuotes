@@ -119,13 +119,13 @@ public class StatisticsActivity extends AppCompatActivity {
         // Anzahl ohne Kategorie anzeigen
         textNoCategory.setText("Without category: " + noCategoryCount);
 
-        StatItemAdapter authorAdapter = new StatItemAdapter(topAuthors, "Author");
+        StatItemAdapter authorAdapter = new StatItemAdapter(topAuthors, QuoteQuery.Field.AUTHOR);
         recyclerTopAuthors.setAdapter(authorAdapter);
 
-        StatItemAdapter sourceAdapter = new StatItemAdapter(topSources, "Source");
+        StatItemAdapter sourceAdapter = new StatItemAdapter(topSources, QuoteQuery.Field.SOURCE);
         recyclerTopSources.setAdapter(sourceAdapter);
 
-        StatItemAdapter categoryAdapter = new StatItemAdapter(topCategories, "Category");
+        StatItemAdapter categoryAdapter = new StatItemAdapter(topCategories, QuoteQuery.Field.CATEGORY);
         recyclerCategories.setAdapter(categoryAdapter);
     }
 

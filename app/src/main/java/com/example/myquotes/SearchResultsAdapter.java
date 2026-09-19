@@ -13,7 +13,7 @@ import java.util.List;
 
 public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdapter.ViewHolder> {
     private List<Quote> quotes = new ArrayList<>();
-    private String searchQuery = "";
+    private QuoteQuery query = QuoteQuery.all("");
     private OnQuoteClickListener clickListener;
 
     public interface OnQuoteClickListener {
@@ -25,9 +25,9 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
         this.clickListener = listener;
     }
 
-    public void updateResults(List<Quote> newQuotes, String query) {
+    public void updateResults(List<Quote> newQuotes, QuoteQuery query) {
         this.quotes = newQuotes;
-        this.searchQuery = query;
+        this.query = query;
         notifyDataSetChanged();
     }
 
@@ -42,7 +42,7 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Quote quote = quotes.get(position);
-        holder.bind(quote, position + 1, searchQuery);
+        holder.bind(quote, position + 1, query);
     }
 
     @Override
@@ -69,7 +69,7 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
             });
         }
 
-        public void bind(Quote quote, int position, String query) {
+        public void bind(Quote quote, int position, QuoteQuery query) {
             searchResultNumber.setText(String.valueOf(position));
 
             String author = quote.getAuthor();
@@ -77,24 +77,8 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
             String authorSource = author + " - " + source;
             authorSourceTextView.setText(authorSource);
 
-            String snippet = getSnippet(quote.getQuoteText(), query);
+            String snippet = query.snippet(quote.getQuoteText());
             quoteSnippetTextView.setText(snippet);
-        }
-
-        private String getSnippet(String text, String query) {
-            int index = query.isEmpty() ? -1 : text.toLowerCase().indexOf(query.toLowerCase());
-            if (index == -1) {
-                return text.length() <= 100 ? text : text.substring(0, 100) + "...";
-            }
-
-            int start = Math.max(0, index - 40);
-            int end = Math.min(text.length(), index + query.length() + 60);
-
-            String snippet = text.substring(start, end);
-            if (start > 0) snippet = "..." + snippet;
-            if (end < text.length()) snippet = snippet + "...";
-
-            return snippet;
         }
     }
 }

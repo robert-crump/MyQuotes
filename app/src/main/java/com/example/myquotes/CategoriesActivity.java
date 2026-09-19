@@ -171,9 +171,7 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void openSearchForCategory(String categoryName) {
-        Intent intent = new Intent(this, SearchActivity.class);
-        intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, categoryName);
-        intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "category");
+        Intent intent = QuoteQuery.forField(QuoteQuery.Field.CATEGORY, categoryName).toIntent(this);
         startActivity(intent);
     }
 }

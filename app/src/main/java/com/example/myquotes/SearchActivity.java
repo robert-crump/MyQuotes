@@ -24,10 +24,6 @@ import java.util.List;
 
 public class SearchActivity extends AppCompatActivity implements SearchResultsAdapter.OnQuoteClickListener {
     private static final String TAG = "SearchActivity";
-    private static final int MIN_QUERY_LENGTH = 3;
-
-    public static final String EXTRA_SEARCH_QUERY = "search_query";
-    public static final String EXTRA_FILTER_TYPE = "filter_type";
 
     private Chip filterQuote;
     private Chip filterAuthor;
@@ -41,12 +37,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes;
 
-    // Active filter states
-    private boolean filterQuoteEnabled = true;
-    private boolean filterAuthorEnabled = true;
-    private boolean filterSourceEnabled = true;
-    private boolean filterCategoryEnabled = true;
-
+    private QuoteQuery query = QuoteQuery.all("");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,11 +69,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
                 allQuotes = new ArrayList<>();
             }
 
-            // Re-run any active search to reflect the updated list
-            String currentQuery = searchEditText.getText().toString();
-            if (!currentQuery.isEmpty() && currentQuery.length() >= MIN_QUERY_LENGTH) {
-                performSearch(currentQuery);
-            }
+            rerunSearch();
         });
 
         // Setup RecyclerView
@@ -100,8 +87,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         handleIntentExtras();
 
         // Show keyboard only when opened from Search icon (no pre-set query)
-        String searchQuery = getIntent().getStringExtra(EXTRA_SEARCH_QUERY);
-        if (searchQuery == null || searchQuery.isEmpty()) {
+        if (QuoteQuery.fromIntent(getIntent()) == null) {
             // Opened via search icon — show keyboard
             searchEditText.requestFocus();
             searchEditText.setSelection(0);
@@ -118,37 +104,12 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     }
 
     private void handleIntentExtras() {
-        Intent intent = getIntent();
-
-        String searchQuery = intent.getStringExtra(EXTRA_SEARCH_QUERY);
-        if (searchQuery != null && !searchQuery.isEmpty()) {
-            searchEditText.setText(searchQuery);
-
-            // Disable all filters, then enable only the requested one
-            filterQuoteEnabled = false;
-            filterAuthorEnabled = false;
-            filterSourceEnabled = false;
-            filterCategoryEnabled = false;
-
-            String filterType = intent.getStringExtra(EXTRA_FILTER_TYPE);
-            if (filterType != null) {
-                switch (filterType) {
-                    case "author":
-                        filterAuthorEnabled = true;
-                        break;
-                    case "source":
-                        filterSourceEnabled = true;
-                        break;
-                    case "category":
-                        filterCategoryEnabled = true;
-                        break;
-                }
-            }
-
-            // Update die Chip-Styles basierend auf den neuen boolean-Werten
+        QuoteQuery initial = QuoteQuery.fromIntent(getIntent());
+        if (initial != null) {
+            query = initial;
+            searchEditText.setText(initial.getText());
             updateFilterButtonStates();
-
-            performSearch(searchQuery);
+            rerunSearch();
         }
     }
 
@@ -156,7 +117,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         searchEditText.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 hideKeyboard();
-                performSearch(searchEditText.getText().toString());
+                rerunSearch();
                 return true;
             }
             return false;
@@ -169,12 +130,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() >= MIN_QUERY_LENGTH) {
-                    performSearch(s.toString());
-                } else {
-                    adapter.updateResults(new ArrayList<>(), "");
-                    updateResultCount(0);
-                }
+                rerunSearch();
             }
 
             @Override
@@ -184,43 +140,27 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     }
 
     private void setupFilterButtons() {
-        setupChip(filterQuote, () -> {
-            filterQuoteEnabled = !filterQuoteEnabled;
-            updateFilterButtonStates();
-            performSearch(searchEditText.getText().toString());
-        });
-
-        setupChip(filterAuthor, () -> {
-            filterAuthorEnabled = !filterAuthorEnabled;
-            updateFilterButtonStates();
-            performSearch(searchEditText.getText().toString());
-        });
-
-        setupChip(filterSource, () -> {
-            filterSourceEnabled = !filterSourceEnabled;
-            updateFilterButtonStates();
-            performSearch(searchEditText.getText().toString());
-        });
-
-        setupChip(filterCategory, () -> {
-            filterCategoryEnabled = !filterCategoryEnabled;
-            updateFilterButtonStates();
-            performSearch(searchEditText.getText().toString());
-        });
-
+        setupChip(filterQuote, QuoteQuery.Field.QUOTE_TEXT);
+        setupChip(filterAuthor, QuoteQuery.Field.AUTHOR);
+        setupChip(filterSource, QuoteQuery.Field.SOURCE);
+        setupChip(filterCategory, QuoteQuery.Field.CATEGORY);
         updateFilterButtonStates();
     }
 
-    private void setupChip(com.google.android.material.chip.Chip chip, Runnable onToggle) {
-        chip.setOnClickListener(v -> onToggle.run());
+    private void setupChip(com.google.android.material.chip.Chip chip, QuoteQuery.Field field) {
+        chip.setOnClickListener(v -> {
+            query = query.toggled(field);
+            updateFilterButtonStates();
+            rerunSearch();
+        });
         chip.setCheckable(false);
     }
 
     private void updateFilterButtonStates() {
-        updateChipStyle(filterQuote, filterQuoteEnabled);
-        updateChipStyle(filterAuthor, filterAuthorEnabled);
-        updateChipStyle(filterSource, filterSourceEnabled);
-        updateChipStyle(filterCategory, filterCategoryEnabled);
+        updateChipStyle(filterQuote, query.hasField(QuoteQuery.Field.QUOTE_TEXT));
+        updateChipStyle(filterAuthor, query.hasField(QuoteQuery.Field.AUTHOR));
+        updateChipStyle(filterSource, query.hasField(QuoteQuery.Field.SOURCE));
+        updateChipStyle(filterCategory, query.hasField(QuoteQuery.Field.CATEGORY));
     }
 
     private void updateChipStyle(com.google.android.material.chip.Chip chip, boolean isEnabled) {
@@ -252,48 +192,10 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         }
     }
 
-    private void performSearch(String query) {
-        String searchQuery = query.toLowerCase().trim();
-        List<Quote> results = new ArrayList<>();
-
-        if (allQuotes == null) {
-            Log.w(TAG, "performSearch called but allQuotes is null");
-            allQuotes = new ArrayList<>();
-            adapter.updateResults(results, "");
-            updateResultCount(0);
-            return;
-        }
-
-        if (searchQuery.length() < MIN_QUERY_LENGTH) {
-            adapter.updateResults(results, "");
-            updateResultCount(0);
-            return;
-        }
-
-        for (Quote quote : allQuotes) {
-            boolean matches = false;
-
-            if (filterQuoteEnabled && quote.getQuoteText().toLowerCase().contains(searchQuery)) {
-                matches = true;
-            }
-            if (filterAuthorEnabled && quote.getAuthor().toLowerCase().contains(searchQuery)) {
-                matches = true;
-            }
-            if (filterSourceEnabled && quote.getSource().toLowerCase().contains(searchQuery)) {
-                matches = true;
-            }
-            if (filterCategoryEnabled && quote.getCategory().toLowerCase().contains(searchQuery)) {
-                matches = true;
-            }
-
-            if (matches) {
-                results.add(quote);
-            }
-        }
-
-        Log.d(TAG, "Search for '" + searchQuery + "' found " + results.size() + " results");
-
-        adapter.updateResults(results, searchQuery);
+    private void rerunSearch() {
+        query = query.withText(searchEditText.getText().toString());
+        List<Quote> results = query.filter(allQuotes);
+        adapter.updateResults(results, query);
         updateResultCount(results.size());
     }
 
@@ -322,10 +224,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
                 allQuotes = new ArrayList<>();
             }
 
-            String currentQuery = searchEditText.getText().toString();
-            if (!currentQuery.isEmpty() && currentQuery.length() >= MIN_QUERY_LENGTH) {
-                performSearch(currentQuery);
-            }
+            rerunSearch();
 
             Toast.makeText(this, "Quote no longer exists - results updated", Toast.LENGTH_SHORT).show();
             return;
@@ -345,11 +244,7 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
         List<Quote> currentQuotes = quoteCollection.getQuoteList().getValue();
         if (currentQuotes != null && !currentQuotes.equals(allQuotes)) {
             allQuotes = currentQuotes;
-
-            String currentQuery = searchEditText.getText().toString();
-            if (!currentQuery.isEmpty() && currentQuery.length() >= MIN_QUERY_LENGTH) {
-                performSearch(currentQuery);
-            }
+            rerunSearch();
         }
     }
 

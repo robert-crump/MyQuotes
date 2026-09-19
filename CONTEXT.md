@@ -26,6 +26,8 @@
 
 **Search / category flow** — list or pager in SearchActivity / CategoriesActivity driven by a filtered view of the Quote Collection.
 
+**Quote Query** — immutable search predicate: normalized (trimmed, lowercased) text plus the set of fields in scope (quote text, author, source, category). Owns matching (case-insensitive contains), the 3-character minimum, and result snippet extraction. A query over all four fields is what typing in the search box produces; a single-field query is what author/source/category click-through and Statistics produce. `toIntent`/`fromIntent` are the only protocol for opening SearchActivity for a query. `SearchActivity` holds one as its state; chip toggles produce a new query.
+
 ## Subsystems
 
 **Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the boot-reschedule BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.

@@ -12,11 +12,11 @@ import java.util.List;
 
 public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHolder> {
     private final List<StatisticsActivity.StatItem> items;
-    private final String label;
+    private final QuoteQuery.Field field;
 
-    public StatItemAdapter(List<StatisticsActivity.StatItem> items, String label) {
+    public StatItemAdapter(List<StatisticsActivity.StatItem> items, QuoteQuery.Field field) {
         this.items = items;
-        this.label = label;
+        this.field = field;
     }
 
     @NonNull
@@ -54,9 +54,8 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
                 if (position != RecyclerView.NO_POSITION) {
                     StatisticsActivity.StatItem item = items.get(position);
 
-                    android.content.Intent intent = new android.content.Intent(itemView.getContext(), SearchActivity.class);
-                    intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, item.name);
-                    intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, label.toLowerCase());
+                    android.content.Intent intent = QuoteQuery.forField(field, item.name)
+                            .toIntent(itemView.getContext());
                     itemView.getContext().startActivity(intent);
                 }
             });

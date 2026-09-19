@@ -281,27 +281,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void searchByAuthor(Quote quote) {
         if (quote != null && !quote.getAuthor().isEmpty()) {
-            Intent intent = new Intent(this, SearchActivity.class);
-            intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getAuthor());
-            intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "author");
+            Intent intent = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, quote.getAuthor()).toIntent(this);
             searchActivityLauncher.launch(intent);
         }
     }
 
     private void searchBySource(Quote quote) {
         if (quote != null && !quote.getSource().isEmpty()) {
-            Intent intent = new Intent(this, SearchActivity.class);
-            intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getSource());
-            intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "source");
+            Intent intent = QuoteQuery.forField(QuoteQuery.Field.SOURCE, quote.getSource()).toIntent(this);
             searchActivityLauncher.launch(intent);
         }
     }
 
     private void searchByCategory(Quote quote) {
         if (quote != null && !quote.getCategory().isEmpty()) {
-            Intent intent = new Intent(this, SearchActivity.class);
-            intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getCategory());
-            intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "category");
+            Intent intent = QuoteQuery.forField(QuoteQuery.Field.CATEGORY, quote.getCategory()).toIntent(this);
             searchActivityLauncher.launch(intent);
         }
     }

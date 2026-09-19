@@ -55,9 +55,7 @@ public class FavoritesActivity extends AppCompatActivity {
             @Override
             public void onAuthorClick(Quote quote) {
                 if (quote != null && !quote.getAuthor().isEmpty()) {
-                    Intent intent = new Intent(FavoritesActivity.this, SearchActivity.class);
-                    intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getAuthor());
-                    intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "author");
+                    Intent intent = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, quote.getAuthor()).toIntent(FavoritesActivity.this);
                     startActivity(intent);
                 }
             }
@@ -65,9 +63,7 @@ public class FavoritesActivity extends AppCompatActivity {
             @Override
             public void onSourceClick(Quote quote) {
                 if (quote != null && !quote.getSource().isEmpty()) {
-                    Intent intent = new Intent(FavoritesActivity.this, SearchActivity.class);
-                    intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getSource());
-                    intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "source");
+                    Intent intent = QuoteQuery.forField(QuoteQuery.Field.SOURCE, quote.getSource()).toIntent(FavoritesActivity.this);
                     startActivity(intent);
                 }
             }
@@ -75,9 +71,7 @@ public class FavoritesActivity extends AppCompatActivity {
             @Override
             public void onCategoryClick(Quote quote) {
                 if (quote != null && !quote.getCategory().isEmpty()) {
-                    Intent intent = new Intent(FavoritesActivity.this, SearchActivity.class);
-                    intent.putExtra(SearchActivity.EXTRA_SEARCH_QUERY, quote.getCategory());
-                    intent.putExtra(SearchActivity.EXTRA_FILTER_TYPE, "category");
+                    Intent intent = QuoteQuery.forField(QuoteQuery.Field.CATEGORY, quote.getCategory()).toIntent(FavoritesActivity.this);
                     startActivity(intent);
                 }
             }
