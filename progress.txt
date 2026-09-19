@@ -1,3 +1,9 @@
+2026-09-19 — Issue #31: Unit tests for Quote, SuggestionProvider, SourceSuggestions
+
+New `QuoteTest` (favorite toggle/timestamp, recordView, null-as-empty getters, id-only equality/hash, constructor), `SuggestionProviderTest` (author tiers exact/prefix/contains, case-insensitivity, duplicate collapse, count-then-name order, no match; source author/other split, alphabetical order, empty author context, de-duplication) and `SourceSuggestionsTest`. Scaffold `ExampleUnitTest` removed. Short-query gating lives in AddEditActivity (min 2 chars), not the provider, so it is not tested here.
+
+Defect found and fixed: `SourceSuggestions.hasSplit()` returned true whenever author sources existed, even with no other sources, so the adapter added a dangling divider row. It now requires both lists non-empty. Build and all unit tests pass. Issue #31 closed.
+
 2026-09-19 — Issue #30: Notifications enabled flag — permission rule moved into the facade, Settings switch refreshes on resume
 
 `QuoteNotifications.onPermissionResult(context, requestCode, grantResults)` now owns "permission granted, therefore enable": returns null for a foreign request code, else whether notifications are enabled (granting calls `setEnabled(true)`). `MainActivity.onRequestPermissionsResult` only delegates and toasts. `SettingsActivity` keeps the daily switch and its listener as fields and re-syncs the switch in `onResume` via `setDailyNotificationChecked` (listener detached/reattached, same pattern as the Drive switch), so a permission grant on the main screen shows up in Settings. The facade is the only class touching the flag's SharedPreferences.
@@ -5,25 +11,3 @@
 No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.
 
 2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
-
-New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
-
-Tests: new `QuoteImporterTest` (pretty round-trip, malformed JSON, legacy bare array, stream failure). Build and all unit tests pass. On-device verification deferred to the user. Issue #29 closed.
-
-2026-09-19 — Issue #28: Quote Statistics module — aggregation out of StatisticsActivity, StatItem un-nested
-
-New pure `QuoteStatistics.of(List<Quote>)` returns an immutable value (total, favoriteCount, topAuthors[10], topSources[10, empty excluded], categories[all, empty excluded], withoutCategoryCount). One private `rank` helper replaces the three count-sort-limit stanzas; ties now sort by count desc then name asc (deterministic). `StatItem` is a top-level class; `StatItemAdapter` no longer references `StatisticsActivity`, takes only its `QuoteQuery.Field`, and has `setItems`. `StatisticsActivity` creates the three adapters once and updates them in place per emission; empty list still shows "No quotes available".
-
-Tests: new `QuoteStatisticsTest` (counts/favorites, top-10 limit, empty source, empty category, tie order, empty list). Docs: CONTEXT.md (Quote Statistics). Build and all unit tests pass. On-device verification deferred to the user. Issue #28 closed.
-
-2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
-
-New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.
-
-2026-09-19 — Issue #26: Quote Query module — typed search predicate and filter protocol
-
-New immutable `QuoteQuery` (normalized text + `EnumSet<Field>` of QUOTE_TEXT/AUTHOR/SOURCE/CATEGORY): `matches`, `filter`, `isActive` (min length 3), `snippet` (moved out of SearchResultsAdapter, double-lowercasing gone), `toggled(field)`, `withText`, and the single intent protocol `toIntent(Context)` / `fromIntent(Intent)`. The `"author"/"source"/"category"` literals, `EXTRA_FILTER_TYPE`/`EXTRA_SEARCH_QUERY`, and the decoding `switch` are gone; MainActivity (3), FavoritesActivity (3), CategoriesActivity and StatItemAdapter all build `QuoteQuery.forField(...)`. `StatItemAdapter` now takes a `QuoteQuery.Field` instead of deriving it from a display label.
-
-`SearchActivity` keeps a `QuoteQuery` as state (four booleans removed); the three pasted re-run blocks and both TextWatcher/IME/chip paths are one `rerunSearch()`. `SearchResultsAdapter.updateResults` takes a `QuoteQuery` and has no snippet logic. Behaviour unchanged: same results, chips, snippets.
-
-Tests: new `QuoteQueryTest` (per-field matching, field set, case/trim, min length, filter, snippet middle/start/end/short/no-match). Docs: CONTEXT.md (Quote Query). Build and all unit tests pass. On-device verification deferred to the user. Issue #26 closed.

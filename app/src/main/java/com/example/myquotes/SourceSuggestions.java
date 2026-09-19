@@ -12,6 +12,6 @@ public class SourceSuggestions {
     }
 
     public boolean hasSplit() {
-        return !authorSources.isEmpty();
+        return !authorSources.isEmpty() && !otherSources.isEmpty();
     }
 }
