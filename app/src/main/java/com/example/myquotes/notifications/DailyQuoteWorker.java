@@ -4,7 +4,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -14,6 +13,7 @@ import androidx.work.WorkerParameters;
 
 import com.example.myquotes.MainActivity;
 import com.example.myquotes.Quote;
+import com.example.myquotes.QuoteTextRenderer;
 import com.example.myquotes.MyApplication;
 import com.example.myquotes.R;
 
@@ -65,19 +65,16 @@ public class DailyQuoteWorker extends Worker {
                 context, 0, openIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        String quoteText = selectedQuote.getQuoteText();
-        String author = selectedQuote.getAuthor();
-
-        String title = TextUtils.isEmpty(author)
-                ? context.getString(R.string.daily_quote_title)
-                : context.getString(R.string.daily_quote_title_with_author, author);
+        String title = QuoteTextRenderer.notificationTitle(selectedQuote,
+                context.getString(R.string.daily_quote_title),
+                author -> context.getString(R.string.daily_quote_title_with_author, author));
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, QuoteNotifications.CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_quotation_24dp)
                 .setContentTitle(title)
-                .setContentText(QuoteTextUtils.truncate(quoteText, 150))
+                .setContentText(QuoteTextRenderer.notificationContent(selectedQuote))
                 .setStyle(new NotificationCompat.BigTextStyle()
-                        .bigText(QuoteTextUtils.truncate(quoteText, 300)))
+                        .bigText(QuoteTextRenderer.notificationBigText(selectedQuote)))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(openPendingIntent)
                 .setAutoCancel(true);

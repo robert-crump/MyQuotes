@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onShareQuote(Quote quote) {
-                shareQuote(quote);
+                QuoteSharer.share(MainActivity.this, quote);
             }
 
             @Override
@@ -180,21 +180,6 @@ public class MainActivity extends AppCompatActivity {
             if (quoteId != -1) {
                 navigateToQuote(quoteId);
             }
-        }
-    }
-
-    private void shareQuote(Quote quote) {
-        if (quote != null) {
-            String shareText = "\"" + quote.getQuoteText() + "\"\n\n" +
-                    "— " + quote.getAuthor();
-            if (!quote.getSource().isEmpty()) {
-                shareText += " (" + quote.getSource() + ")";
-            }
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Quote from My Quotes");
-            startActivity(Intent.createChooser(shareIntent, "Share quote via"));
         }
     }
 

@@ -30,6 +30,8 @@
 
 ## Subsystems
 
+**Quote text rendering** — `QuoteTextRenderer` (pure) is the one place a Quote becomes text: the share format and the daily-notification title/body (with the 150/300 truncation limits). `QuoteSharer` starts the chooser for both pager screens.
+
 **Quote Notifications** — the daily-quote notification feature. A single facade (`com.example.myquotes.notifications.QuoteNotifications`) owns the WorkManager scheduling, the notification channel, the boot-reschedule BroadcastReceiver, the runtime `POST_NOTIFICATIONS` permission flow, the battery-optimization dialog, and the enabled/disabled flag. The rest of the app interacts only with this facade. See ADR-002.
 
 **Backup Destination** — where a backup run puts its files. An interface (`backup.BackupDestination`) with four operations: check availability, write bytes under a filename, list existing entries (name plus opaque handle), delete an entry. Two adapters: `SafDestination` (a user-chosen local folder via the Storage Access Framework) and `DriveDestination` (the app-owned "MyQuotes Backups" folder under My Drive, via `DriveRestClient`; auth and network happen lazily in `checkAvailable`).

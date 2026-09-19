@@ -1,3 +1,9 @@
+2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
+
+New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.
+
+Tests: share text with/without/null source, title fallback, notification limits, existing truncate cases. Docs: CONTEXT.md (Quote text rendering). Build and all unit tests pass. On-device verification deferred to the user. Issue #27 closed.
+
 2026-09-19 — Issue #26: Quote Query module — typed search predicate and filter protocol
 
 New immutable `QuoteQuery` (normalized text + `EnumSet<Field>` of QUOTE_TEXT/AUTHOR/SOURCE/CATEGORY): `matches`, `filter`, `isActive` (min length 3), `snippet` (moved out of SearchResultsAdapter, double-lowercasing gone), `toggled(field)`, `withText`, and the single intent protocol `toIntent(Context)` / `fromIntent(Intent)`. The `"author"/"source"/"category"` literals, `EXTRA_FILTER_TYPE`/`EXTRA_SEARCH_QUERY`, and the decoding `switch` are gone; MainActivity (3), FavoritesActivity (3), CategoriesActivity and StatItemAdapter all build `QuoteQuery.forField(...)`. `StatItemAdapter` now takes a `QuoteQuery.Field` instead of deriving it from a display label.
@@ -33,14 +39,3 @@ Defects closed: local and Drive now write identical pretty-printed bytes and the
 Found while doing this: the #21 fix re-armed from inside `doWork()` with `ExistingWorkPolicy.KEEP`, but the running request still counts as unfinished work under that name, so KEEP is a no-op there and the chain only healed on the next app open. `WorkChain.rearmFromWorker` uses `APPEND_OR_REPLACE` (worker must return success or the appended successor is cancelled), and `DailyQuoteWorker` uses it too. Reasoned from WorkManager's documented semantics, NOT verified on device. Behaviour change: a failed backup run now posts the notification, re-arms, and returns success instead of Result.failure().
 
 Tests: new `BackupRunTest` (skip on unchanged hash, filename parses back to clock timestamp, recorded hash equals hash of received bytes, prune converges on 9 over 15 simulated days, write failure -> FAILED with no hash). Docs: CONTEXT.md (Backup Destination, Backup run, Auto-backup replace the two subsystem entries), ADR-003. Build and all unit tests pass. On-device verification deferred to the user. Issue #23 closed.
-
-2026-09-13 — Issue #21: Daily quote notification silent for weeks, then fired instantly on app open
-
-Diagnosed by elimination rather than logs (no device access): the two usual stock-Android causes for "background work goes silent until the app is reopened" were both ruled out via the user — battery setting was already "Unrestricted" the whole three weeks (rules out Doze/App Standby Bucket throttling), and the app was not force-stopped (rules out the OS cancelling all scheduled work until next manual launch). Device is a Pixel, so no OEM-specific battery manager (e.g. Samsung's separate Sleeping Apps list) is in play either.
-
-That leaves WorkManager's own `PeriodicWorkRequest`: its internal re-arm after each 24h cycle is documented to occasionally fail to persist, and — because `QuoteNotifications.scheduleDailyNotification` used `ExistingPeriodicWorkPolicy.UPDATE`, which explicitly preserves the original enqueue-time bookkeeping — reopening the app wouldn't have self-healed a corrupted schedule even though it happened to "fix" it this time (a fresh cold start's `enqueueUniquePeriodicWork` call still runs unconditionally on every launch via `MyApplication.onCreate` -> `QuoteNotifications.initialize`).
-
-Fixed by replacing the periodic request with a self-rescheduling one-shot chain: `scheduleDailyNotification` now enqueues a single `OneTimeWorkRequest` targeting the next ~4 PM, and `DailyQuoteWorker.doWork()` calls it again itself right after showing each notification to arm tomorrow's occurrence, rather than relying on WorkManager to autonomously re-trigger a periodic contract days later unattended. Every call site (app open, boot, the worker) switched from `ExistingPeriodicWorkPolicy.UPDATE` to `ExistingWorkPolicy.KEEP`, so an already-pending schedule is left alone but a missing one (chain broken again, for whatever reason) gets self-healed the next time any entry point runs. See ADR-002 amendment. Side effect: delivery narrows from the old 8 AM-4 PM flex window to a single ~4 PM target, since one-shot requests carry no flex interval.
-
-Build and all unit tests passed. On-device verification of the new schedule (and whether it survives another multi-week idle stretch) deferred to the user. Issue #21 closed.
-
