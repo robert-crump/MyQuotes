@@ -19,3 +19,11 @@ Tests: new `QuoteStatisticsTest` (counts/favorites, top-10 limit, empty source, 
 2026-09-19 — Issue #27: Quote text rendering — one share and notification formatter
 
 New pure `QuoteTextRenderer` (main package) owns `shareText(Quote)` (unchanged format), `notificationTitle` (fallback when author empty; resource strings passed in), `notificationContent`/`notificationBigText` with named 150/300 limits, and the moved `truncate` (QuoteTextUtils deleted, test renamed). New `QuoteSharer.share(Context, Quote)` replaces the duplicated private `shareQuote` in MainActivity and FavoritesActivity. `DailyQuoteWorker` no longer uses `TextUtils` or assembles strings.
+
+2026-09-19 — Issue #26: Quote Query module — typed search predicate and filter protocol
+
+New immutable `QuoteQuery` (normalized text + `EnumSet<Field>` of QUOTE_TEXT/AUTHOR/SOURCE/CATEGORY): `matches`, `filter`, `isActive` (min length 3), `snippet` (moved out of SearchResultsAdapter, double-lowercasing gone), `toggled(field)`, `withText`, and the single intent protocol `toIntent(Context)` / `fromIntent(Intent)`. The `"author"/"source"/"category"` literals, `EXTRA_FILTER_TYPE`/`EXTRA_SEARCH_QUERY`, and the decoding `switch` are gone; MainActivity (3), FavoritesActivity (3), CategoriesActivity and StatItemAdapter all build `QuoteQuery.forField(...)`. `StatItemAdapter` now takes a `QuoteQuery.Field` instead of deriving it from a display label.
+
+`SearchActivity` keeps a `QuoteQuery` as state (four booleans removed); the three pasted re-run blocks and both TextWatcher/IME/chip paths are one `rerunSearch()`. `SearchResultsAdapter.updateResults` takes a `QuoteQuery` and has no snippet logic. Behaviour unchanged: same results, chips, snippets.
+
+Tests: new `QuoteQueryTest` (per-field matching, field set, case/trim, min length, filter, snippet middle/start/end/short/no-match). Docs: CONTEXT.md (Quote Query). Build and all unit tests pass. On-device verification deferred to the user. Issue #26 closed.
