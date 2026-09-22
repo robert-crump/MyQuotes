@@ -29,7 +29,7 @@ public final class DriveBackup {
     /** Records the connected account and starts the daily upload chain, with a first upload right away. Call once authorization succeeds. */
     public static void connect(Context context, String accountEmail) {
         DriveAuth.markConnected(context, accountEmail);
-        BackupState.clear(context, TARGET); // a new account has no backup yet
+        BackupState.clear(context, TARGET); // new account: no last-backup time to show yet
         BackupScheduler.arm(context, TARGET);
     }
 

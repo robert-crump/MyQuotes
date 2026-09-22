@@ -89,6 +89,16 @@ final class DriveRestClient {
         return result;
     }
 
+    /** Downloads the raw content of {@code fileId}. */
+    byte[] downloadFile(String fileId) throws IOException {
+        HttpURLConnection conn = open(FILES_URL + "/" + encode(fileId) + "?alt=media", "GET");
+        int code = conn.getResponseCode();
+        if (code < 200 || code >= 300) {
+            throw new IOException("Drive download failed: HTTP " + code + " " + readErrorBody(conn));
+        }
+        return readBytes(conn.getInputStream());
+    }
+
     void deleteFile(String fileId) throws IOException {
         HttpURLConnection conn = open(FILES_URL + "/" + encode(fileId), "DELETE");
         int code = conn.getResponseCode();
@@ -171,6 +181,10 @@ final class DriveRestClient {
     }
 
     private static String readStream(InputStream in) throws IOException {
+        return new String(readBytes(in), StandardCharsets.UTF_8);
+    }
+
+    private static byte[] readBytes(InputStream in) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096];
         int read;
@@ -178,7 +192,7 @@ final class DriveRestClient {
             out.write(buffer, 0, read);
         }
         in.close();
-        return out.toString("UTF-8");
+        return out.toByteArray();
     }
 
     private static String encode(String value) throws IOException {

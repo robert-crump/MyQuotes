@@ -14,7 +14,10 @@ import java.util.Map;
 
 /**
  * One backup of the quote list to one {@link BackupDestination}: encode, hash the bytes that will
- * be written, skip if unchanged and the destination still has a backup, write a timestamped file, prune to {@link BackupRetention}.
+ * be written, skip if that matches the most recent backup already at the destination, otherwise
+ * write a timestamped file and prune to {@link BackupRetention}. The "unchanged" comparison reads
+ * the destination's own latest file rather than trusting locally cached state, so a stale local
+ * cache (e.g. state that didn't get persisted before the process died) can't cause a duplicate.
  * Deliberately free of Android state: recording the outcome is the caller's job.
  */
 public final class BackupRun {
@@ -37,16 +40,17 @@ public final class BackupRun {
 
     private BackupRun() {}
 
-    public static Outcome run(List<Quote> quotes, String lastHash, BackupDestination destination,
-                              long nowMillis) {
+    public static Outcome run(List<Quote> quotes, BackupDestination destination, long nowMillis) {
         try {
             // Pretty-printed to match the manual export; the hash covers exactly these bytes.
             byte[] bytes = QuoteCodec.encodePretty(quotes).getBytes(StandardCharsets.UTF_8);
             String hash = sha256(bytes);
             destination.checkAvailable();
-            // Unchanged content is only skipped while the destination still holds a backup; a
-            // new account or a hand-deleted folder gets one even though the hash matches.
-            if (hash.equals(lastHash) && hasBackups(destination)) {
+
+            BackupDestination.Entry latest = latestBackup(destination);
+            // A new account or a hand-deleted folder has no latest backup, so it gets one even
+            // though the content matches what used to be there.
+            if (latest != null && hash.equals(sha256(destination.read(latest)))) {
                 return new Outcome(Kind.SKIPPED_UNCHANGED, null, null, null);
             }
 
@@ -59,11 +63,17 @@ public final class BackupRun {
         }
     }
 
-    private static boolean hasBackups(BackupDestination destination) throws Exception {
+    private static BackupDestination.Entry latestBackup(BackupDestination destination) throws Exception {
+        BackupDestination.Entry latest = null;
+        long latestTimestamp = Long.MIN_VALUE;
         for (BackupDestination.Entry entry : destination.list()) {
-            if (BackupFilename.parseTimestamp(entry.name) != null) return true;
+            Long timestamp = BackupFilename.parseTimestamp(entry.name);
+            if (timestamp != null && timestamp > latestTimestamp) {
+                latestTimestamp = timestamp;
+                latest = entry;
+            }
         }
-        return false;
+        return latest;
     }
 
     private static void prune(BackupDestination destination) throws Exception {

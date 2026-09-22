@@ -1,3 +1,11 @@
+2026-09-22 — Drive backup: fixed duplicate uploads from stale local state
+
+Root cause: `BackupRun` decided "unchanged, skip" by comparing against a hash cached locally in `BackupState` (SharedPreferences), written only after `destination.write()` returned. If the process died between the upload succeeding and that local write landing (or any other way the cache fell out of sync with reality), the next run trusted the stale cache and re-uploaded identical content — seen as two Drive files with the same minute-resolution filename.
+
+Fix: `BackupRun` now compares against the destination's own most recent backup (read back and re-hashed) instead of any locally cached value, so it's self-healing regardless of why local state went stale. `BackupDestination` gained `read(Entry)`; `SafDestination` reads the local file, `DriveDestination`/`DriveRestClient` added a `GET .../files/{id}?alt=media` download. `BackupState` dropped the now-unused hash field — it only tracks last-backup time for the Settings display now. `BackupRun.run` dropped its `lastHash` parameter accordingly; `BackupWorker` and tests updated. `BackupRunTest` adds coverage for the crash-recovery case (no local cache, destination still has the same content → skip).
+
+Build and all unit tests pass. On-device verification (watch for a repeat duplicate) deferred to the user.
+
 2026-09-19 — Issue #33: Drive backup no longer skipped after reconnecting with a different account
 
 2026-09-19 — Issue #32: CI workflow; CSV seeding removed so a fresh clone builds
@@ -17,9 +25,3 @@ Defect found and fixed: `SourceSuggestions.hasSplit()` returned true whenever au
 `QuoteNotifications.onPermissionResult(context, requestCode, grantResults)` now owns "permission granted, therefore enable": returns null for a foreign request code, else whether notifications are enabled (granting calls `setEnabled(true)`). `MainActivity.onRequestPermissionsResult` only delegates and toasts. `SettingsActivity` keeps the daily switch and its listener as fields and re-syncs the switch in `onResume` via `setDailyNotificationChecked` (listener detached/reattached, same pattern as the Drive switch), so a permission grant on the main screen shows up in Settings. The facade is the only class touching the flag's SharedPreferences.
 
 No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.
-
-2026-09-19 — Issue #29: Manual import/export — QuoteImporter mirroring QuoteExporter, filename via BackupFilename
-
-New `QuoteImporter` (main package): pure `read(InputStream)` (UTF-8, decodes via `QuoteCodec`; `QuoteCodecException` for bad JSON, `IOException` for stream failures) plus `readFromUri(Context, Uri)`. `SettingsActivity` lost its BufferedReader loop and keeps only the three catch/Toast branches ("replaced database with N quotes" unchanged). `startExport` takes its filename from `BackupFilename.forTimestamp` (left in the `backup` package). Two raw `new Thread` blocks became one single-thread `ioExecutor` (shut down in onDestroy). The two "last backup" formatters are one `formatLastBackup(formatRes, millis)`.
-
-Tests: new `QuoteImporterTest` (pretty round-trip, malformed JSON, legacy bare array, stream failure). Build and all unit tests pass. On-device verification deferred to the user. Issue #29 closed.

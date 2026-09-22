@@ -40,11 +40,10 @@ public class BackupWorker extends Worker {
 
         List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
         if (!quotes.isEmpty()) {
-            BackupRun.Outcome outcome = BackupRun.run(quotes,
-                    BackupState.lastHash(context, target), destination, System.currentTimeMillis());
+            BackupRun.Outcome outcome = BackupRun.run(quotes, destination, System.currentTimeMillis());
             switch (outcome.kind) {
                 case WRITTEN:
-                    BackupState.record(context, target, outcome.hash, System.currentTimeMillis());
+                    BackupState.record(context, target, System.currentTimeMillis());
                     BackupNotifications.clearFailed(context, target);
                     Log.d(TAG, target.id + " backup written: " + outcome.filename);
                     break;

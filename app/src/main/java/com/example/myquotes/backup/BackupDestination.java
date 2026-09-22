@@ -23,5 +23,7 @@ public interface BackupDestination {
 
     List<Entry> list() throws IOException;
 
+    byte[] read(Entry entry) throws IOException;
+
     void delete(Entry entry) throws IOException;
 }

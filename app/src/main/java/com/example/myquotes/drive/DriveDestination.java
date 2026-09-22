@@ -64,4 +64,9 @@ final class DriveDestination implements BackupDestination {
     public void delete(Entry entry) throws IOException {
         client.deleteFile(((DriveRestClient.DriveFile) entry.handle).id);
     }
+
+    @Override
+    public byte[] read(Entry entry) throws IOException {
+        return client.downloadFile(((DriveRestClient.DriveFile) entry.handle).id);
+    }
 }

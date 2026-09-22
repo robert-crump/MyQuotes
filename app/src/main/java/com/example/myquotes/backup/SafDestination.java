@@ -5,7 +5,9 @@ import android.net.Uri;
 
 import androidx.documentfile.provider.DocumentFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,5 +62,18 @@ final class SafDestination implements BackupDestination {
     @Override
     public void delete(Entry entry) {
         ((DocumentFile) entry.handle).delete();
+    }
+
+    @Override
+    public byte[] read(Entry entry) throws IOException {
+        Uri uri = ((DocumentFile) entry.handle).getUri();
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new IOException("Could not open input stream for " + uri);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            return out.toByteArray();
+        }
     }
 }
