@@ -42,9 +42,9 @@ public class QuoteQueryTest {
     }
 
     @Test
-    public void caseInsensitiveAndTrimmed() {
+    public void caseInsensitiveMatchingButOriginalCasePreserved() {
         assertTrue(QuoteQuery.all("  SENECA ").matches(q));
-        assertEquals("seneca", QuoteQuery.all("  SENECA ").getText());
+        assertEquals("SENECA", QuoteQuery.all("  SENECA ").getText());
     }
 
     @Test

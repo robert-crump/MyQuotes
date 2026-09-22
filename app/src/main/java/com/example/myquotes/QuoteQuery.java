@@ -13,9 +13,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Immutable search predicate: normalized query text plus the fields it is scoped to.
- * Owns matching, the minimum-length rule and result snippets, and is the single
- * protocol for opening SearchActivity for a query.
+ * Immutable search predicate: trimmed query text (original case preserved for display,
+ * matched case-insensitively) plus the fields it is scoped to. Owns matching, the
+ * minimum-length rule and result snippets, and is the single protocol for opening
+ * SearchActivity for a query.
  */
 public final class QuoteQuery {
     public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, CATEGORY }
@@ -32,7 +33,7 @@ public final class QuoteQuery {
     private final EnumSet<Field> fields;
 
     private QuoteQuery(String text, Set<Field> fields) {
-        this.text = text == null ? "" : text.toLowerCase().trim();
+        this.text = text == null ? "" : text.trim();
         this.fields = EnumSet.noneOf(Field.class);
         this.fields.addAll(fields);
     }
@@ -94,7 +95,7 @@ public final class QuoteQuery {
 
     /** Excerpt of {@code quoteText} around the first match, with ellipses where cut. */
     public String snippet(String quoteText) {
-        int index = text.isEmpty() ? -1 : quoteText.toLowerCase().indexOf(text);
+        int index = text.isEmpty() ? -1 : quoteText.toLowerCase().indexOf(text.toLowerCase());
         if (index == -1) {
             return quoteText.length() <= SNIPPET_FALLBACK_LENGTH
                     ? quoteText
@@ -110,7 +111,7 @@ public final class QuoteQuery {
     }
 
     private boolean contains(@Nullable String value) {
-        return value != null && value.toLowerCase().contains(text);
+        return value != null && value.toLowerCase().contains(text.toLowerCase());
     }
 
     /** The one way to open SearchActivity for a query. */
