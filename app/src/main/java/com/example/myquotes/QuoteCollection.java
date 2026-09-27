@@ -46,6 +46,7 @@ public class QuoteCollection {
         List<Quote> current = getCurrentList();
         int maxId = current.stream().mapToInt(Quote::getId).max().orElse(0);
         quote.setId(maxId + 1);
+        quote.setAddedAt(System.currentTimeMillis());
         List<Quote> updated = new ArrayList<>(current);
         updated.add(quote);
         liveQuoteList.setValue(updated);
@@ -73,7 +74,7 @@ public class QuoteCollection {
         Log.w(TAG, "Quote with ID " + updatedQuote.getId() + " not found");
     }
 
-    // Replaces the editable fields, keeping favorite and view state.
+    // Replaces the editable fields, keeping favorite, view state and addedAt.
     public void edit(int id, String author, String text, String source, String category) {
         Quote stored = findById(id);
         if (stored == null) {
@@ -86,6 +87,7 @@ public class QuoteCollection {
         edited.setFavoritedAt(stored.getFavoritedAt());
         edited.setTimesShown(stored.getTimesShown());
         edited.setLastShown(stored.getLastShown());
+        edited.setAddedAt(stored.getAddedAt());
         update(edited);
     }
 

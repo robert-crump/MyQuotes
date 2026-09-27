@@ -1,6 +1,8 @@
 package com.example.myquotes.backup;
 
+import com.example.myquotes.BackupDocument;
 import com.example.myquotes.Quote;
+import com.example.myquotes.notifications.NotificationHistory;
 
 import org.junit.Test;
 
@@ -44,8 +46,9 @@ public class BackupRunTest {
         @Override public byte[] read(Entry entry) { return files.get((String) entry.handle); }
     }
 
-    private static List<Quote> quotes(String text) {
-        return Collections.singletonList(new Quote(1, "Author", text, "Source"));
+    private static BackupDocument document(String text) {
+        return new BackupDocument(Collections.singletonList(new Quote(1, "Author", text, "Source")),
+                new NotificationHistory());
     }
 
     private static String sha256(byte[] bytes) throws Exception {
@@ -58,7 +61,7 @@ public class BackupRunTest {
     public void writesFileNamedForTheClockTimestamp() {
         InMemoryDestination dest = new InMemoryDestination();
 
-        BackupRun.Outcome outcome = BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.Outcome outcome = BackupRun.run(document("a"), dest, NOW);
 
         assertEquals(BackupRun.Kind.WRITTEN, outcome.kind);
         assertEquals(1, dest.files.size());
@@ -70,7 +73,7 @@ public class BackupRunTest {
     public void recordedHashIsTheHashOfTheBytesTheDestinationReceived() throws Exception {
         InMemoryDestination dest = new InMemoryDestination();
 
-        BackupRun.Outcome outcome = BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.Outcome outcome = BackupRun.run(document("a"), dest, NOW);
 
         byte[] written = dest.files.get(outcome.filename);
         assertNotNull(written);
@@ -82,9 +85,9 @@ public class BackupRunTest {
     @Test
     public void skipsWhenContentMatchesTheDestinationsLatestBackup() {
         InMemoryDestination dest = new InMemoryDestination();
-        BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.run(document("a"), dest, NOW);
 
-        BackupRun.Outcome second = BackupRun.run(quotes("a"), dest, NOW + DAY);
+        BackupRun.Outcome second = BackupRun.run(document("a"), dest, NOW + DAY);
 
         assertEquals(BackupRun.Kind.SKIPPED_UNCHANGED, second.kind);
         assertEquals(1, dest.files.size());
@@ -96,9 +99,9 @@ public class BackupRunTest {
         // local cache survives, but the destination itself still shows the same content, so the
         // next run must not write a duplicate.
         InMemoryDestination dest = new InMemoryDestination();
-        BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.run(document("a"), dest, NOW);
 
-        BackupRun.Outcome retry = BackupRun.run(quotes("a"), dest, NOW + 60_000);
+        BackupRun.Outcome retry = BackupRun.run(document("a"), dest, NOW + 60_000);
 
         assertEquals(BackupRun.Kind.SKIPPED_UNCHANGED, retry.kind);
         assertEquals(1, dest.files.size());
@@ -107,9 +110,9 @@ public class BackupRunTest {
     @Test
     public void writesWhenContentDiffersFromTheDestinationsLatestBackup() {
         InMemoryDestination dest = new InMemoryDestination();
-        BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.run(document("a"), dest, NOW);
 
-        BackupRun.Outcome second = BackupRun.run(quotes("b"), dest, NOW + DAY);
+        BackupRun.Outcome second = BackupRun.run(document("b"), dest, NOW + DAY);
 
         assertEquals(BackupRun.Kind.WRITTEN, second.kind);
         assertEquals(2, dest.files.size());
@@ -118,10 +121,10 @@ public class BackupRunTest {
     @Test
     public void writesDespiteMatchingContentWhenDestinationHasNoBackups() {
         InMemoryDestination previousAccount = new InMemoryDestination();
-        BackupRun.run(quotes("a"), previousAccount, NOW);
+        BackupRun.run(document("a"), previousAccount, NOW);
 
         InMemoryDestination newAccount = new InMemoryDestination();
-        BackupRun.Outcome outcome = BackupRun.run(quotes("a"), newAccount, NOW + DAY);
+        BackupRun.Outcome outcome = BackupRun.run(document("a"), newAccount, NOW + DAY);
 
         assertEquals(BackupRun.Kind.WRITTEN, outcome.kind);
         assertEquals(1, newAccount.files.size());
@@ -131,7 +134,7 @@ public class BackupRunTest {
     public void pruneConvergesOnNineFilesOverSimulatedDays() {
         InMemoryDestination dest = new InMemoryDestination();
         for (int day = 0; day < 15; day++) {
-            BackupRun.Outcome outcome = BackupRun.run(quotes("v" + day), dest, NOW + day * DAY);
+            BackupRun.Outcome outcome = BackupRun.run(document("v" + day), dest, NOW + day * DAY);
             assertEquals(BackupRun.Kind.WRITTEN, outcome.kind);
             assertTrue(dest.files.size() <= BackupRetention.TOTAL_COUNT);
         }
@@ -146,7 +149,7 @@ public class BackupRunTest {
         InMemoryDestination dest = new InMemoryDestination();
         dest.failWrites = true;
 
-        BackupRun.Outcome outcome = BackupRun.run(quotes("a"), dest, NOW);
+        BackupRun.Outcome outcome = BackupRun.run(document("a"), dest, NOW);
 
         assertEquals(BackupRun.Kind.FAILED, outcome.kind);
         assertNotNull(outcome.cause);

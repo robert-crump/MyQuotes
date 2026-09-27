@@ -7,9 +7,11 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import com.example.myquotes.BackupDocument;
 import com.example.myquotes.Quote;
 import com.example.myquotes.MyApplication;
 import com.example.myquotes.drive.DriveBackup;
+import com.example.myquotes.notifications.QuoteNotifications;
 
 import java.util.List;
 
@@ -40,7 +42,8 @@ public class BackupWorker extends Worker {
 
         List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
         if (!quotes.isEmpty()) {
-            BackupRun.Outcome outcome = BackupRun.run(quotes, destination, System.currentTimeMillis());
+            BackupDocument document = new BackupDocument(quotes, QuoteNotifications.loadHistory(context));
+            BackupRun.Outcome outcome = BackupRun.run(document, destination, System.currentTimeMillis());
             switch (outcome.kind) {
                 case WRITTEN:
                     BackupState.record(context, target, System.currentTimeMillis());

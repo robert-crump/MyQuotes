@@ -20,11 +20,12 @@ public class QuoteCodecTest {
         q.setFavoritedAt(1000L);
         q.setLastShown(2000L);
         q.setTimesShown(5);
+        q.setAddedAt(3000L);
         return q;
     }
 
     @Test
-    public void roundtrip_allNineFields() throws QuoteCodecException {
+    public void roundtrip_allTenFields() throws QuoteCodecException {
         List<Quote> in = Arrays.asList(makeQuote(42));
 
         List<Quote> out = QuoteCodec.decode(QuoteCodec.encode(in));
@@ -40,6 +41,7 @@ public class QuoteCodecTest {
         assertEquals(1000L, result.getFavoritedAt());
         assertEquals(2000L, result.getLastShown());
         assertEquals(5, result.getTimesShown());
+        assertEquals(3000L, result.getAddedAt());
     }
 
     @Test
@@ -61,6 +63,7 @@ public class QuoteCodecTest {
         List<Quote> quotes = QuoteCodec.decode(legacy);
         assertEquals(1, quotes.size());
         assertEquals(7, (int) quotes.get(0).getId());
+        assertEquals(0L, quotes.get(0).getAddedAt());
     }
 
     @Test
@@ -93,13 +96,4 @@ public class QuoteCodecTest {
         assertTrue(result.isEmpty());
     }
 
-    @Test
-    public void encodePretty_produces2SpaceIndentedOutput() throws JSONException {
-        String json = QuoteCodec.encodePretty(Arrays.asList(makeQuote(1)));
-
-        assertTrue("Expected 2-space indent", json.contains("\n  "));
-        JSONObject envelope = new JSONObject(json);
-        assertEquals(1, envelope.getInt("version"));
-        assertEquals(1, envelope.getJSONArray("quotes").length());
-    }
 }

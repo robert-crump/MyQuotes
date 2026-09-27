@@ -1,7 +1,6 @@
 package com.example.myquotes.backup;
 
-import com.example.myquotes.Quote;
-import com.example.myquotes.QuoteCodec;
+import com.example.myquotes.BackupDocument;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * One backup of the quote list to one {@link BackupDestination}: encode, hash the bytes that will
- * be written, skip if that matches the most recent backup already at the destination, otherwise
+ * One backup of a {@link BackupDocument} to one {@link BackupDestination}: encode, hash the bytes
+ * that will be written, skip if that matches the most recent backup already at the destination, otherwise
  * write a timestamped file and prune to {@link BackupRetention}. The "unchanged" comparison reads
  * the destination's own latest file rather than trusting locally cached state, so a stale local
  * cache (e.g. state that didn't get persisted before the process died) can't cause a duplicate.
@@ -40,10 +39,10 @@ public final class BackupRun {
 
     private BackupRun() {}
 
-    public static Outcome run(List<Quote> quotes, BackupDestination destination, long nowMillis) {
+    public static Outcome run(BackupDocument document, BackupDestination destination, long nowMillis) {
         try {
             // Pretty-printed to match the manual export; the hash covers exactly these bytes.
-            byte[] bytes = QuoteCodec.encodePretty(quotes).getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = document.encodePretty().getBytes(StandardCharsets.UTF_8);
             String hash = sha256(bytes);
             destination.checkAvailable();
 

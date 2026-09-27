@@ -8,6 +8,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
@@ -17,6 +18,7 @@ import com.example.myquotes.QuoteTextRenderer;
 import com.example.myquotes.MyApplication;
 import com.example.myquotes.R;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -45,10 +47,16 @@ public class DailyQuoteWorker extends Worker {
             return Result.retry();
         }
 
-        Quote selectedQuote = quotes.get(new Random().nextInt(quotes.size()));
-        Log.d(TAG, "Showing random quote #" + selectedQuote.getId());
+        long now = System.currentTimeMillis();
+        Quote selectedQuote = QuoteOfTheDayPicker.pick(
+                quotes, QuoteNotifications.loadHistory(context), now, new Random());
+        Log.d(TAG, "Showing quote #" + selectedQuote.getId());
 
-        showQuoteNotification(context, selectedQuote);
+        if (showQuoteNotification(context, selectedQuote)) {
+            List<Integer> existingIds = new ArrayList<>();
+            for (Quote quote : quotes) existingIds.add(quote.getId());
+            QuoteNotifications.recordNotified(context, selectedQuote, existingIds, now);
+        }
 
         // Self-rescheduling chain, not a PeriodicWorkRequest (#21) -- arm tomorrow's occurrence
         // ourselves rather than relying on WorkManager to re-trigger this run days later unattended.
@@ -56,9 +64,11 @@ public class DailyQuoteWorker extends Worker {
         return Result.success();
     }
 
-    private void showQuoteNotification(Context context, Quote selectedQuote) {
+    /** Whether the notification was actually posted (only then does it count as notified). */
+    private boolean showQuoteNotification(Context context, Quote selectedQuote) {
         Intent openIntent = new Intent(context, MainActivity.class);
         openIntent.putExtra(QuoteNotifications.EXTRA_QUOTE_ID, selectedQuote.getId());
+        openIntent.putExtra(QuoteNotifications.EXTRA_FROM_NOTIFICATION, true);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
         PendingIntent openPendingIntent = PendingIntent.getActivity(
@@ -81,11 +91,18 @@ public class DailyQuoteWorker extends Worker {
 
         NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) {
-            notificationManager.notify(QuoteNotifications.NOTIFICATION_ID, builder.build());
-            Log.d(TAG, "Notification shown for quote #" + selectedQuote.getId());
-        } else {
+        if (notificationManager == null) {
             Log.e(TAG, "NotificationManager is null!");
+            return false;
         }
+        // Posting silently does nothing when the user has blocked notifications (or revoked
+        // POST_NOTIFICATIONS); don't count that as the quote having been shown.
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            Log.w(TAG, "Notifications are blocked by the system, not recording quote #" + selectedQuote.getId());
+            return false;
+        }
+        notificationManager.notify(QuoteNotifications.NOTIFICATION_ID, builder.build());
+        Log.d(TAG, "Notification shown for quote #" + selectedQuote.getId());
+        return true;
     }
 }

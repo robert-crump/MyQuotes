@@ -1,5 +1,7 @@
 package com.example.myquotes;
 
+import com.example.myquotes.notifications.NotificationHistory;
+
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -24,7 +26,8 @@ public class QuoteImporterTest {
         q.setFavorite(true);
         List<Quote> in = Arrays.asList(q, new Quote(8, "B", "T", "S"));
 
-        List<Quote> out = QuoteImporter.read(stream(QuoteCodec.encodePretty(in)));
+        List<Quote> out = QuoteImporter.read(stream(
+                new BackupDocument(in, new NotificationHistory()).encodePretty())).quotes;
 
         assertEquals(2, out.size());
         assertEquals(7, (int) out.get(0).getId());
@@ -42,7 +45,7 @@ public class QuoteImporterTest {
     @Test
     public void read_acceptsLegacyBareArray() throws Exception {
         List<Quote> out = QuoteImporter.read(stream(
-                "[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\"}]"));
+                "[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\"}]")).quotes;
         assertEquals(1, out.size());
         assertEquals("A", out.get(0).getAuthor());
     }

@@ -23,14 +23,6 @@ public final class QuoteCodec {
         }
     }
 
-    public static String encodePretty(List<Quote> quotes) {
-        try {
-            return buildEnvelope(quotes).toString(2);
-        } catch (JSONException e) {
-            throw new IllegalStateException("Unexpected JSON encoding failure", e);
-        }
-    }
-
     public static List<Quote> decode(String json) throws QuoteCodecException {
         if (json == null || json.trim().isEmpty()) {
             throw new QuoteCodecException("JSON string is null or empty");
@@ -56,6 +48,14 @@ public final class QuoteCodec {
     }
 
     private static JSONObject buildEnvelope(List<Quote> quotes) throws JSONException {
+        JSONObject envelope = new JSONObject();
+        envelope.put("version", VERSION);
+        envelope.put("quotes", encodeArray(quotes));
+        return envelope;
+    }
+
+    // Shared with BackupDocument, which wraps the same quote array in its own envelope.
+    static JSONArray encodeArray(List<Quote> quotes) throws JSONException {
         JSONArray quotesArray = new JSONArray();
         for (Quote quote : quotes) {
             JSONObject jsonQuote = new JSONObject();
@@ -68,15 +68,13 @@ public final class QuoteCodec {
             jsonQuote.put("favoritedAt", quote.getFavoritedAt());
             jsonQuote.put("lastShown", quote.getLastShown());
             jsonQuote.put("timesShown", quote.getTimesShown());
+            jsonQuote.put("addedAt", quote.getAddedAt());
             quotesArray.put(jsonQuote);
         }
-        JSONObject envelope = new JSONObject();
-        envelope.put("version", VERSION);
-        envelope.put("quotes", quotesArray);
-        return envelope;
+        return quotesArray;
     }
 
-    private static List<Quote> parseQuotesArray(JSONArray jsonArray) {
+    static List<Quote> parseQuotesArray(JSONArray jsonArray) {
         List<Quote> quotes = new ArrayList<>();
         for (int i = 0; i < jsonArray.length(); i++) {
             try {
@@ -94,6 +92,7 @@ public final class QuoteCodec {
                 long favoritedAt = jsonQuote.optLong("favoritedAt", 0);
                 long lastShown = jsonQuote.optLong("lastShown", 0);
                 int timesShown = jsonQuote.optInt("timesShown", 0);
+                long addedAt = jsonQuote.optLong("addedAt", 0);
 
                 Quote quote = new Quote(id, author, quoteText, source);
                 quote.setCategory(category);
@@ -101,6 +100,7 @@ public final class QuoteCodec {
                 quote.setFavoritedAt(favoritedAt);
                 quote.setLastShown(lastShown);
                 quote.setTimesShown(timesShown);
+                quote.setAddedAt(addedAt);
                 quotes.add(quote);
             } catch (JSONException e) {
                 Log.w(TAG, "Skipping quote at index " + i + ": " + e.getMessage());

@@ -12,16 +12,22 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
 
+import com.example.myquotes.Quote;
 import com.example.myquotes.R;
 import com.example.myquotes.scheduling.WorkChain;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.Calendar;
+import java.util.Collection;
 
 /**
  * Public facade for the notification subsystem. All other modules talk to this class only;
@@ -34,6 +40,10 @@ public final class QuoteNotifications {
     private static final String PREFS_NAME = "QuoteNotificationPrefs";
     private static final String KEY_ENABLED = "notifications_enabled";
     private static final String KEY_MIGRATED_TO_WORKMANAGER = "migrated_to_workmanager";
+    private static final String KEY_HISTORY_JSON = "notification_history_json";
+
+    // Worker (background) and notification taps (main thread) both read-modify-write the history.
+    private static final Object HISTORY_LOCK = new Object();
 
     private static final String WORK_NAME_DAILY = "daily_quote_notification";
 
@@ -41,6 +51,8 @@ public final class QuoteNotifications {
     static final int NOTIFICATION_ID = 1001;
 
     public static final String EXTRA_QUOTE_ID = "quote_id";
+    // Set only on the daily notification's intent: SearchActivity reuses EXTRA_QUOTE_ID to open MainActivity.
+    static final String EXTRA_FROM_NOTIFICATION = "from_daily_notification";
     public static final int REQUEST_CODE_POST_NOTIFICATIONS = 100;
 
     private QuoteNotifications() {}
@@ -126,6 +138,66 @@ public final class QuoteNotifications {
         if (!isEnabled(context)) return;
         WorkChain.rearmFromWorker(context, WORK_NAME_DAILY, DailyQuoteWorker.class,
                 calculateDelayTo4PM(), null, null);
+    }
+
+    // ========== NOTIFICATION HISTORY (#37) ==========
+
+    /** Snapshot of the per-quote notification history, e.g. for a backup or export. */
+    public static NotificationHistory loadHistory(Context context) {
+        synchronized (HISTORY_LOCK) {
+            String json = prefs(context).getString(KEY_HISTORY_JSON, null);
+            if (json == null) return new NotificationHistory();
+            try {
+                return NotificationHistory.fromJson(new JSONObject(json));
+            } catch (JSONException e) {
+                Log.e(TAG, "Unreadable notification history, starting fresh", e);
+                return new NotificationHistory();
+            }
+        }
+    }
+
+    /** Replaces the whole history, e.g. on import (an empty one clears it). */
+    public static void replaceHistory(Context context, NotificationHistory history) {
+        synchronized (HISTORY_LOCK) {
+            saveHistory(context, history);
+        }
+    }
+
+    /**
+     * Counts a tap on the daily notification. Call from the activity the notification opens,
+     * passing its {@code savedInstanceState} (null from {@code onNewIntent}): a recreated
+     * activity or a relaunch from Recents re-delivers the same intent and must not count again.
+     */
+    public static void recordOpenedFromNotification(Context context, Intent intent, Bundle savedInstanceState) {
+        if (savedInstanceState != null) return;
+        if (!intent.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false)) return;
+        if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return;
+        int quoteId = intent.getIntExtra(EXTRA_QUOTE_ID, -1);
+        if (quoteId == -1) return;
+        synchronized (HISTORY_LOCK) {
+            NotificationHistory history = loadHistory(context);
+            history.recordClicked(quoteId);
+            saveHistory(context, history);
+        }
+        Log.d(TAG, "Recorded notification tap for quote #" + quoteId);
+    }
+
+    /** Called by the worker after a notification was posted; also prunes deleted quotes. */
+    static void recordNotified(Context context, Quote quote, Collection<Integer> existingIds, long nowMillis) {
+        synchronized (HISTORY_LOCK) {
+            NotificationHistory history = loadHistory(context);
+            history.retainOnly(existingIds);
+            history.recordNotified(quote, nowMillis);
+            saveHistory(context, history);
+        }
+    }
+
+    private static void saveHistory(Context context, NotificationHistory history) {
+        try {
+            prefs(context).edit().putString(KEY_HISTORY_JSON, history.toJson().toString()).apply();
+        } catch (JSONException e) {
+            throw new IllegalStateException("Unexpected JSON encoding failure", e);
+        }
     }
 
     private static void cancelScheduledWork(Context context) {

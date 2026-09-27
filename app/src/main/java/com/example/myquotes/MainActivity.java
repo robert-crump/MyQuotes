@@ -164,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
         readingSession.getCurrentQuote().observe(this, quote -> currentQuote = quote);
 
         Intent intent = getIntent();
+        QuoteNotifications.recordOpenedFromNotification(this, intent, savedInstanceState);
         if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
             pendingQuoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
             Log.d(TAG, "Opened from notification with quote ID: " + pendingQuoteId);
@@ -174,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        QuoteNotifications.recordOpenedFromNotification(this, intent, null);
         if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
             int quoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
             if (quoteId != -1) {

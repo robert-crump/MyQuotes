@@ -386,7 +386,8 @@ public class SettingsActivity extends AppCompatActivity {
                     return;
                 }
 
-                QuoteExporter.writeToUri(this, uri, quotes);
+                QuoteExporter.writeToUri(this, uri,
+                        new BackupDocument(quotes, QuoteNotifications.loadHistory(this)));
 
                 final int count = quotes.size();
                 runOnUiThread(() ->
@@ -405,11 +406,13 @@ public class SettingsActivity extends AppCompatActivity {
     private void importQuotesFromJson(Uri uri) {
         ioExecutor.execute(() -> {
             try {
-                List<Quote> importedQuotes = QuoteImporter.readFromUri(this, uri);
+                BackupDocument imported = QuoteImporter.readFromUri(this, uri);
 
-                final int totalQuotes = importedQuotes.size();
+                final int totalQuotes = imported.quotes.size();
                 runOnUiThread(() -> {
-                    quoteCollection.setList(importedQuotes);
+                    quoteCollection.setList(imported.quotes);
+                    // Replaced, not merged: a file without history clears it (#37).
+                    QuoteNotifications.replaceHistory(this, imported.history);
                     Toast.makeText(this,
                             "Import replaced database with " + totalQuotes + " quotes",
                             Toast.LENGTH_LONG).show();

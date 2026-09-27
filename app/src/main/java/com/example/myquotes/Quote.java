@@ -13,6 +13,7 @@ public class Quote {
     private long favoritedAt = 0L;
     private long lastShown = 0L;
     private int timesShown = 0;
+    private long addedAt = 0L;
 
     public Quote() {
     }
@@ -50,6 +51,10 @@ public class Quote {
 
     public int getTimesShown() { return timesShown; }
     public void setTimesShown(int timesShown) { this.timesShown = timesShown; }
+
+    // 0 = unknown (added before this field existed, or restored from a file without it).
+    public long getAddedAt() { return addedAt; }
+    public void setAddedAt(long addedAt) { this.addedAt = addedAt; }
 
     public void toggleFavorite() {
         this.isFavorite = !this.isFavorite;

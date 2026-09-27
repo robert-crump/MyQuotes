@@ -35,12 +35,22 @@ public class QuoteCollectionTest {
     }
 
     @Test
-    public void editPreservesFavoriteAndViewState() {
+    public void addStampsAddedAt() {
+        QuoteCollection c = collectionOf(new InMemoryQuoteStore(Arrays.asList(quote(1, "a"))));
+        long before = System.currentTimeMillis();
+        Quote added = quote(0, "b");
+        c.add(added);
+        assertTrue(added.getAddedAt() >= before);
+    }
+
+    @Test
+    public void editPreservesFavoriteViewStateAndAddedAt() {
         Quote q = quote(1, "a");
         q.setFavorite(true);
         q.setFavoritedAt(1234L);
         q.setTimesShown(5);
         q.setLastShown(99L);
+        q.setAddedAt(42L);
         InMemoryQuoteStore store = new InMemoryQuoteStore(Arrays.asList(q));
         QuoteCollection c = collectionOf(store);
 
@@ -54,6 +64,7 @@ public class QuoteCollectionTest {
         assertEquals(1234L, edited.getFavoritedAt());
         assertEquals(5, edited.getTimesShown());
         assertEquals(99L, edited.getLastShown());
+        assertEquals(42L, edited.getAddedAt());
         assertTrue(store.load().get(0).isFavorite());
     }
 
