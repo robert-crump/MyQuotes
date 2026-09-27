@@ -1,3 +1,9 @@
+2026-09-27 — Issue #34: AddEditQuote app bar save/close, keyboard handling, fixed-height quote field
+
+Save/Dismiss panel removed: the toolbar now shows X (navigation, `ic_close`) and a tick action (`menu_add_edit`, new `ic_check`). Tick keeps the old save semantics (Add: save, toast, clear form, stay; Edit: save, close). X and system back go through one `OnBackPressedCallback`: close straight away when the form matches its baseline, else a "Discard changes?" dialog. New pure `QuoteFormSnapshot` (trimmed four fields, value equality) is the baseline — `EMPTY` in Add mode, the loaded quote in Edit mode — with `QuoteFormSnapshotTest`. Keyboard: manifest `adjustNothing` -> `adjustResize`, and `EdgeToEdgeUtils.apply(..., padForIme)` pads the root bottom by max(system bars, IME) (opt-in; other screens unchanged). Quote field fixed at 6 lines, scrolling internally (touch listener stops the outer ScrollView stealing drags). Form top padding 24dp -> 8dp, which puts the floating "Author *" label 20dp below the app bar.
+
+Build and all unit tests pass. Verified on device: label gap, quote field fully above the keyboard with cursor visible, discard dialog (X and back), clean close in Add and unchanged Edit. Tick not exercised on device (would write real data).
+
 2026-09-22 — Drive backup: fixed duplicate uploads from stale local state
 
 Root cause: `BackupRun` decided "unchanged, skip" by comparing against a hash cached locally in `BackupState` (SharedPreferences), written only after `destination.write()` returned. If the process died between the upload succeeding and that local write landing (or any other way the cache fell out of sync with reality), the next run trusted the stale cache and re-uploaded identical content — seen as two Drive files with the same minute-resolution filename.
@@ -19,9 +25,3 @@ Build and all unit tests pass locally. Green run on GitHub and on-device empty-s
 New `QuoteTest` (favorite toggle/timestamp, recordView, null-as-empty getters, id-only equality/hash, constructor), `SuggestionProviderTest` (author tiers exact/prefix/contains, case-insensitivity, duplicate collapse, count-then-name order, no match; source author/other split, alphabetical order, empty author context, de-duplication) and `SourceSuggestionsTest`. Scaffold `ExampleUnitTest` removed. Short-query gating lives in AddEditActivity (min 2 chars), not the provider, so it is not tested here.
 
 Defect found and fixed: `SourceSuggestions.hasSplit()` returned true whenever author sources existed, even with no other sources, so the adapter added a dangling divider row. It now requires both lists non-empty. Build and all unit tests pass. Issue #31 closed.
-
-2026-09-19 — Issue #30: Notifications enabled flag — permission rule moved into the facade, Settings switch refreshes on resume
-
-`QuoteNotifications.onPermissionResult(context, requestCode, grantResults)` now owns "permission granted, therefore enable": returns null for a foreign request code, else whether notifications are enabled (granting calls `setEnabled(true)`). `MainActivity.onRequestPermissionsResult` only delegates and toasts. `SettingsActivity` keeps the daily switch and its listener as fields and re-syncs the switch in `onResume` via `setDailyNotificationChecked` (listener detached/reattached, same pattern as the Drive switch), so a permission grant on the main screen shows up in Settings. The facade is the only class touching the flag's SharedPreferences.
-
-No new tests: static, Context-bound facade; this is a locality fix in the spirit of ADR-002. Build and all unit tests pass. On-device verification deferred to the user. Issue #30 closed.

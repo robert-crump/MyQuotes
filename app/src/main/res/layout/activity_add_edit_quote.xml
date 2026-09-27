@@ -24,10 +24,11 @@
         android:elevation="4dp"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         android:layout_alignParentTop="true"
-        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationIcon="@drawable/ic_close"
+        app:navigationContentDescription="Close"
         app:titleTextColor="@android:color/white" />
 
-    <!-- ScrollView für die Form -->
+    <!-- Form -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -40,7 +41,7 @@
             android:orientation="vertical"
             android:paddingLeft="20dp"
             android:paddingRight="20dp"
-            android:paddingTop="24dp"
+            android:paddingTop="8dp"
             android:paddingBottom="16dp">
 
             <!-- Author Input -->
@@ -136,8 +137,8 @@
                     android:gravity="top|start"
                     android:imeOptions="actionDone"
                     android:inputType="textMultiLine|textCapSentences"
-                    android:maxLines="20"
                     android:minLines="6"
+                    android:maxLines="6"
                     android:scrollbars="vertical"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
@@ -155,42 +156,5 @@
         </LinearLayout>
 
     </ScrollView>
-
-    <!-- Action Buttons — full-width stacked -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="16dp"
-        android:background="?attr/colorSurface"
-        android:elevation="4dp">
-
-        <Button
-            android:id="@+id/button_save"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Save"
-            android:textAllCaps="false"
-            android:paddingTop="13dp"
-            android:paddingBottom="13dp"
-            android:layout_marginBottom="8dp"
-            android:onClick="saveButtonOnClick"
-            style="@style/Widget.Material3.Button" />
-
-        <Button
-            android:id="@+id/button_dismiss"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Dismiss"
-            android:textAllCaps="false"
-            android:paddingTop="9dp"
-            android:paddingBottom="9dp"
-            android:onClick="dismissButtonOnClick"
-            style="@style/Widget.Material3.Button.TextButton" />
-
-    </LinearLayout>
 
 </LinearLayout>

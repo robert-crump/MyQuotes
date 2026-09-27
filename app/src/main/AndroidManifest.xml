@@ -35,7 +35,7 @@
             android:name=".AddEditActivity"
             android:label="Add/Edit Quote"
             android:theme="@style/Theme.MyQuotes.NoActionBar"
-            android:windowSoftInputMode="stateHidden|adjustNothing"/>
+            android:windowSoftInputMode="stateHidden|adjustResize"/>
 
         <activity
             android:name=".StatisticsActivity"

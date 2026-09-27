@@ -6,12 +6,17 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ListPopupWindow;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
@@ -35,6 +40,9 @@ public class AddEditActivity extends AppCompatActivity {
     private int quoteId = -1;
     private boolean isEditMode = false;
     private boolean isLoadingQuote = false;
+    // What the form held when opened (empty for Add, the loaded quote for Edit); closing with a
+    // form that differs from it asks for confirmation.
+    private QuoteFormSnapshot baseline = QuoteFormSnapshot.EMPTY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,11 +53,12 @@ public class AddEditActivity extends AppCompatActivity {
         setupViewModel();
         setupViews();
         handleIntent();
+        setupBackHandling();
     }
 
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar);
-        EdgeToEdgeUtils.apply(this, findViewById(R.id.status_bar_scrim));
+        EdgeToEdgeUtils.apply(this, findViewById(R.id.status_bar_scrim), true);
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
     }
@@ -93,8 +102,55 @@ public class AddEditActivity extends AppCompatActivity {
 
         editTextCategory.setOnClickListener(this::showCategoryPicker);
 
+        // The quote field is a fixed 6 lines and scrolls internally; keep drags inside it from
+        // being taken over by the surrounding ScrollView while it can still scroll.
+        editTextQuote.setOnTouchListener((v, event) -> {
+            if (v.canScrollVertically(1) || v.canScrollVertically(-1)) {
+                v.getParent().requestDisallowInterceptTouchEvent(
+                        event.getActionMasked() != MotionEvent.ACTION_UP
+                                && event.getActionMasked() != MotionEvent.ACTION_CANCEL);
+            }
+            return false;
+        });
+
         setupAuthorSuggestions();
         setupSourceSuggestions();
+    }
+
+    private void setupBackHandling() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (readForm().equals(baseline)) {
+                    finish();
+                } else {
+                    showDiscardDialog();
+                }
+            }
+        });
+    }
+
+    private void showDiscardDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Discard changes?")
+                .setPositiveButton("Discard", (dialog, which) -> finish())
+                .setNegativeButton("Keep editing", null)
+                .show();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_add_edit, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_save) {
+            saveQuote();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void setupAuthorSuggestions() {
@@ -233,6 +289,7 @@ public class AddEditActivity extends AppCompatActivity {
             editTextSource.setText(quote.getSource());
             editTextCategory.setText(quote.getCategory());
             isLoadingQuote = false;
+            baseline = QuoteFormSnapshot.of(quote);
             Log.d(TAG, "Loaded quote #" + id);
         } else {
             Log.w(TAG, "Quote not found: " + id);
@@ -241,7 +298,7 @@ public class AddEditActivity extends AppCompatActivity {
         }
     }
 
-    public void saveButtonOnClick(View view) {
+    private void saveQuote() {
         if (!validateInput()) {
             return;
         }
@@ -286,6 +343,12 @@ public class AddEditActivity extends AppCompatActivity {
         return true;
     }
 
+    private QuoteFormSnapshot readForm() {
+        return new QuoteFormSnapshot(editTextAuthor.getText().toString(),
+                editTextQuote.getText().toString(), editTextSource.getText().toString(),
+                editTextCategory.getText().toString());
+    }
+
     private Quote createQuoteFromInput() {
         Quote quote = new Quote();
         quote.setAuthor(editTextAuthor.getText().toString().trim());
@@ -293,9 +356,5 @@ public class AddEditActivity extends AppCompatActivity {
         quote.setSource(editTextSource.getText().toString().trim());
         quote.setCategory(editTextCategory.getText().toString().trim());
         return quote;
-    }
-
-    public void dismissButtonOnClick(View view) {
-        finish();
     }
 }

@@ -28,6 +28,15 @@ final class EdgeToEdgeUtils {
     private EdgeToEdgeUtils() {}
 
     static void apply(Activity activity, View statusBarScrim) {
+        apply(activity, statusBarScrim, false);
+    }
+
+    /**
+     * @param padForIme also pad the bottom by the on-screen keyboard's height, so a screen
+     *                  declared with adjustResize shrinks its content above the keyboard (with
+     *                  edge-to-edge the window no longer resizes for the IME on its own).
+     */
+    static void apply(Activity activity, View statusBarScrim, boolean padForIme) {
         WindowCompat.setDecorFitsSystemWindows(activity.getWindow(), false);
 
         // Status bar scrim: an initially-zero-height strip above the toolbar, grown to exactly
@@ -49,7 +58,11 @@ final class EdgeToEdgeUtils {
         final int contentTop = content.getPaddingTop();
         ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, contentTop, systemBars.right, systemBars.bottom);
+            int bottom = systemBars.bottom;
+            if (padForIme) {
+                bottom = Math.max(bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom);
+            }
+            v.setPadding(systemBars.left, contentTop, systemBars.right, bottom);
             return insets;
         });
     }

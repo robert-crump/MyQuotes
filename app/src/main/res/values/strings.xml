@@ -15,8 +15,6 @@
     <string name="hint_search">Search for quotes, authors, or sources…</string>
 
     <!-- Buttons -->
-    <string name="button_save">Save</string>
-    <string name="button_dismiss">Dismiss</string>
     <string name="button_search">Search</string>
 
     <!-- Messages -->
