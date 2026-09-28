@@ -5,35 +5,49 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.TextView;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.annotation.NonNull;
-import androidx.lifecycle.ViewModel;
-import androidx.lifecycle.ViewModelProvider;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.example.myquotes.databinding.ActivityMainBinding;
 import com.example.myquotes.notifications.QuoteNotifications;
 
-import java.util.List;
-
-public class MainActivity extends AppCompatActivity {
+/**
+ * Bottom-navigation host: one app bar, the Quotes / Search / Favorites tab fragments (added
+ * once, switched with show/hide so each keeps its state) and the add-quote FAB (Quotes only).
+ */
+public class MainActivity extends AppCompatActivity
+        implements QuotesFragment.Host, SearchFragment.Host, FavoritesFragment.Host {
     private static final String TAG = "MainActivity";
+    private static final String STATE_TAB = "selected_tab";
+
+    private static final String TAG_QUOTES = "tab_quotes";
+    private static final String TAG_SEARCH = "tab_search";
+    private static final String TAG_FAVORITES = "tab_favorites";
+
     private ActivityMainBinding binding;
 
-    private androidx.viewpager2.widget.ViewPager2 viewPager;
-    private QuotePagerAdapter pagerAdapter;
-    private TextView quoteCounter;
+    private QuotesFragment quotesFragment;
+    private SearchFragment searchFragment;
+    private FavoritesFragment favoritesFragment;
 
-    private QuoteCollection quoteCollection;
-    private ReadingSession readingSession;
-
-    private boolean isFirstDeckLoad = true;
-    private int pendingQuoteId = -1;
+    private int selectedTab = R.id.tab_quotes;
     private boolean isFabHidden = false;
 
-    private androidx.activity.result.ActivityResultLauncher<Intent> searchActivityLauncher;
+    private final OnBackPressedCallback backToQuotes = new OnBackPressedCallback(false) {
+        @Override
+        public void handleOnBackPressed() {
+            selectTab(R.id.tab_quotes);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,87 +55,44 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeUtils.apply(this, binding.statusBarScrim);
-
-        searchActivityLauncher = registerForActivityResult(
-                new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        int quoteId = result.getData().getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
-                        if (quoteId != -1) {
-                            navigateToQuote(quoteId);
-                        }
-                    }
-                }
-        );
-
+        // The bottom nav pads itself for the navigation bar.
+        EdgeToEdgeUtils.applyAboveBottomNav(this, binding.statusBarScrim);
         setSupportActionBar(binding.toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("My Quotes");
-        }
 
         QuoteNotifications.requestPostNotificationsPermission(this);
-
-        quoteCollection = MyApplication.getInstance().getQuoteCollection();
-        readingSession = new ViewModelProvider(this, new ViewModelProvider.Factory() {
-            @NonNull
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
-                return (T) new ReadingSession(quoteCollection);
-            }
-        }).get(ReadingSession.class);
-
-        viewPager = findViewById(R.id.quotes_viewpager);
-        pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
-            @Override
-            public void onToggleFavorite(Quote quote) {
-                toggleFavorite(quote);
-            }
-
-            @Override
-            public void onShareQuote(Quote quote) {
-                QuoteSharer.share(MainActivity.this, quote);
-            }
-
-            @Override
-            public void onAuthorClick(Quote quote) {
-                searchByAuthor(quote);
-            }
-
-            @Override
-            public void onSourceClick(Quote quote) {
-                searchBySource(quote);
-            }
-
-            @Override
-            public void onCategoryClick(Quote quote) {
-                searchByCategory(quote);
-            }
-
-            @Override
-            public void onEditQuote(Quote quote) {
-                startActivity(AddEditActivity.editIntent(MainActivity.this, quote.getId()));
-            }
-        });
-
         QuoteNotifications.promptBackgroundPermissionIfNeeded(this);
 
-        viewPager.setAdapter(pagerAdapter);
+        // Reuse the fragments restored after recreation instead of adding duplicates.
+        FragmentManager fm = getSupportFragmentManager();
+        quotesFragment = (QuotesFragment) fm.findFragmentByTag(TAG_QUOTES);
+        searchFragment = (SearchFragment) fm.findFragmentByTag(TAG_SEARCH);
+        favoritesFragment = (FavoritesFragment) fm.findFragmentByTag(TAG_FAVORITES);
+        if (quotesFragment == null) {
+            quotesFragment = new QuotesFragment();
+            searchFragment = SearchFragment.newInstance(null);
+            favoritesFragment = new FavoritesFragment();
+            fm.beginTransaction()
+                    .add(R.id.tab_container, quotesFragment, TAG_QUOTES)
+                    .add(R.id.tab_container, searchFragment, TAG_SEARCH)
+                    .add(R.id.tab_container, favoritesFragment, TAG_FAVORITES)
+                    .hide(searchFragment)
+                    .hide(favoritesFragment)
+                    .commitNow();
+        }
 
-        pagerAdapter.setScrollDirectionListener(new QuotePagerAdapter.ScrollDirectionListener() {
-            @Override
-            public void onScrollDown() {
-                hideFab();
-            }
-
-            @Override
-            public void onScrollUp() {
-                showFab();
-            }
+        if (savedInstanceState != null) {
+            selectedTab = savedInstanceState.getInt(STATE_TAB, R.id.tab_quotes);
+        }
+        getOnBackPressedDispatcher().addCallback(this, backToQuotes);
+        binding.bottomNav.setOnItemSelectedListener(item -> {
+            showTab(item.getItemId());
+            return true;
         });
-
-        quoteCounter = findViewById(R.id.quote_counter);
+        binding.bottomNav.setOnItemReselectedListener(item -> {
+            if (item.getItemId() == R.id.tab_search) searchFragment.focusSearchField();
+        });
+        binding.bottomNav.setSelectedItemId(selectedTab);
+        showTab(selectedTab);
 
         binding.fabAddQuote.setOnClickListener(v -> {
             Intent intent = new Intent(this, AddEditActivity.class);
@@ -129,57 +100,13 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        viewPager.registerOnPageChangeCallback(new androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                super.onPageSelected(position);
-                readingSession.setPosition(position);
-                updateQuoteCounter(position);
-                showFab();
-            }
-        });
-
-        // Observe deck: update adapter and restore position on structural changes.
-        readingSession.getDeck().observe(this, deck -> {
-            if (deck == null) return;
-            if (deck.isEmpty()) {
-                // Before the first load the deck is just the empty placeholder; after it, an empty
-                // deck means the last quote was deleted (e.g. from the editor), so clear the pager.
-                if (!isFirstDeckLoad) {
-                    pagerAdapter.setQuotes(deck);
-                    quoteCounter.setText("");
-                }
-                return;
-            }
-            pagerAdapter.setQuotes(deck);
-
-            if (isFirstDeckLoad) {
-                isFirstDeckLoad = false;
-                if (pendingQuoteId != -1) {
-                    if (!readingSession.navigateTo(pendingQuoteId)) {
-                        Toast.makeText(this, "Quote no longer exists", Toast.LENGTH_SHORT).show();
-                    }
-                    pendingQuoteId = -1;
-                }
-                int pos = readingSession.getCurrentPosition();
-                viewPager.setCurrentItem(pos, false);
-                updateQuoteCounter(pos);
-            } else {
-                int pos = readingSession.getCurrentPosition();
-                if (viewPager.getCurrentItem() != pos) {
-                    viewPager.setCurrentItem(pos, false);
-                }
-                updateQuoteCounter(pos);
-            }
-        });
-
         Intent intent = getIntent();
         QuoteNotifications.recordOpenedFromNotification(this, intent, savedInstanceState);
-        if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
-            pendingQuoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
-            Log.d(TAG, "Opened from notification with quote ID: " + pendingQuoteId);
+        if (savedInstanceState == null && intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
+            int quoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
+            Log.d(TAG, "Opened from notification with quote ID: " + quoteId);
+            if (quoteId != -1) showQuote(quoteId);
         }
-
     }
 
     @Override
@@ -188,52 +115,63 @@ public class MainActivity extends AppCompatActivity {
         QuoteNotifications.recordOpenedFromNotification(this, intent, null);
         if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
             int quoteId = intent.getIntExtra(QuoteNotifications.EXTRA_QUOTE_ID, -1);
-            if (quoteId != -1) {
-                navigateToQuote(quoteId);
-            }
+            if (quoteId != -1) showQuote(quoteId);
         }
     }
 
-    private void toggleFavorite(Quote quote) {
-        if (quote != null) {
-            boolean isFavorite = quoteCollection.toggleFavorite(quote.getId());
-            String message = isFavorite ? "Added to favorites" : "Removed from favorites";
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "Quote #" + quote.getId() + " favorite: " + isFavorite);
-        }
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_TAB, selectedTab);
     }
 
-    private void navigateToQuote(int quoteId) {
-        if (!readingSession.navigateTo(quoteId)) {
-            Log.w(TAG, "Quote #" + quoteId + " not found in deck");
-            Toast.makeText(this, "Quote no longer exists", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        int pos = readingSession.getCurrentPosition();
-        viewPager.setCurrentItem(pos, false);
-        updateQuoteCounter(pos);
-        Log.d(TAG, "Navigated to quote #" + quoteId + " at position " + pos);
+    /** Selects a tab through the bottom nav, which calls back into {@link #showTab}. */
+    private void selectTab(int tabId) {
+        binding.bottomNav.setSelectedItemId(tabId);
     }
 
-    private void searchByAuthor(Quote quote) {
-        if (quote != null && !quote.getAuthor().isEmpty()) {
-            Intent intent = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, quote.getAuthor()).toIntent(this);
-            searchActivityLauncher.launch(intent);
+    private void showTab(int tabId) {
+        if (tabId != R.id.tab_search) searchFragment.hideKeyboard();
+        selectedTab = tabId;
+
+        Fragment shown = tabId == R.id.tab_search ? searchFragment
+                : tabId == R.id.tab_favorites ? favoritesFragment
+                : quotesFragment;
+        FragmentTransaction tx = getSupportFragmentManager().beginTransaction();
+        for (Fragment f : new Fragment[]{quotesFragment, searchFragment, favoritesFragment}) {
+            if (f == shown) tx.show(f); else tx.hide(f);
         }
+        tx.commitNow();
+
+        boolean onQuotes = tabId == R.id.tab_quotes;
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(onQuotes ? getString(R.string.app_name)
+                    : tabId == R.id.tab_search ? getString(R.string.tab_search)
+                    : getString(R.string.tab_favorites));
+        }
+        binding.fabAddQuote.setVisibility(onQuotes ? View.VISIBLE : View.GONE);
+        backToQuotes.setEnabled(!onQuotes);
+        binding.appBar.setLiftOnScrollTargetViewId(
+                tabId == R.id.tab_search ? R.id.search_scroll : View.NO_ID);
+        binding.appBar.setLifted(false);
+        invalidateOptionsMenu();
     }
 
-    private void searchBySource(Quote quote) {
-        if (quote != null && !quote.getSource().isEmpty()) {
-            Intent intent = QuoteQuery.forField(QuoteQuery.Field.SOURCE, quote.getSource()).toIntent(this);
-            searchActivityLauncher.launch(intent);
-        }
+    /** Opens the Quotes tab at this quote (notification, search result). */
+    private void showQuote(int quoteId) {
+        selectTab(R.id.tab_quotes);
+        quotesFragment.navigateTo(quoteId);
     }
 
-    private void searchByCategory(Quote quote) {
-        if (quote != null && !quote.getCategory().isEmpty()) {
-            Intent intent = QuoteQuery.forField(QuoteQuery.Field.CATEGORY, quote.getCategory()).toIntent(this);
-            searchActivityLauncher.launch(intent);
-        }
+    @Override
+    public void showSearch(QuoteQuery query) {
+        searchFragment.applyQuery(query);
+        selectTab(R.id.tab_search);
+    }
+
+    @Override
+    public void onSearchResultClick(int quoteId) {
+        showQuote(quoteId);
     }
 
     @Override
@@ -253,54 +191,42 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        menu.findItem(R.id.action_settings).setVisible(selectedTab == R.id.tab_quotes);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.action_search) {
-            Intent intent = new Intent(this, SearchActivity.class);
-            searchActivityLauncher.launch(intent);
-            return true;
-
-        } else if (id == R.id.action_favorites) {
-            startActivity(new Intent(this, FavoritesActivity.class));
-            return true;
-
-        } else if (id == R.id.action_settings) {
+        if (item.getItemId() == R.id.action_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
-    private void hideFab() {
+    @Override
+    public void hideFab() {
         if (!isFabHidden) {
             isFabHidden = true;
             binding.fabAddQuote.animate()
                     .translationY(binding.fabAddQuote.getHeight() +
-                            ((android.view.ViewGroup.MarginLayoutParams) binding.fabAddQuote.getLayoutParams()).bottomMargin)
+                            ((ViewGroup.MarginLayoutParams) binding.fabAddQuote.getLayoutParams()).bottomMargin)
                     .setDuration(200)
-                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .setInterpolator(new AccelerateInterpolator())
                     .start();
         }
     }
 
-    private void showFab() {
+    @Override
+    public void showFab() {
         if (isFabHidden) {
             isFabHidden = false;
             binding.fabAddQuote.animate()
                     .translationY(0)
                     .setDuration(200)
-                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .setInterpolator(new DecelerateInterpolator())
                     .start();
         }
     }
-
-    private void updateQuoteCounter(int position) {
-        List<Quote> deck = readingSession.getDeck().getValue();
-        if (deck != null && !deck.isEmpty() && quoteCounter != null) {
-            quoteCounter.setText((position + 1) + " of " + deck.size());
-        }
-    }
-
 }

@@ -2,6 +2,7 @@ package com.example.myquotes;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,7 +17,7 @@ import java.util.Set;
  * Immutable search predicate: trimmed query text (original case preserved for display,
  * matched case-insensitively) plus the fields it is scoped to. Owns matching, the
  * minimum-length rule and result snippets, and is the single protocol for opening
- * SearchActivity for a query.
+ * SearchActivity (or handing SearchFragment) a query.
  */
 public final class QuoteQuery {
     public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, CATEGORY }
@@ -123,10 +124,7 @@ public final class QuoteQuery {
     @NonNull
     public Intent toIntent(Context context) {
         Intent intent = new Intent(context, SearchActivity.class);
-        intent.putExtra(EXTRA_TEXT, text);
-        ArrayList<String> names = new ArrayList<>();
-        for (Field f : fields) names.add(f.name());
-        intent.putStringArrayListExtra(EXTRA_FIELDS, names);
+        intent.putExtras(toBundle());
         return intent;
     }
 
@@ -135,7 +133,27 @@ public final class QuoteQuery {
     public static QuoteQuery fromIntent(Intent intent) {
         String text = intent.getStringExtra(EXTRA_TEXT);
         if (text == null || text.isEmpty()) return null;
-        ArrayList<String> names = intent.getStringArrayListExtra(EXTRA_FIELDS);
+        return fromBundle(intent.getExtras());
+    }
+
+    /** The query as fragment arguments / saved state; read back with {@link #fromBundle}. */
+    @NonNull
+    public Bundle toBundle() {
+        Bundle bundle = new Bundle();
+        bundle.putString(EXTRA_TEXT, text);
+        ArrayList<String> names = new ArrayList<>();
+        for (Field f : fields) names.add(f.name());
+        bundle.putStringArrayList(EXTRA_FIELDS, names);
+        return bundle;
+    }
+
+    /** Reads back a query written by {@link #toBundle}; null if the bundle carries none. */
+    @Nullable
+    public static QuoteQuery fromBundle(@Nullable Bundle bundle) {
+        if (bundle == null) return null;
+        String text = bundle.getString(EXTRA_TEXT);
+        if (text == null) return null;
+        ArrayList<String> names = bundle.getStringArrayList(EXTRA_FIELDS);
         if (names == null) return all(text);
         Set<Field> fields = EnumSet.noneOf(Field.class);
         for (String name : names) {

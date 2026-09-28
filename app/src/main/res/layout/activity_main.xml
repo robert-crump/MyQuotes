@@ -1,70 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    android:orientation="vertical"
     tools:context=".MainActivity">
 
-    <RelativeLayout
+    <!-- Everything above the bottom nav; the FAB is clipped here when it slides out on scroll -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
-        android:orientation="vertical">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-        <!-- Status bar scrim: sized to the status bar inset height at runtime -->
-        <View
-            android:id="@+id/status_bar_scrim"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_alignParentTop="true"
-            android:background="?attr/statusBarScrimColor" />
-
-        <!-- Toolbar at top -->
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:layout_below="@id/status_bar_scrim"
-            style="@style/Widget.Material3.Toolbar.Surface" />
-
-        <!-- Quote Counter -->
-        <TextView
-            android:id="@+id/quote_counter"
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/app_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/toolbar"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp"
-            android:text="1 of 545"
-            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-            android:textColor="?android:attr/textColorPrimary"
-            android:gravity="center"
-            android:textStyle="bold" />
+            app:liftOnScroll="true">
 
-        <!-- ViewPager2 für Swipe-Funktionalität -->
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/quotes_viewpager"
+            <!-- Status bar scrim: sized to the status bar inset height at runtime -->
+            <View
+                android:id="@+id/status_bar_scrim"
+                android:layout_width="match_parent"
+                android:layout_height="0dp" />
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent" />
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Tab fragments (Quotes / Search / Favorites), switched with show/hide -->
+        <FrameLayout
+            android:id="@+id/tab_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/quote_counter"
-            android:layout_marginTop="4dp" />
+            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    </RelativeLayout>
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add_quote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:contentDescription="@string/cd_add_quote"
+            app:srcCompat="@drawable/ic_add_24dp" />
 
-    <!-- Floating Action Button -->
-    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/fab_add_quote"
-        android:layout_width="wrap_content"
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:contentDescription="Add quote"
-        android:text=""
-        app:icon="@android:drawable/ic_input_add"
-        app:iconTint="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary"
-        app:shapeAppearanceOverlay="@style/ShapeAppearance.MyApp.FAB" />
+        app:menu="@menu/menu_bottom_nav" />
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

@@ -82,4 +82,10 @@
         <item quantity="one">%d quote</item>
         <item quantity="other">%d quotes</item>
     </plurals>
+    <!-- Bottom navigation -->
+    <string name="tab_quotes">Quotes</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="favorites_empty">No favorites yet — tap ♥ on a quote</string>
+    <string name="cd_add_quote">Add quote</string>
 </resources>

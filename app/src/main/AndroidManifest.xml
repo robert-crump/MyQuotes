@@ -19,7 +19,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="My Quotes: Main Page"
+            android:label="@string/app_name"
             android:theme="@style/Theme.MyQuotes.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -40,12 +40,6 @@
         <activity
             android:name=".StatisticsActivity"
             android:label="Statistics"
-            android:theme="@style/Theme.MyQuotes.NoActionBar"
-            android:exported="false" />
-
-        <activity
-            android:name=".FavoritesActivity"
-            android:label="Favorites"
             android:theme="@style/Theme.MyQuotes.NoActionBar"
             android:exported="false" />
 

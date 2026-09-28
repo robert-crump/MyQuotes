@@ -20,13 +20,15 @@
 
 ## Flows
 
-**Main browse flow** — ViewPager2 in MainActivity driven by the Reading Session's Deck.
+**Main screen** — `MainActivity` is a bottom-navigation host: one app bar (title follows the tab; the Settings gear only on Quotes), three tab fragments — `QuotesFragment`, `SearchFragment`, `FavoritesFragment` — added once and switched with show/hide so each keeps its state, and the add-quote FAB (Quotes only). Back from Search or Favorites returns to Quotes; from Quotes it exits. An author/source/category tap on a card opens the Search tab with that single-field query; a search result tap, a notification tap or `EXTRA_QUOTE_ID` via `onNewIntent` opens the Quotes tab at that quote. Settings, Statistics, Categories and Add/Edit are pushed Activities without the bottom bar.
 
-**Favorites flow** — ViewPager2 in FavoritesActivity driven by a filtered, recency-sorted view of the Quote Collection (not a Reading Session).
+**Main browse flow** — the Quotes tab: ViewPager2 in `QuotesFragment` driven by the Reading Session's Deck (the session is scoped to MainActivity).
 
-**Search / category flow** — list or pager in SearchActivity / CategoriesActivity driven by a filtered view of the Quote Collection. Search results are newest first (`Quote.NEWEST_FIRST`: `addedAt` descending, then id descending — ids grow with each add, so quotes with unknown `addedAt` still order sensibly). Below the 3-character minimum the Search screen lists every quote ("N quotes"), so it doubles as the full, recently-added-first list.
+**Favorites flow** — the Favorites tab: ViewPager2 in `FavoritesFragment` driven by a filtered, recency-sorted view of the Quote Collection (not a Reading Session). Observes the Collection, so ♥ taps elsewhere show up at once; keeps the shown quote in view across changes; shows an empty state when there are no favorites.
 
-**Quote Query** — immutable search predicate: normalized (trimmed, lowercased) text plus the set of fields in scope (quote text, author, source, category). Owns matching (case-insensitive contains), the 3-character minimum, and result snippet extraction. A query over all four fields is what typing in the search box produces; a single-field query is what author/source/category click-through and Statistics produce. `toIntent`/`fromIntent` are the only protocol for opening SearchActivity for a query. `SearchActivity` holds one as its state; chip toggles produce a new query.
+**Search / category flow** — the result list in `SearchFragment` (the Search tab, or the thin pushed `SearchActivity` that Statistics and Categories open via `QuoteQuery.toIntent`; a result tap there returns to MainActivity with `CLEAR_TOP | SINGLE_TOP`) driven by a filtered view of the Quote Collection. Search results are newest first (`Quote.NEWEST_FIRST`: `addedAt` descending, then id descending — ids grow with each add, so quotes with unknown `addedAt` still order sensibly). Below the 3-character minimum the Search screen lists every quote ("N quotes"), so it doubles as the full, recently-added-first list.
+
+**Quote Query** — immutable search predicate: normalized (trimmed, lowercased) text plus the set of fields in scope (quote text, author, source, category). Owns matching (case-insensitive contains), the 3-character minimum, and result snippet extraction. A query over all four fields is what typing in the search box produces; a single-field query is what author/source/category click-through and Statistics produce. `toIntent`/`fromIntent` are the only protocol for opening SearchActivity for a query; `toBundle`/`fromBundle` carry it as `SearchFragment` arguments and saved state. `SearchFragment` holds one as its state; chip toggles produce a new query, `applyQuery` replaces it.
 
 ## Subsystems
 

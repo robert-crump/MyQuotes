@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/tab_quotes"
+        android:icon="@drawable/ic_quotation_24dp"
+        android:title="@string/tab_quotes" />
+
+    <item
+        android:id="@+id/tab_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/tab_search" />
+
+    <item
+        android:id="@+id/tab_favorites"
+        android:icon="@drawable/ic_favorite_heart"
+        android:title="@string/tab_favorites" />
+
+</menu>

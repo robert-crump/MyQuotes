@@ -36,6 +36,45 @@ final class EdgeToEdgeUtils {
      *                  edge-to-edge the window no longer resizes for the IME on its own).
      */
     static void apply(Activity activity, View statusBarScrim, boolean padForIme) {
+        applyStatusBarScrim(activity, statusBarScrim);
+
+        // Root content: pad left/right/bottom by the system bar insets so nothing sits under
+        // the navigation bar or a side display cutout. Top is handled by the scrim above.
+        View content = rootContent(activity);
+        final int contentTop = content.getPaddingTop();
+        ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            int bottom = systemBars.bottom;
+            if (padForIme) {
+                bottom = Math.max(bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom);
+            }
+            v.setPadding(systemBars.left, contentTop, systemBars.right, bottom);
+            return insets;
+        });
+    }
+
+    /**
+     * For a screen whose root ends in a BottomNavigationView: the root pads only left/right,
+     * and the bottom nav pads itself for the navigation bar, so its background reaches the
+     * bottom edge. Left/right are consumed here so the bottom nav doesn't pad them twice.
+     */
+    static void applyAboveBottomNav(Activity activity, View statusBarScrim) {
+        applyStatusBarScrim(activity, statusBarScrim);
+
+        View content = rootContent(activity);
+        final int contentTop = content.getPaddingTop();
+        final int contentBottom = content.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, contentTop, systemBars.right, contentBottom);
+            return new WindowInsetsCompat.Builder(insets)
+                    .setInsets(WindowInsetsCompat.Type.systemBars(),
+                            Insets.of(0, systemBars.top, 0, systemBars.bottom))
+                    .build();
+        });
+    }
+
+    private static void applyStatusBarScrim(Activity activity, View statusBarScrim) {
         WindowCompat.setDecorFitsSystemWindows(activity.getWindow(), false);
 
         // Status bar scrim: an initially-zero-height strip above the toolbar, grown to exactly
@@ -50,19 +89,9 @@ final class EdgeToEdgeUtils {
             }
             return insets;
         });
+    }
 
-        // Root content: pad left/right/bottom by the system bar insets so nothing sits under
-        // the navigation bar or a side display cutout. Top is handled by the scrim above.
-        View content = ((ViewGroup) activity.findViewById(android.R.id.content)).getChildAt(0);
-        final int contentTop = content.getPaddingTop();
-        ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            int bottom = systemBars.bottom;
-            if (padForIme) {
-                bottom = Math.max(bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom);
-            }
-            v.setPadding(systemBars.left, contentTop, systemBars.right, bottom);
-            return insets;
-        });
+    private static View rootContent(Activity activity) {
+        return ((ViewGroup) activity.findViewById(android.R.id.content)).getChildAt(0);
     }
 }

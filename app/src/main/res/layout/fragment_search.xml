@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/search_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Search Input -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:boxStrokeWidth="2dp"
+            app:boxBackgroundColor="?attr/colorSurface"
+            app:hintTextColor="?attr/colorPrimary">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Search quotes..."
+                android:inputType="text"
+                android:imeOptions="actionSearch|flagNoExtractUi"
+                android:maxLines="1"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorSecondary"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Filter Buttons -->
+        <com.google.android.material.chip.ChipGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:singleLine="false">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/filter_quote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Quote"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textStyle="bold"
+                app:closeIcon="@drawable/ic_close"
+                app:chipBackgroundColor="?attr/colorPrimary"
+                app:chipStrokeColor="?attr/colorPrimary"
+                app:chipStrokeWidth="2dp"
+                app:chipCornerRadius="16dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/filter_author"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Author"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textStyle="bold"
+                app:closeIcon="@drawable/ic_close"
+                app:chipBackgroundColor="?attr/colorPrimary"
+                app:chipStrokeColor="?attr/colorPrimary"
+                app:chipStrokeWidth="2dp"
+                app:chipCornerRadius="16dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/filter_source"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Source"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textStyle="bold"
+                app:closeIcon="@drawable/ic_close"
+                app:chipBackgroundColor="?attr/colorPrimary"
+                app:chipStrokeColor="?attr/colorPrimary"
+                app:chipStrokeWidth="2dp"
+                app:chipCornerRadius="16dp" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/filter_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Category"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                android:textStyle="bold"
+                app:closeIcon="@drawable/ic_close"
+                app:chipBackgroundColor="?attr/colorPrimary"
+                app:chipStrokeColor="?attr/colorPrimary"
+                app:chipStrokeWidth="2dp"
+                app:chipCornerRadius="16dp" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- Suchergebnis-Zähler -->
+        <TextView
+            android:id="@+id/searchResultsCountTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="0 search results"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textStyle="italic" />
+
+        <!-- RecyclerView für Suchergebnisse -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/searchResultsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:nestedScrollingEnabled="false" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
