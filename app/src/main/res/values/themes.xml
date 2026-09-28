@@ -49,15 +49,27 @@
 
         <item name="android:fontFamily">@font/dm_sans</item>
 
-        <!-- Status bar -->
-        <item name="android:statusBarColor">@color/md3_light_surface</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
-        <item name="statusBarScrimColor">@color/md3_light_primary_container</item>
-        <item name="appBarColor">@color/md3_light_primary_container</item>
+        <!-- Status bar and app bar: solid brand pink (the author name's colour) with white
+             text, title and icons (ThemeOverlay.MyQuotes.AppBar), so the status bar icons
+             are light too. White on #E91E63 is ~4.35:1, accepted for the large bar title. -->
+        <item name="android:statusBarColor">@color/pink_primary</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="statusBarScrimColor">@color/pink_primary</item>
+        <item name="appBarColor">@color/pink_primary</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/white</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+
+    <!-- Applied to every Toolbar (android:theme): white title, navigation and action icons on
+         the pink app bar. The night variant is empty, so dark-mode bars keep their colours. -->
+    <style name="ThemeOverlay.MyQuotes.AppBar" parent="">
+        <item name="colorControlNormal">@color/white</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">@color/white</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/white</item>
     </style>
 
     <!-- NoActionBar variant for activities with custom toolbar -->

@@ -58,6 +58,9 @@
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
+    <!-- Dark bars keep the theme's own colours (see the light ThemeOverlay.MyQuotes.AppBar). -->
+    <style name="ThemeOverlay.MyQuotes.AppBar" parent="" />
+
     <!-- NoActionBar variant for activities with custom toolbar -->
     <style name="Theme.MyQuotes.NoActionBar">
         <item name="windowActionBar">false</item>
