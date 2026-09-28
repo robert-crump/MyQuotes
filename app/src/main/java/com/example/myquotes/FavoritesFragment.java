@@ -5,7 +5,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,8 +29,6 @@ public class FavoritesFragment extends Fragment {
 
     private ViewPager2 viewPager;
     private QuotePagerAdapter pagerAdapter;
-    private TextView favoriteCounter;
-    private View content;
     private View emptyState;
 
     private QuoteCollection quoteCollection;
@@ -55,10 +52,9 @@ public class FavoritesFragment extends Fragment {
             restoreQuoteId = savedInstanceState.getInt(STATE_QUOTE_ID, -1);
         }
 
-        content = view.findViewById(R.id.favorites_content);
         emptyState = view.findViewById(R.id.favorites_empty);
-        favoriteCounter = view.findViewById(R.id.favorite_counter);
         viewPager = view.findViewById(R.id.favorites_viewpager);
+        PagerPeek.apply(viewPager, R.dimen.pager_peek, R.dimen.pager_page_margin);
 
         pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
             @Override
@@ -111,7 +107,6 @@ public class FavoritesFragment extends Fragment {
                 if (position < favoriteQuotes.size()) {
                     restoreQuoteId = favoriteQuotes.get(position).getId();
                 }
-                updateCounter(position);
             }
         });
 
@@ -128,8 +123,6 @@ public class FavoritesFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         viewPager = null;
-        favoriteCounter = null;
-        content = null;
         emptyState = null;
     }
 
@@ -140,7 +133,7 @@ public class FavoritesFragment extends Fragment {
         favoriteQuotes = quoteCollection.getFavorites();
 
         boolean empty = favoriteQuotes.isEmpty();
-        content.setVisibility(empty ? View.GONE : View.VISIBLE);
+        viewPager.setVisibility(empty ? View.GONE : View.VISIBLE);
         emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
         pagerAdapter.setQuotes(favoriteQuotes);
         if (empty) return;
@@ -154,12 +147,5 @@ public class FavoritesFragment extends Fragment {
         }
         viewPager.setCurrentItem(position, false);
         restoreQuoteId = favoriteQuotes.get(position).getId();
-        updateCounter(position);
-    }
-
-    private void updateCounter(int position) {
-        if (!favoriteQuotes.isEmpty()) {
-            favoriteCounter.setText((position + 1) + " of " + favoriteQuotes.size());
-        }
     }
 }

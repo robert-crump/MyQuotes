@@ -1,11 +1,11 @@
 package com.example.myquotes;
 
+import android.animation.Animator;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -15,7 +15,7 @@ import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.widget.ViewPager2;
 
-import java.util.List;
+import com.example.myquotes.notifications.QuoteNotifications;
 
 /** Quotes tab: the main browse flow, a pager over the Reading Session's Deck. */
 public class QuotesFragment extends Fragment {
@@ -30,13 +30,17 @@ public class QuotesFragment extends Fragment {
 
     private ViewPager2 viewPager;
     private QuotePagerAdapter pagerAdapter;
-    private TextView quoteCounter;
+    @Nullable private Animator swipeHint;
 
     private QuoteCollection quoteCollection;
     private ReadingSession readingSession;
 
     private boolean isFirstDeckLoad = true;
     private int pendingQuoteId = -1;
+    // Only a fresh start (not rotation or a restored activity) may play the swipe nudge.
+    private boolean mayPlaySwipeHint;
+    // True from a user's finger-down drag until the pager settles again.
+    private boolean userDragging;
 
     @Nullable
     @Override
@@ -60,9 +64,10 @@ public class QuotesFragment extends Fragment {
             }
         }).get(ReadingSession.class);
         isFirstDeckLoad = true;
+        mayPlaySwipeHint = savedInstanceState == null;
 
         viewPager = view.findViewById(R.id.quotes_viewpager);
-        quoteCounter = view.findViewById(R.id.quote_counter);
+        PagerPeek.apply(viewPager, R.dimen.pager_peek, R.dimen.pager_page_margin);
 
         pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
             @Override
@@ -120,8 +125,22 @@ public class QuotesFragment extends Fragment {
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
                 readingSession.setPosition(position);
-                updateQuoteCounter(position);
                 host.showFab();
+                // Programmatic jumps (search result, notification) don't count as a swipe.
+                if (userDragging && !SwipeHint.hasSwiped(requireContext())) {
+                    SwipeHint.markSwiped(requireContext());
+                }
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+                if (state == ViewPager2.SCROLL_STATE_DRAGGING) {
+                    // The swipe nudge drags too, but only as a fake drag.
+                    userDragging = !viewPager.isFakeDragging();
+                    if (userDragging) cancelSwipeHint();
+                } else if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                    userDragging = false;
+                }
             }
         });
 
@@ -133,7 +152,6 @@ public class QuotesFragment extends Fragment {
                 // deck means the last quote was deleted (e.g. from the editor), so clear the pager.
                 if (!isFirstDeckLoad) {
                     pagerAdapter.setQuotes(deck);
-                    quoteCounter.setText("");
                 }
                 return;
             }
@@ -152,15 +170,18 @@ public class QuotesFragment extends Fragment {
             if (viewPager.getCurrentItem() != pos) {
                 viewPager.setCurrentItem(pos, false);
             }
-            updateQuoteCounter(pos);
+            if (mayPlaySwipeHint) {
+                mayPlaySwipeHint = false;
+                maybePlaySwipeHint(deck.size());
+            }
         });
     }
 
     @Override
     public void onDestroyView() {
+        cancelSwipeHint();
         super.onDestroyView();
         viewPager = null;
-        quoteCounter = null;
     }
 
     /** Shows the quote with this id; deferred until the deck has loaded if called earlier. */
@@ -169,6 +190,7 @@ public class QuotesFragment extends Fragment {
             pendingQuoteId = quoteId;
             return;
         }
+        cancelSwipeHint();
         if (!readingSession.navigateTo(quoteId)) {
             Log.w(TAG, "Quote #" + quoteId + " not found in deck");
             Toast.makeText(requireContext(), "Quote no longer exists", Toast.LENGTH_SHORT).show();
@@ -176,7 +198,6 @@ public class QuotesFragment extends Fragment {
         }
         int pos = readingSession.getCurrentPosition();
         viewPager.setCurrentItem(pos, false);
-        updateQuoteCounter(pos);
         Log.d(TAG, "Navigated to quote #" + quoteId + " at position " + pos);
     }
 
@@ -189,10 +210,23 @@ public class QuotesFragment extends Fragment {
         }
     }
 
-    private void updateQuoteCounter(int position) {
-        List<Quote> deck = readingSession.getDeck().getValue();
-        if (deck != null && !deck.isEmpty() && quoteCounter != null) {
-            quoteCounter.setText((position + 1) + " of " + deck.size());
+    private void maybePlaySwipeHint(int deckSize) {
+        boolean fromNotification =
+                requireActivity().getIntent().hasExtra(QuoteNotifications.EXTRA_QUOTE_ID);
+        if (!SwipeHint.shouldShow(SwipeHint.hasSwiped(requireContext()), fromNotification,
+                deckSize, SwipeHint.animationsEnabled(requireContext()))) {
+            return;
+        }
+        // The pager needs its width to know how far to drag.
+        viewPager.post(() -> {
+            if (viewPager != null && viewPager.getWidth() > 0) swipeHint = SwipeHint.play(viewPager);
+        });
+    }
+
+    private void cancelSwipeHint() {
+        if (swipeHint != null) {
+            swipeHint.cancel();
+            swipeHint = null;
         }
     }
 }

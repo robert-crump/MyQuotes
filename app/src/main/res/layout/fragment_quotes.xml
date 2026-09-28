@@ -1,28 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<androidx.viewpager2.widget.ViewPager2
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/quotes_viewpager"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
-
-    <!-- Quote Counter -->
-    <TextView
-        android:id="@+id/quote_counter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
-        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-        android:textColor="?android:attr/textColorPrimary"
-        android:gravity="center"
-        android:textStyle="bold"
-        tools:text="1 of 545" />
-
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/quotes_viewpager"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="4dp" />
-
-</LinearLayout>
+    android:paddingTop="12dp" />
