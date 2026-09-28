@@ -81,11 +81,7 @@ public class AddEditActivity extends AppCompatActivity {
         editTextSource = findViewById(R.id.edit_text_source);
         editTextCategory = findViewById(R.id.edit_text_category);
 
-        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
-                this,
-                android.R.layout.simple_dropdown_item_1line,
-                new java.util.ArrayList<>()
-        );
+        UnfilteredAdapter adapter = new UnfilteredAdapter(this);
         editTextCategory.setAdapter(adapter);
         MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
             adapter.clear();
@@ -317,7 +313,7 @@ public class AddEditActivity extends AppCompatActivity {
             editTextAuthor.setText(quote.getAuthor());
             editTextQuote.setText(quote.getQuoteText());
             editTextSource.setText(quote.getSource());
-            editTextCategory.setText(quote.getCategory());
+            editTextCategory.setText(quote.getCategory(), false);
             isLoadingQuote = false;
             baseline = QuoteFormSnapshot.of(quote);
             Log.d(TAG, "Loaded quote #" + id);
@@ -353,7 +349,7 @@ public class AddEditActivity extends AppCompatActivity {
         editTextAuthor.setText("");
         editTextQuote.setText("");
         editTextSource.setText("");
-        editTextCategory.setText("");
+        editTextCategory.setText("", false);
         editTextAuthor.requestFocus();
     }
 
@@ -386,5 +382,33 @@ public class AddEditActivity extends AppCompatActivity {
         quote.setSource(editTextSource.getText().toString().trim());
         quote.setCategory(editTextCategory.getText().toString().trim());
         return quote;
+    }
+
+    /**
+     * The category picker is a pick-list, not an autocomplete: it always offers the whole
+     * category set. A plain ArrayAdapter would filter it by the field's current text, so an
+     * edited quote's own category hid every other one.
+     */
+    private static final class UnfilteredAdapter extends android.widget.ArrayAdapter<String> {
+        private final android.widget.Filter noFilter = new android.widget.Filter() {
+            @Override
+            protected FilterResults performFiltering(CharSequence constraint) {
+                return null;
+            }
+
+            @Override
+            protected void publishResults(CharSequence constraint, FilterResults results) {
+                notifyDataSetChanged();
+            }
+        };
+
+        UnfilteredAdapter(Context context) {
+            super(context, android.R.layout.simple_dropdown_item_1line, new java.util.ArrayList<>());
+        }
+
+        @Override
+        public android.widget.Filter getFilter() {
+            return noFilter;
+        }
     }
 }
