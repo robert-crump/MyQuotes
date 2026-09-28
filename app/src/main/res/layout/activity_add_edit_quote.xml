@@ -20,13 +20,9 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
-        android:elevation="4dp"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        android:layout_alignParentTop="true"
+        style="@style/Widget.Material3.Toolbar.Surface"
         app:navigationIcon="@drawable/ic_close"
-        app:navigationContentDescription="Close"
-        app:titleTextColor="@android:color/white" />
+        app:navigationContentDescription="Close" />
 
     <!-- Form -->
     <ScrollView

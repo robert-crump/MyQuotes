@@ -48,9 +48,9 @@
         <item name="android:textColorSecondary">@color/light_text_secondary</item>
 
         <!-- Status bar -->
-        <item name="android:statusBarColor">@color/purple_primary_variant</item>
+        <item name="android:statusBarColor">@color/md3_dark_surface</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
-        <item name="statusBarScrimColor">@color/purple_primary_variant</item>
+        <item name="statusBarScrimColor">@color/md3_dark_surface</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/dark_background</item>
@@ -62,11 +62,5 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
-
-    <!-- AppBarOverlay -->
-    <style name="Theme.MyQuotes.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
-
-    <!-- PopupOverlay -->
-    <style name="Theme.MyQuotes.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
 </resources>

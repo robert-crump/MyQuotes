@@ -27,11 +27,7 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:layout_below="@id/status_bar_scrim"
-            android:background="?attr/colorPrimary"
-            android:elevation="4dp"
-            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-            app:titleTextColor="?attr/colorOnPrimary"/>
+            style="@style/Widget.Material3.Toolbar.Surface" />
 
         <!-- Quote Counter -->
         <TextView

@@ -1,35 +1,4 @@
 <resources>
-    <!-- Toolbar Style -->
-    <style name="ToolbarStyle" parent="Widget.AppCompat.Toolbar">
-        <item name="titleTextColor">?attr/colorOnPrimary</item>
-        <item name="android:textColorSecondary">?attr/colorOnPrimary</item>
-    </style>
-
-    <!-- Theme Overlay für Toolbar - Generic (used by Favorites and Settings) -->
-    <style name="ThemeOverlay.MyApp.Toolbar" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
-        <item name="android:textColorSecondary">?attr/colorOnPrimary</item>
-        <item name="colorControlNormal">?attr/colorOnPrimary</item>
-    </style>
-
-    <!-- Theme Overlay für Toolbar mit schwarzen Icons im Light Mode -->
-    <style name="ThemeOverlay.MyApp.Toolbar.Light" parent="ThemeOverlay.AppCompat.Light">
-        <item name="android:textColorSecondary">?attr/colorOnPrimary</item>
-        <item name="colorControlNormal">?attr/colorOnPrimary</item>
-    </style>
-
-    <!-- Theme Overlay für Toolbar mit weißen Icons im Dark Mode -->
-    <style name="ThemeOverlay.MyApp.Toolbar.Dark" parent="ThemeOverlay.AppCompat.Dark.ActionBar">
-        <item name="android:textColorSecondary">?attr/colorOnPrimary</item>
-        <item name="colorControlNormal">?attr/colorOnPrimary</item>
-    </style>
-
-    <!-- Toolbar Title -->
-    <style name="ToolbarTitle" parent="TextAppearance.AppCompat.Title">
-        <item name="android:textSize">20sp</item>
-        <item name="android:textColor">?attr/colorOnPrimary</item>
-        <item name="android:textStyle">bold</item>
-    </style>
-
     <!-- Menu Item Style -->
     <style name="MenuItemStyle" parent="Widget.AppCompat.PopupMenu">
         <item name="android:itemTextAppearance">@style/MenuItemText</item>

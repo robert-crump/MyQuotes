@@ -17,11 +17,10 @@ import androidx.core.view.WindowInsetsCompat;
  * android:statusBarColor/navigationBarColor, regardless of what the theme sets. Every screen's
  * root layout also has android:fitsSystemWindows removed (it no longer reserves space for the
  * bars once edge-to-edge is enforced), so each Activity calls {@link #apply} after
- * setContentView to size a dedicated status-bar scrim strip (?attr/statusBarScrimColor, a
- * darker "variant" of colorPrimary — see themes.xml) behind the transparent status bar, keeping
- * the pre-edge-to-edge two-tone look instead of the toolbar's own colorPrimary bleeding
- * straight through, and to pad the rest of the content away from the navigation bar / side
- * cutouts.
+ * setContentView to size a dedicated status-bar scrim strip behind the transparent status bar
+ * (?attr/statusBarScrimColor, the surface colour — see themes.xml; inside an AppBarLayout the
+ * strip is transparent so the bar's lift-on-scroll colour reaches the top edge), and to pad the
+ * rest of the content away from the navigation bar / side cutouts.
  */
 final class EdgeToEdgeUtils {
 
