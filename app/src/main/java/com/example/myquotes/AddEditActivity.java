@@ -145,6 +145,20 @@ public class AddEditActivity extends AppCompatActivity {
                 .show();
     }
 
+    // Deleting closes the editor straight away: the quote is gone, so any unsaved edits are moot.
+    private void showDeleteDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Quote")
+                .setMessage("Are you sure you want to delete this quote?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    quoteCollection.deleteById(quoteId);
+                    Toast.makeText(this, "Quote deleted", Toast.LENGTH_SHORT).show();
+                    finish();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_add_edit, menu);
@@ -152,9 +166,18 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        menu.findItem(R.id.action_delete).setVisible(isEditMode);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_save) {
             saveQuote();
+            return true;
+        } else if (item.getItemId() == R.id.action_delete) {
+            showDeleteDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);

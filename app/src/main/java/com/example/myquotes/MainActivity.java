@@ -28,7 +28,6 @@ public class MainActivity extends AppCompatActivity {
 
     private QuoteCollection quoteCollection;
     private ReadingSession readingSession;
-    private Quote currentQuote;
 
     private boolean isFirstDeckLoad = true;
     private int pendingQuoteId = -1;
@@ -142,7 +141,16 @@ public class MainActivity extends AppCompatActivity {
 
         // Observe deck: update adapter and restore position on structural changes.
         readingSession.getDeck().observe(this, deck -> {
-            if (deck == null || deck.isEmpty()) return;
+            if (deck == null) return;
+            if (deck.isEmpty()) {
+                // Before the first load the deck is just the empty placeholder; after it, an empty
+                // deck means the last quote was deleted (e.g. from the editor), so clear the pager.
+                if (!isFirstDeckLoad) {
+                    pagerAdapter.setQuotes(deck);
+                    quoteCounter.setText("");
+                }
+                return;
+            }
             pagerAdapter.setQuotes(deck);
 
             if (isFirstDeckLoad) {
@@ -165,9 +173,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Observe currentQuote: keep local field in sync for menu actions (edit/delete).
-        readingSession.getCurrentQuote().observe(this, quote -> currentQuote = quote);
-
         Intent intent = getIntent();
         QuoteNotifications.recordOpenedFromNotification(this, intent, savedInstanceState);
         if (intent.hasExtra(QuoteNotifications.EXTRA_QUOTE_ID)) {
@@ -187,25 +192,6 @@ public class MainActivity extends AppCompatActivity {
                 navigateToQuote(quoteId);
             }
         }
-    }
-
-    private void showDeleteConfirmationDialog(Quote quote) {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Delete Quote")
-                .setMessage("Are you sure you want to delete this quote?")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    quoteCollection.deleteById(quote.getId());
-                    List<Quote> deck = readingSession.getDeck().getValue();
-                    if (deck == null || deck.isEmpty()) {
-                        currentQuote = null;
-                        updateQuoteCounter(0);
-                        Toast.makeText(this, "No more quotes", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(this, "Quote deleted", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
     }
 
     private void toggleFavorite(Quote quote) {
@@ -273,14 +259,6 @@ public class MainActivity extends AppCompatActivity {
         if (id == R.id.action_search) {
             Intent intent = new Intent(this, SearchActivity.class);
             searchActivityLauncher.launch(intent);
-            return true;
-
-        } else if (id == R.id.action_delete) {
-            if (currentQuote != null) {
-                showDeleteConfirmationDialog(currentQuote);
-            } else {
-                Toast.makeText(this, "No quote to delete", Toast.LENGTH_SHORT).show();
-            }
             return true;
 
         } else if (id == R.id.action_statistics) {
