@@ -4,13 +4,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
+import androidx.viewpager2.widget.ViewPager2;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +48,36 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
         notifyDataSetChanged();
     }
 
+    /** The quote list index shown at this pager position (the pager loops, see {@link LoopingPositions}). */
+    public int indexOf(int pagerPosition) {
+        return LoopingPositions.indexOf(pagerPosition, quotes.size());
+    }
+
+    /** The pager position showing quote list {@code index}, near pager position {@code around}. */
+    public int pagerPositionOf(int index, int around) {
+        return LoopingPositions.pagerPositionOf(index, quotes.size(), around);
+    }
+
+    /**
+     * Scrolls every page but the current one back to its top once a swipe settles, so a card
+     * swiped away (and still peeking) starts at the top when it comes back.
+     */
+    public static void resetScrollOnPageChange(ViewPager2 pager) {
+        RecyclerView recyclerView = (RecyclerView) pager.getChildAt(0);
+        pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageScrollStateChanged(int state) {
+                if (state != ViewPager2.SCROLL_STATE_IDLE) return;
+                for (int i = 0; i < recyclerView.getChildCount(); i++) {
+                    View page = recyclerView.getChildAt(i);
+                    if (recyclerView.getChildAdapterPosition(page) != pager.getCurrentItem()) {
+                        page.scrollTo(0, 0);
+                    }
+                }
+            }
+        });
+    }
+
     @NonNull
     @Override
     public QuoteViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -59,21 +88,22 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
 
     @Override
     public void onBindViewHolder(@NonNull QuoteViewHolder holder, int position) {
-        Quote quote = quotes.get(position);
+        Quote quote = quotes.get(indexOf(position));
+        // A recycled page keeps its old scroll offset.
+        holder.itemView.scrollTo(0, 0);
         holder.bind(quote);
     }
 
     @Override
     public int getItemCount() {
-        return quotes.size();
+        return LoopingPositions.count(quotes.size());
     }
 
     class QuoteViewHolder extends RecyclerView.ViewHolder {
         private final TextView textQuote;
         private final TextView textAuthor;
-        private final ChipGroup chipGroupMeta;
-        private final Chip textSource;
-        private final Chip textCategory;
+        private final TextView textSource;
+        private final TextView textCategory;
         private final ImageButton buttonFavorite;
         private final ImageButton buttonShare;
         private final ImageButton buttonEdit;
@@ -83,7 +113,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             textQuote = itemView.findViewById(R.id.text_quote);
             textAuthor = itemView.findViewById(R.id.text_author);
             textSource = itemView.findViewById(R.id.text_source);
-            chipGroupMeta = itemView.findViewById(R.id.chip_group_meta);
             textCategory = itemView.findViewById(R.id.text_category);
             buttonFavorite = itemView.findViewById(R.id.button_favorite);
             buttonShare = itemView.findViewById(R.id.button_share);
@@ -95,8 +124,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             bindOptional(textAuthor, quote.getAuthor().isEmpty() ? "" : "— " + quote.getAuthor());
             bindOptional(textSource, quote.getSource());
             bindOptional(textCategory, quote.getCategory());
-            chipGroupMeta.setVisibility(quote.getSource().isEmpty() && quote.getCategory().isEmpty()
-                    ? View.GONE : View.VISIBLE);
 
             buttonFavorite.setImageResource(quote.isFavorite()
                     ? R.drawable.ic_favorite_heart_filled
@@ -132,7 +159,7 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
             });
 
             // Scroll direction listener for FAB hide/show
-            android.widget.ScrollView scrollView = (android.widget.ScrollView) itemView;
+            ScrollView scrollView = (ScrollView) itemView;
             scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
                 if (scrollDirectionListener != null) {
                     if (scrollY == 0) {

@@ -99,13 +99,15 @@ public class FavoritesFragment extends Fragment {
             }
         });
         viewPager.setAdapter(pagerAdapter);
+        QuotePagerAdapter.resetScrollOnPageChange(viewPager);
 
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                if (position < favoriteQuotes.size()) {
-                    restoreQuoteId = favoriteQuotes.get(position).getId();
+                int index = pagerAdapter.indexOf(position);
+                if (index < favoriteQuotes.size()) {
+                    restoreQuoteId = favoriteQuotes.get(index).getId();
                 }
             }
         });
@@ -128,7 +130,7 @@ public class FavoritesFragment extends Fragment {
 
     private void showFavorites() {
         // Keep the shown quote in view; if it was un-favorited, stay at the same index.
-        int previousPosition = viewPager.getCurrentItem();
+        int previousPosition = pagerAdapter.indexOf(viewPager.getCurrentItem());
         int keepId = restoreQuoteId; // setQuotes may fire onPageSelected, which overwrites it
         favoriteQuotes = quoteCollection.getFavorites();
 
@@ -145,7 +147,7 @@ public class FavoritesFragment extends Fragment {
                 break;
             }
         }
-        viewPager.setCurrentItem(position, false);
+        viewPager.setCurrentItem(pagerAdapter.pagerPositionOf(position, viewPager.getCurrentItem()), false);
         restoreQuoteId = favoriteQuotes.get(position).getId();
     }
 }

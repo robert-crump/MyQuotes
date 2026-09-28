@@ -107,6 +107,7 @@ public class QuotesFragment extends Fragment {
             }
         });
         viewPager.setAdapter(pagerAdapter);
+        QuotePagerAdapter.resetScrollOnPageChange(viewPager);
 
         pagerAdapter.setScrollDirectionListener(new QuotePagerAdapter.ScrollDirectionListener() {
             @Override
@@ -124,7 +125,7 @@ public class QuotesFragment extends Fragment {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                readingSession.setPosition(position);
+                readingSession.setPosition(pagerAdapter.indexOf(position));
                 host.showFab();
                 // Programmatic jumps (search result, notification) don't count as a swipe.
                 if (userDragging && !SwipeHint.hasSwiped(requireContext())) {
@@ -167,8 +168,9 @@ public class QuotesFragment extends Fragment {
                 }
             }
             int pos = readingSession.getCurrentPosition();
-            if (viewPager.getCurrentItem() != pos) {
-                viewPager.setCurrentItem(pos, false);
+            int current = viewPager.getCurrentItem();
+            if (pagerAdapter.indexOf(current) != pos) {
+                viewPager.setCurrentItem(pagerAdapter.pagerPositionOf(pos, current), false);
             }
             if (mayPlaySwipeHint) {
                 mayPlaySwipeHint = false;
@@ -197,7 +199,7 @@ public class QuotesFragment extends Fragment {
             return;
         }
         int pos = readingSession.getCurrentPosition();
-        viewPager.setCurrentItem(pos, false);
+        viewPager.setCurrentItem(pagerAdapter.pagerPositionOf(pos, viewPager.getCurrentItem()), false);
         Log.d(TAG, "Navigated to quote #" + quoteId + " at position " + pos);
     }
 
