@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Search filter chip label: on-primary on the filled chip, primary on the outlined one -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="?attr/colorOnPrimary" android:state_checked="true" />
-    <item android:color="?attr/colorPrimary" />
-</selector>

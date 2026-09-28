@@ -93,4 +93,48 @@ public class SuggestionProviderTest {
         assertTrue(onlyAuthor.otherSources.isEmpty());
         assertFalse(onlyAuthor.hasSplit());
     }
+
+    private static Quote qc(String author, String source, String category) {
+        Quote quote = new Quote(1, author, "text", source);
+        quote.setCategory(category);
+        return quote;
+    }
+
+    private static List<String> values(List<SuggestionProvider.FieldSuggestion> suggestions) {
+        List<String> values = new ArrayList<>();
+        for (SuggestionProvider.FieldSuggestion s : suggestions) values.add(s.value + ":" + s.count);
+        return values;
+    }
+
+    @Test
+    public void fieldSuggestionsMatchTheStartOfAnyWord() {
+        List<Quote> quotes = Arrays.asList(
+                qc("A", "Thinking, Fast and Slow", ""), qc("B", "Rethinking", ""));
+        assertEquals(Collections.singletonList("Thinking, Fast and Slow:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.SOURCE, "think", 6)));
+        assertEquals(Collections.singletonList("Thinking, Fast and Slow:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.SOURCE, "FAST", 6)));
+        assertEquals(Collections.singletonList("Thinking, Fast and Slow:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.SOURCE, "thinking, fa", 6)));
+    }
+
+    @Test
+    public void fieldSuggestionsRankByCountThenNameAndRespectTheLimit() {
+        List<Quote> quotes = Arrays.asList(
+                qc("Seneca", "", ""), qc("seneca", "", ""), qc("Amartya Sen", "", ""),
+                qc("Sendak", "", ""), qc("Plato", "", ""));
+        assertEquals(Arrays.asList("Seneca:2", "Amartya Sen:1", "Sendak:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.AUTHOR, "sen", 6)));
+        assertEquals(Arrays.asList("Seneca:2", "Amartya Sen:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.AUTHOR, "sen", 2)));
+    }
+
+    @Test
+    public void fieldSuggestionsCoverCategoriesButNotQuoteTextOrEmptyInput() {
+        List<Quote> quotes = Arrays.asList(qc("A", "", "Stoicism"), qc("B", "", ""));
+        assertEquals(Collections.singletonList("Stoicism:1"), values(
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.CATEGORY, "sto", 6)));
+        assertTrue(provider.getFieldSuggestions(quotes, QuoteQuery.Field.QUOTE_TEXT, "tex", 6).isEmpty());
+        assertTrue(provider.getFieldSuggestions(quotes, QuoteQuery.Field.CATEGORY, " ", 6).isEmpty());
+    }
 }

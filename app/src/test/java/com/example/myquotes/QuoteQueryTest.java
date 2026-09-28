@@ -38,7 +38,17 @@ public class QuoteQueryTest {
         assertFalse(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "letters").matches(q));
         assertFalse(QuoteQuery.forField(QuoteQuery.Field.SOURCE, "seneca").matches(q));
         assertTrue(QuoteQuery.all("seneca").matches(q));
-        assertFalse(QuoteQuery.all("seneca").toggled(QuoteQuery.Field.AUTHOR).matches(q));
+    }
+
+    @Test
+    public void scopedToSwitchesBetweenOneFieldAndAllKeepingText() {
+        QuoteQuery author = QuoteQuery.all("seneca").scopedTo(QuoteQuery.Field.AUTHOR);
+        assertEquals(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "seneca"), author);
+        assertEquals(QuoteQuery.Field.AUTHOR, author.singleField());
+        assertFalse(author.scopedTo(QuoteQuery.Field.SOURCE).matches(q));
+        QuoteQuery all = author.scopedTo(null);
+        assertEquals(QuoteQuery.all("seneca"), all);
+        assertEquals(null, all.singleField());
     }
 
     @Test

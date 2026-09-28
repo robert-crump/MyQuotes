@@ -1,16 +1,17 @@
 package com.example.myquotes;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,7 +21,9 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +31,8 @@ import java.util.List;
 /**
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
  * SearchActivity. Holds one {@link QuoteQuery}; a tapped result goes to the {@link Host}.
+ * The filter icon in the search field picks what the text searches: all fields or one; for
+ * author, source and category the field suggests existing values.
  */
 public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQuoteClickListener {
     private static final String TAG = "SearchFragment";
@@ -38,12 +43,18 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
         void onSearchResultClick(int quoteId);
     }
 
-    private Chip filterQuote;
-    private Chip filterAuthor;
-    private Chip filterSource;
-    private Chip filterCategory;
+    /** Filter dialog entries; null is "all fields". */
+    private static final QuoteQuery.Field[] FILTERS = {
+            null, QuoteQuery.Field.QUOTE_TEXT, QuoteQuery.Field.AUTHOR,
+            QuoteQuery.Field.SOURCE, QuoteQuery.Field.CATEGORY};
+    private static final String[] FILTER_LABELS = {"All fields", "Quote", "Author", "Source", "Category"};
+    private static final String[] FILTER_HINTS = {
+            "Search all fields", "Search in quote text", "Search in authors",
+            "Search in sources", "Search in categories"};
 
-    private EditText searchEditText;
+    private TextInputLayout searchInputLayout;
+    private MaterialAutoCompleteTextView searchEditText;
+    private FieldSuggestionAdapter suggestionAdapter;
     private TextView searchResultsCountTextView;
     private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
@@ -64,7 +75,8 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
         QuoteQuery restored = savedInstanceState != null
                 ? QuoteQuery.fromBundle(savedInstanceState.getBundle(STATE_QUERY))
                 : QuoteQuery.fromBundle(getArguments());
-        if (restored != null) query = restored;
+        // The filter is all fields or exactly one; older multi-field states widen to all.
+        if (restored != null) query = restored.scopedTo(restored.singleField());
     }
 
     @Nullable
@@ -77,12 +89,9 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        searchInputLayout = view.findViewById(R.id.searchInputLayout);
         searchEditText = view.findViewById(R.id.searchEditText);
         searchResultsCountTextView = view.findViewById(R.id.searchResultsCountTextView);
-        filterQuote = view.findViewById(R.id.filter_quote);
-        filterAuthor = view.findViewById(R.id.filter_author);
-        filterSource = view.findViewById(R.id.filter_source);
-        filterCategory = view.findViewById(R.id.filter_category);
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
@@ -91,13 +100,17 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
         adapter = new SearchResultsAdapter(new ArrayList<>(), this);
         searchResultsRecyclerView.setAdapter(adapter);
 
+        suggestionAdapter = new FieldSuggestionAdapter(requireContext());
+        searchEditText.setAdapter(suggestionAdapter);
         // Set before the watcher is attached; a restored view state rewrites the same text.
-        searchEditText.setText(query.getText());
-        setupFilterButtons();
+        searchEditText.setText(query.getText(), false);
+        searchInputLayout.setStartIconOnClickListener(v -> showFilterDialog());
+        renderFilter();
         setupSearchInput();
 
         quoteCollection.getQuoteList().observe(getViewLifecycleOwner(), quotes -> {
             allQuotes = quotes != null ? quotes : new ArrayList<>();
+            suggestionAdapter.setQuotes(allQuotes);
             rerunSearch();
         });
     }
@@ -112,15 +125,16 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
     public void onDestroyView() {
         super.onDestroyView();
         searchEditText = null;
+        searchInputLayout = null;
     }
 
-    /** Replaces the current query (text and fields), as an author/source/category tap does. */
+    /** Replaces the current query (text and filter), as an author/source/category tap does. */
     public void applyQuery(QuoteQuery newQuery) {
         query = newQuery;
         if (searchEditText == null) return; // the view picks the query up when it is created
-        searchEditText.setText(newQuery.getText());
+        renderFilter();
+        searchEditText.setText(newQuery.getText(), false);
         searchEditText.clearFocus();
-        updateFilterButtonStates();
         rerunSearch();
     }
 
@@ -148,6 +162,7 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
     private void setupSearchInput() {
         searchEditText.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                searchEditText.dismissDropDown();
                 hideKeyboard();
                 rerunSearch();
                 return true;
@@ -169,31 +184,44 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
             public void afterTextChanged(Editable s) {
             }
         });
+
+        // A picked suggestion fills the field (the watcher reruns the search); show the results.
+        searchEditText.setOnItemClickListener((parent, view, position, id) -> hideKeyboard());
     }
 
-    private void setupFilterButtons() {
-        setupChip(filterQuote, QuoteQuery.Field.QUOTE_TEXT);
-        setupChip(filterAuthor, QuoteQuery.Field.AUTHOR);
-        setupChip(filterSource, QuoteQuery.Field.SOURCE);
-        setupChip(filterCategory, QuoteQuery.Field.CATEGORY);
-        updateFilterButtonStates();
+    /** "Select a filter, then enter text": picking a filter focuses the field for typing. */
+    private void showFilterDialog() {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Search in")
+                .setSingleChoiceItems(FILTER_LABELS, filterIndex(), (dialog, which) -> {
+                    dialog.dismiss();
+                    query = query.scopedTo(FILTERS[which]);
+                    renderFilter();
+                    rerunSearch();
+                    focusSearchField();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
-    private void setupChip(Chip chip, QuoteQuery.Field field) {
-        chip.setOnClickListener(v -> {
-            query = query.toggled(field);
-            updateFilterButtonStates();
-            // Let the chip repaint first; the search itself runs on the next loop pass.
-            chip.post(this::rerunSearch);
-        });
+    private int filterIndex() {
+        QuoteQuery.Field field = query.singleField();
+        for (int i = 0; i < FILTERS.length; i++) {
+            if (FILTERS[i] == field) return i;
+        }
+        return 0;
     }
 
-    /** Checked chips (styled filled via their colour selectors) are the searched fields. */
-    private void updateFilterButtonStates() {
-        filterQuote.setChecked(query.hasField(QuoteQuery.Field.QUOTE_TEXT));
-        filterAuthor.setChecked(query.hasField(QuoteQuery.Field.AUTHOR));
-        filterSource.setChecked(query.hasField(QuoteQuery.Field.SOURCE));
-        filterCategory.setChecked(query.hasField(QuoteQuery.Field.CATEGORY));
+    /** The field label names the filter; the filter icon is tinted while it narrows the search. */
+    private void renderFilter() {
+        int index = filterIndex();
+        searchInputLayout.setHint(FILTER_HINTS[index]);
+        TypedValue value = new TypedValue();
+        requireContext().getTheme().resolveAttribute(index == 0
+                ? com.google.android.material.R.attr.colorOnSurfaceVariant
+                : androidx.appcompat.R.attr.colorPrimary, value, true);
+        searchInputLayout.setStartIconTintList(ColorStateList.valueOf(value.data));
+        suggestionAdapter.setField(FILTERS[index]);
     }
 
     private void rerunSearch() {

@@ -65,12 +65,15 @@ public final class QuoteQuery {
         return new QuoteQuery(newText, fields);
     }
 
-    public QuoteQuery toggled(Field field) {
-        EnumSet<Field> next = EnumSet.copyOf(fields.isEmpty() ? EnumSet.noneOf(Field.class) : fields);
-        if (!next.remove(field)) {
-            next.add(field);
-        }
-        return new QuoteQuery(text, next);
+    /** Same text, scoped to {@code field}, or to all four fields when null (the search filter). */
+    public QuoteQuery scopedTo(@Nullable Field field) {
+        return field == null ? all(text) : forField(field, text);
+    }
+
+    /** The one field this query is scoped to, or null when it covers several (e.g. all). */
+    @Nullable
+    public Field singleField() {
+        return fields.size() == 1 ? fields.iterator().next() : null;
     }
 
     public boolean isActive() {

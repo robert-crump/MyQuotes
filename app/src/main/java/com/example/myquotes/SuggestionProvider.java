@@ -10,6 +10,66 @@ import java.util.Set;
 
 public class SuggestionProvider {
 
+    /** A distinct field value offered while searching, with the number of quotes using it. */
+    public static final class FieldSuggestion {
+        public final String value;
+        public final int count;
+
+        FieldSuggestion(String value, int count) {
+            this.value = value;
+            this.count = count;
+        }
+    }
+
+    /**
+     * Distinct author, source or category values with a word starting with {@code input}
+     * (case-insensitive; "fast" finds "Thinking, Fast and Slow"), most-used first, then by
+     * name, at most {@code limit}. Quote text has no suggestions.
+     */
+    public List<FieldSuggestion> getFieldSuggestions(List<Quote> quotes, QuoteQuery.Field field,
+                                                     String input, int limit) {
+        String query = input.trim().toLowerCase();
+        List<FieldSuggestion> result = new ArrayList<>();
+        if (query.isEmpty() || field == QuoteQuery.Field.QUOTE_TEXT) return result;
+
+        Map<String, String> displayName = new HashMap<>();
+        Map<String, Integer> count = new HashMap<>();
+        for (Quote q : quotes) {
+            String value = valueOf(q, field).trim();
+            if (value.isEmpty()) continue;
+            String key = value.toLowerCase();
+            displayName.putIfAbsent(key, value);
+            count.merge(key, 1, Integer::sum);
+        }
+
+        for (Map.Entry<String, String> e : displayName.entrySet()) {
+            if (hasWordStartingWith(e.getKey(), query)) {
+                result.add(new FieldSuggestion(e.getValue(), count.get(e.getKey())));
+            }
+        }
+        result.sort((a, b) -> {
+            int c = Integer.compare(b.count, a.count);
+            return c != 0 ? c : a.value.compareToIgnoreCase(b.value);
+        });
+        return result.size() > limit ? new ArrayList<>(result.subList(0, limit)) : result;
+    }
+
+    private static String valueOf(Quote quote, QuoteQuery.Field field) {
+        switch (field) {
+            case AUTHOR: return quote.getAuthor();
+            case SOURCE: return quote.getSource();
+            case CATEGORY: return quote.getCategory();
+            default: return quote.getQuoteText();
+        }
+    }
+
+    private static boolean hasWordStartingWith(String value, String query) {
+        for (int i = value.indexOf(query); i >= 0; i = value.indexOf(query, i + 1)) {
+            if (i == 0 || !Character.isLetterOrDigit(value.charAt(i - 1))) return true;
+        }
+        return false;
+    }
+
     /**
      * Returns authors matching {@code input} (case-insensitive substring match), ranked:
      * tier 0 = exact match, tier 1 = prefix match, tier 2 = contains match.

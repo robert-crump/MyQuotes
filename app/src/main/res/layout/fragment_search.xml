@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fixed header (field, filters, count) above the results list; the RecyclerView is the scroller
+<!-- Fixed header (field, count) above the results list; the RecyclerView is the scroller
      so only visible rows are bound. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -15,69 +15,36 @@
         android:paddingTop="16dp"
         android:paddingEnd="16dp">
 
-        <!-- Search Input -->
+        <!-- Search input: the filter icon picks the searched field (all or one); the label
+             names it. For author, source and category the field suggests existing values. -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/searchInputLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:hint="Search all fields"
             app:boxStrokeColor="?attr/colorPrimary"
             app:boxStrokeWidth="2dp"
             app:boxBackgroundColor="?attr/colorSurface"
             app:hintTextColor="?attr/colorPrimary"
+            app:startIconDrawable="@drawable/ic_filter_list"
+            app:startIconContentDescription="Choose search filter"
             app:endIconMode="clear_text"
             app:endIconContentDescription="@string/cd_clear_search">
 
-            <com.google.android.material.textfield.TextInputEditText
+            <com.google.android.material.textfield.MaterialAutoCompleteTextView
                 android:id="@+id/searchEditText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Search quotes..."
+                android:completionThreshold="1"
                 android:inputType="text"
                 android:imeOptions="actionSearch|flagNoExtractUi"
                 android:maxLines="1"
                 android:textColor="?android:attr/textColorPrimary"
-                android:textColorHint="?android:attr/textColorSecondary"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp" />
 
         </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Field filters: filled = searched, outlined = not searched -->
-        <com.google.android.material.chip.ChipGroup
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:singleLine="false">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/filter_quote"
-                style="@style/Widget.MyQuotes.SearchFilterChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Quote" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/filter_author"
-                style="@style/Widget.MyQuotes.SearchFilterChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Author" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/filter_source"
-                style="@style/Widget.MyQuotes.SearchFilterChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Source" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/filter_category"
-                style="@style/Widget.MyQuotes.SearchFilterChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Category" />
-
-        </com.google.android.material.chip.ChipGroup>
 
         <!-- Suchergebnis-Zähler -->
         <TextView
