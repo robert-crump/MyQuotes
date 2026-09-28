@@ -261,16 +261,8 @@ public class MainActivity extends AppCompatActivity {
             searchActivityLauncher.launch(intent);
             return true;
 
-        } else if (id == R.id.action_statistics) {
-            startActivity(new Intent(this, StatisticsActivity.class));
-            return true;
-
         } else if (id == R.id.action_favorites) {
             startActivity(new Intent(this, FavoritesActivity.class));
-            return true;
-
-        } else if (id == R.id.action_categories) {
-            startActivity(new Intent(this, CategoriesActivity.class));
             return true;
 
         } else if (id == R.id.action_settings) {

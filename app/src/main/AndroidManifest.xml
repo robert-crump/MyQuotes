@@ -59,7 +59,7 @@
             android:name=".CategoriesActivity"
             android:label="Categories"
             android:theme="@style/Theme.MyQuotes.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:parentActivityName=".SettingsActivity" />
 
         <!-- Broadcast receiver for boot re-schedule -->
         <receiver

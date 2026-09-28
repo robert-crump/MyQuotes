@@ -71,4 +71,15 @@
     <string name="drive_backup_last_format">Last change backed up to Drive: %s</string>
     <string name="drive_backup_failed_title">Drive backup failed</string>
     <string name="drive_backup_failed_message">Automatic backup to Google Drive failed. Check Settings.</string>
+    <string name="settings_library">Library</string>
+    <string name="settings_categories">Categories</string>
+    <string name="settings_statistics">Statistics</string>
+    <plurals name="settings_category_count">
+        <item quantity="one">%d category</item>
+        <item quantity="other">%d categories</item>
+    </plurals>
+    <plurals name="settings_quote_count">
+        <item quantity="one">%d quote</item>
+        <item quantity="other">%d quotes</item>
+    </plurals>
 </resources>

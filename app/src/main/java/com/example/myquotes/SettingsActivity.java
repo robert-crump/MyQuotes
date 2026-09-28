@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.myquotes.backup.BackupFilename;
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
+import com.example.myquotes.databinding.ItemSettingsNavRowBinding;
 import com.example.myquotes.drive.DriveAuth;
 import com.example.myquotes.drive.DriveBackup;
 import com.example.myquotes.notifications.QuoteNotifications;
@@ -121,13 +122,7 @@ public class SettingsActivity extends AppCompatActivity {
         btnExport.setOnClickListener(v -> startExport());
         btnImport.setOnClickListener(v -> startImport());
 
-        // Setup Quote Counter (observes LiveData)
-        android.widget.TextView quoteCountTextView = findViewById(R.id.quote_count_text);
-        quoteCollection.getQuoteList().observe(this, quotes -> {
-            if (quotes != null) {
-                quoteCountTextView.setText("Total quotes: " + quotes.size());
-            }
-        });
+        setupLibrarySection();
 
         // Setup Daily Notification Switch
         switchDailyNotification = findViewById(R.id.switch_daily_notification);
@@ -247,6 +242,29 @@ public class SettingsActivity extends AppCompatActivity {
                 newMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
             }
             MyApplication.getInstance().setThemeMode(newMode);
+        });
+    }
+
+    // Library rows: Categories and Statistics, each with a live count.
+    private void setupLibrarySection() {
+        ItemSettingsNavRowBinding categoriesRow = binding.rowCategories;
+        categoriesRow.rowTitle.setText(R.string.settings_categories);
+        categoriesRow.getRoot().setOnClickListener(
+                v -> startActivity(new Intent(this, CategoriesActivity.class)));
+        MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
+            int count = names != null ? names.size() : 0;
+            categoriesRow.rowSubtitle.setText(
+                    getResources().getQuantityString(R.plurals.settings_category_count, count, count));
+        });
+
+        ItemSettingsNavRowBinding statisticsRow = binding.rowStatistics;
+        statisticsRow.rowTitle.setText(R.string.settings_statistics);
+        statisticsRow.getRoot().setOnClickListener(
+                v -> startActivity(new Intent(this, StatisticsActivity.class)));
+        quoteCollection.getQuoteList().observe(this, quotes -> {
+            int count = quotes != null ? quotes.size() : 0;
+            statisticsRow.rowSubtitle.setText(
+                    getResources().getQuantityString(R.plurals.settings_quote_count, count, count));
         });
     }
 
