@@ -6,7 +6,9 @@ import androidx.lifecycle.MutableLiveData;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 // Owns the Category set: the user-managed names unioned with every category in use
@@ -39,12 +41,14 @@ public class Categories {
         return new ArrayList<>(names);
     }
 
-    public int countQuotes(String name) {
-        int count = 0;
+    // Quotes per category name in one pass; names without quotes are absent.
+    public Map<String, Integer> quoteCounts() {
+        Map<String, Integer> counts = new HashMap<>();
         for (Quote quote : collection.getCurrentList()) {
-            if (name.equals(quote.getCategory())) count++;
+            String category = quote.getCategory().trim();
+            if (!category.isEmpty()) counts.merge(category, 1, Integer::sum);
         }
-        return count;
+        return counts;
     }
 
     public void add(String name) {

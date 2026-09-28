@@ -52,6 +52,7 @@
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="statusBarScrimColor">@color/md3_dark_surface</item>
         <item name="appBarColor">@color/md3_dark_surface</item>
+        <item name="selectionBarColor">@color/md3_dark_primary_container</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/dark_background</item>

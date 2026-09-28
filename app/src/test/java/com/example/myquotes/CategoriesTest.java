@@ -9,7 +9,9 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class CategoriesTest {
     @Rule
@@ -44,6 +46,16 @@ public class CategoriesTest {
         setUp(new InMemoryCategoryStore("Zen", "Work"),
                 quote(1, "Work"), quote(2, "Art"), quote(3, "Art"));
         assertEquals(Arrays.asList("Art", "Work", "Zen"), categories.all());
+    }
+
+    @Test
+    public void quoteCountsCountInUseNamesAndSkipUnusedAndEmpty() {
+        setUp(new InMemoryCategoryStore("Zen"),
+                quote(1, "Art"), quote(2, "Art "), quote(3, "Work"), quote(4, ""));
+        Map<String, Integer> expected = new HashMap<>();
+        expected.put("Art", 2);
+        expected.put("Work", 1);
+        assertEquals(expected, categories.quoteCounts());
     }
 
     @Test

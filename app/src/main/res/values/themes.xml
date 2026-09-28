@@ -56,6 +56,7 @@
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="statusBarScrimColor">@color/pink_primary</item>
         <item name="appBarColor">@color/pink_primary</item>
+        <item name="selectionBarColor">@color/pink_primary_dark</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/white</item>
