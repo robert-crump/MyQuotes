@@ -168,9 +168,12 @@ public class QuotesFragment extends Fragment {
                 }
             }
             int pos = readingSession.getCurrentPosition();
+            // Also moves when the quote is already shown but in the first or last lap (the pager
+            // starts at position 0), so the first card has neighbours on both sides.
             int current = viewPager.getCurrentItem();
-            if (pagerAdapter.indexOf(current) != pos) {
-                viewPager.setCurrentItem(pagerAdapter.pagerPositionOf(pos, current), false);
+            int target = pagerAdapter.pagerPositionOf(pos, current);
+            if (target != current) {
+                viewPager.setCurrentItem(target, false);
             }
             if (mayPlaySwipeHint) {
                 mayPlaySwipeHint = false;
