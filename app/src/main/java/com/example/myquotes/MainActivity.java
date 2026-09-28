@@ -99,6 +99,11 @@ public class MainActivity extends AppCompatActivity {
             public void onCategoryClick(Quote quote) {
                 searchByCategory(quote);
             }
+
+            @Override
+            public void onEditQuote(Quote quote) {
+                startActivity(AddEditActivity.editIntent(MainActivity.this, quote.getId()));
+            }
         });
 
         QuoteNotifications.promptBackgroundPermissionIfNeeded(this);
@@ -268,17 +273,6 @@ public class MainActivity extends AppCompatActivity {
         if (id == R.id.action_search) {
             Intent intent = new Intent(this, SearchActivity.class);
             searchActivityLauncher.launch(intent);
-            return true;
-
-        } else if (id == R.id.action_edit) {
-            if (currentQuote != null) {
-                Intent intent = new Intent(this, AddEditActivity.class);
-                intent.putExtra(AddEditActivity.EXTRA_ACTION, AddEditActivity.ACTION_EDIT);
-                intent.putExtra(AddEditActivity.EXTRA_QUOTE_ID, currentQuote.getId());
-                startActivity(intent);
-            } else {
-                Toast.makeText(this, "No quote to edit", Toast.LENGTH_SHORT).show();
-            }
             return true;
 
         } else if (id == R.id.action_delete) {

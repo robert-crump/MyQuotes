@@ -29,6 +29,13 @@ public class AddEditActivity extends AppCompatActivity {
     public static final String ACTION_ADD = "ADD_QUOTE";
     public static final String ACTION_EDIT = "EDIT_QUOTE";
 
+    /** Intent that opens the editor for the quote with {@code quoteId}. */
+    public static Intent editIntent(Context context, int quoteId) {
+        return new Intent(context, AddEditActivity.class)
+                .putExtra(EXTRA_ACTION, ACTION_EDIT)
+                .putExtra(EXTRA_QUOTE_ID, quoteId);
+    }
+
     private EditText editTextAuthor;
     private EditText editTextQuote;
     private EditText editTextSource;

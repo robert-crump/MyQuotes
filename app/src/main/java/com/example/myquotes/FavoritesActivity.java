@@ -75,6 +75,11 @@ public class FavoritesActivity extends AppCompatActivity {
                     startActivity(intent);
                 }
             }
+
+            @Override
+            public void onEditQuote(Quote quote) {
+                startActivity(AddEditActivity.editIntent(FavoritesActivity.this, quote.getId()));
+            }
         });
 
         viewPager.setAdapter(pagerAdapter);
