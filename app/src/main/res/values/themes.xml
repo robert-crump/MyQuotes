@@ -52,7 +52,8 @@
         <!-- Status bar -->
         <item name="android:statusBarColor">@color/md3_light_surface</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
-        <item name="statusBarScrimColor">@color/md3_light_surface</item>
+        <item name="statusBarScrimColor">@color/md3_light_primary_container</item>
+        <item name="appBarColor">@color/md3_light_primary_container</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/white</item>

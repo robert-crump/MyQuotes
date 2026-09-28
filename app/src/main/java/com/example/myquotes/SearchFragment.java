@@ -1,12 +1,10 @@
 package com.example.myquotes;
 
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -88,7 +86,7 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
-        RecyclerView searchResultsRecyclerView = view.findViewById(R.id.searchResultsRecyclerView);
+        RecyclerView searchResultsRecyclerView = view.findViewById(R.id.search_scroll);
         searchResultsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new SearchResultsAdapter(new ArrayList<>(), this);
         searchResultsRecyclerView.setAdapter(adapter);
@@ -185,43 +183,17 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
         chip.setOnClickListener(v -> {
             query = query.toggled(field);
             updateFilterButtonStates();
-            rerunSearch();
+            // Let the chip repaint first; the search itself runs on the next loop pass.
+            chip.post(this::rerunSearch);
         });
-        chip.setCheckable(false);
     }
 
+    /** Checked chips (styled filled via their colour selectors) are the searched fields. */
     private void updateFilterButtonStates() {
-        updateChipStyle(filterQuote, query.hasField(QuoteQuery.Field.QUOTE_TEXT));
-        updateChipStyle(filterAuthor, query.hasField(QuoteQuery.Field.AUTHOR));
-        updateChipStyle(filterSource, query.hasField(QuoteQuery.Field.SOURCE));
-        updateChipStyle(filterCategory, query.hasField(QuoteQuery.Field.CATEGORY));
-    }
-
-    private void updateChipStyle(Chip chip, boolean isEnabled) {
-        Context context = requireContext();
-        TypedValue typedValue = new TypedValue();
-        context.getTheme().resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true);
-        int primaryColor = typedValue.data;
-
-        ColorStateList primaryList = ColorStateList.valueOf(primaryColor);
-        ColorStateList whiteList = ColorStateList.valueOf(
-                getResources().getColor(android.R.color.white, context.getTheme())
-        );
-
-        if (isEnabled) {
-            chip.setChipBackgroundColor(primaryList);
-            chip.setTextColor(whiteList);
-            chip.setCloseIconVisible(true);
-            chip.setCloseIconTint(whiteList);
-            chip.setChipStrokeColor(primaryList);
-            chip.setChipStrokeWidth(0);
-        } else {
-            chip.setChipBackgroundColor(whiteList);
-            chip.setTextColor(primaryList);
-            chip.setCloseIconVisible(false);
-            chip.setChipStrokeColor(primaryList);
-            chip.setChipStrokeWidth(2);
-        }
+        filterQuote.setChecked(query.hasField(QuoteQuery.Field.QUOTE_TEXT));
+        filterAuthor.setChecked(query.hasField(QuoteQuery.Field.AUTHOR));
+        filterSource.setChecked(query.hasField(QuoteQuery.Field.SOURCE));
+        filterCategory.setChecked(query.hasField(QuoteQuery.Field.CATEGORY));
     }
 
     private void rerunSearch() {

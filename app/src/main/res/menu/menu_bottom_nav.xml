@@ -3,17 +3,17 @@
 
     <item
         android:id="@+id/tab_quotes"
-        android:icon="@drawable/ic_quotation_24dp"
+        android:icon="@drawable/tab_quotes"
         android:title="@string/tab_quotes" />
 
     <item
         android:id="@+id/tab_search"
-        android:icon="@drawable/ic_search"
+        android:icon="@drawable/tab_search"
         android:title="@string/tab_search" />
 
     <item
         android:id="@+id/tab_favorites"
-        android:icon="@drawable/ic_favorite_heart"
+        android:icon="@drawable/tab_favorites"
         android:title="@string/tab_favorites" />
 
 </menu>

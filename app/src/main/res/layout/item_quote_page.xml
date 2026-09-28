@@ -46,17 +46,18 @@
                     android:layout_marginTop="12dp"
                     android:layout_marginEnd="8dp"
                     android:text="Your quote will appear here..."
-                    android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-                    android:lineSpacingMultiplier="1.25"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                    android:textSize="15sp"
+                    android:lineHeight="22sp"
                     android:textColor="?attr/colorOnSurface" />
 
                 <TextView
                     android:id="@+id/text_author"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="8dp"
                     android:layout_marginStart="-8dp"
-                    android:minHeight="48dp"
+                    android:minHeight="40dp"
                     android:gravity="center_vertical"
                     android:paddingStart="8dp"
                     android:paddingEnd="8dp"
@@ -86,6 +87,8 @@
                         android:ellipsize="end"
                         android:text="Source"
                         android:checkable="false"
+                        app:ensureMinTouchTargetSize="false"
+                        app:chipMinHeight="32dp"
                         android:visibility="gone" />
 
                     <com.google.android.material.chip.Chip
@@ -97,6 +100,8 @@
                         android:ellipsize="end"
                         android:text="Category"
                         android:checkable="false"
+                        app:ensureMinTouchTargetSize="false"
+                        app:chipMinHeight="32dp"
                         android:visibility="gone" />
 
                 </com.google.android.material.chip.ChipGroup>
@@ -105,7 +110,6 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:orientation="horizontal"
                     android:gravity="end|center_vertical">
 

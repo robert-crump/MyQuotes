@@ -8,7 +8,9 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:liftOnScroll="true">
+        android:background="?attr/appBarColor"
+        app:liftOnScroll="true"
+        app:liftOnScrollColor="?attr/appBarColor">
 
         <!-- Status bar scrim: sized to the status bar inset height at runtime -->
         <View

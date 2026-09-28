@@ -18,7 +18,7 @@ import androidx.core.view.WindowInsetsCompat;
  * root layout also has android:fitsSystemWindows removed (it no longer reserves space for the
  * bars once edge-to-edge is enforced), so each Activity calls {@link #apply} after
  * setContentView to size a dedicated status-bar scrim strip behind the transparent status bar
- * (?attr/statusBarScrimColor, the surface colour — see themes.xml; inside an AppBarLayout the
+ * (?attr/statusBarScrimColor, the app bar colour — see themes.xml; inside an AppBarLayout the
  * strip is transparent so the bar's lift-on-scroll colour reaches the top edge), and to pad the
  * rest of the content away from the navigation bar / side cutouts.
  */

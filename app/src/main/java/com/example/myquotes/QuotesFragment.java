@@ -204,8 +204,6 @@ public class QuotesFragment extends Fragment {
     private void toggleFavorite(Quote quote) {
         if (quote != null) {
             boolean isFavorite = quoteCollection.toggleFavorite(quote.getId());
-            String message = isFavorite ? "Added to favorites" : "Removed from favorites";
-            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
             Log.d(TAG, "Quote #" + quote.getId() + " favorite: " + isFavorite);
         }
     }

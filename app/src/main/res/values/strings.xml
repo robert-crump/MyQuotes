@@ -34,6 +34,7 @@
     <!-- Content Descriptions -->
     <string name="cd_new_quote">New random quote</string>
     <string name="cd_search">Search quotes</string>
+    <string name="cd_clear_search">Clear search</string>
     <string name="cd_favorite">Favorite</string>
     <string name="cd_thumbs_up">Thumbs up</string>
     <string name="cd_thumbs_down">Thumbs down</string>

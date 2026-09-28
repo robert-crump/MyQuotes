@@ -2,9 +2,12 @@
 <resources>
 
     <!-- Background color of the status-bar scrim strip drawn behind the transparent status bar
-         on edge-to-edge (API 35+) screens. A darker "variant" of colorPrimary so the status bar
-         reads as a distinct strip above the toolbar, matching the pre-edge-to-edge
-         android:statusBarColor look. See EdgeToEdgeUtils. -->
+         on edge-to-edge (API 35+) screens; matches appBarColor so status bar and app bar read as
+         one tinted band. See EdgeToEdgeUtils. -->
     <attr name="statusBarScrimColor" format="color" />
+
+    <!-- Top app bar background on every screen: the FAB's primary-container tone in the light
+         theme, the plain surface in the dark theme. -->
+    <attr name="appBarColor" format="color" />
 
 </resources>

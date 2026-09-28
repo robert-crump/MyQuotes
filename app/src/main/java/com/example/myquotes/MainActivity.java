@@ -145,7 +145,7 @@ public class MainActivity extends AppCompatActivity
 
         boolean onQuotes = tabId == R.id.tab_quotes;
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(onQuotes ? getString(R.string.app_name)
+            getSupportActionBar().setTitle(onQuotes ? getString(R.string.tab_quotes)
                     : tabId == R.id.tab_search ? getString(R.string.tab_search)
                     : getString(R.string.tab_favorites));
         }
