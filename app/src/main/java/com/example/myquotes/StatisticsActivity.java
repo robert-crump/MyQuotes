@@ -1,6 +1,7 @@
 package com.example.myquotes;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,6 +17,8 @@ public class StatisticsActivity extends AppCompatActivity {
     private TextView textTotalQuotes;
     private TextView textFavorites;
     private TextView textNoCategory;
+    private TextView textUnknownAdded;
+    private MonthlyBarChartView chartAddedPerMonth;
 
     private final StatItemAdapter authorAdapter = new StatItemAdapter(QuoteQuery.Field.AUTHOR);
     private final StatItemAdapter sourceAdapter = new StatItemAdapter(QuoteQuery.Field.SOURCE);
@@ -49,6 +52,8 @@ public class StatisticsActivity extends AppCompatActivity {
         textTotalQuotes = findViewById(R.id.text_total_quotes);
         textFavorites = findViewById(R.id.text_favorites);
         textNoCategory = findViewById(R.id.text_no_category);
+        textUnknownAdded = findViewById(R.id.text_unknown_added);
+        chartAddedPerMonth = findViewById(R.id.chart_added_per_month);
 
         bindList(R.id.recycler_top_authors, authorAdapter);
         bindList(R.id.recycler_top_sources, sourceAdapter);
@@ -73,5 +78,10 @@ public class StatisticsActivity extends AppCompatActivity {
         authorAdapter.setItems(stats.topAuthors);
         sourceAdapter.setItems(stats.topSources);
         categoryAdapter.setItems(stats.categories);
+        chartAddedPerMonth.setMonths(stats.addedPerMonth);
+        textUnknownAdded.setVisibility(stats.unknownAddedCount > 0 ? View.VISIBLE : View.GONE);
+        textUnknownAdded.setText(stats.unknownAddedCount
+                + (stats.unknownAddedCount == 1 ? " quote" : " quotes")
+                + " added before tracking began");
     }
 }

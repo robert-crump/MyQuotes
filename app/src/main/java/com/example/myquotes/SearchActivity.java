@@ -200,7 +200,8 @@ public class SearchActivity extends AppCompatActivity implements SearchResultsAd
     }
 
     private void updateResultCount(int count) {
-        String message = count + " search result" + (count != 1 ? "s" : "");
+        String noun = query.isActive() ? " search result" : " quote";
+        String message = count + noun + (count != 1 ? "s" : "");
         searchResultsCountTextView.setText(message);
     }
 

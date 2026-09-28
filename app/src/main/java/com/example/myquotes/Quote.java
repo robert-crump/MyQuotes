@@ -1,8 +1,18 @@
 package com.example.myquotes;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 public class Quote {
+    /**
+     * Most recently added first: {@code addedAt} descending, then id descending. Ids grow with
+     * each add, so quotes with an unknown {@code addedAt} (0) still come out newest first.
+     */
+    public static final Comparator<Quote> NEWEST_FIRST =
+            Comparator.comparingLong(Quote::getAddedAt)
+                    .thenComparing(q -> q.getId() != null ? q.getId() : 0)
+                    .reversed();
+
     private Integer id;
     private String author;
     private String quoteText;

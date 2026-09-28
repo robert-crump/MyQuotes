@@ -24,13 +24,13 @@
 
 **Favorites flow** — ViewPager2 in FavoritesActivity driven by a filtered, recency-sorted view of the Quote Collection (not a Reading Session).
 
-**Search / category flow** — list or pager in SearchActivity / CategoriesActivity driven by a filtered view of the Quote Collection.
+**Search / category flow** — list or pager in SearchActivity / CategoriesActivity driven by a filtered view of the Quote Collection. Search results are newest first (`Quote.NEWEST_FIRST`: `addedAt` descending, then id descending — ids grow with each add, so quotes with unknown `addedAt` still order sensibly). Below the 3-character minimum the Search screen lists every quote ("N quotes"), so it doubles as the full, recently-added-first list.
 
 **Quote Query** — immutable search predicate: normalized (trimmed, lowercased) text plus the set of fields in scope (quote text, author, source, category). Owns matching (case-insensitive contains), the 3-character minimum, and result snippet extraction. A query over all four fields is what typing in the search box produces; a single-field query is what author/source/category click-through and Statistics produce. `toIntent`/`fromIntent` are the only protocol for opening SearchActivity for a query. `SearchActivity` holds one as its state; chip toggles produce a new query.
 
 ## Subsystems
 
-**Quote Statistics** — `QuoteStatistics.of(quotes)` (pure) is the one place the Statistics screen's numbers are computed: totals, favorites, top-10 authors/sources, category histogram, without-category count. Ties rank by count then name. `StatisticsActivity` only binds the result to views and three long-lived `StatItemAdapter`s.
+**Quote Statistics** — `QuoteStatistics.of(quotes)` (pure; clock and zone injectable) is the one place the Statistics screen's numbers are computed: totals, favorites, top-10 authors/sources, category histogram, without-category count, quotes added per calendar month over the last 12 months (current month last; drawn by `MonthlyBarChartView`) and the count with unknown `addedAt`. Ties rank by count then name. `StatisticsActivity` only binds the result to views and three long-lived `StatItemAdapter`s.
 
 **Quote text rendering** — `QuoteTextRenderer` (pure) is the one place a Quote becomes text: the share format and the daily-notification title/body (with the 150/300 truncation limits). `QuoteSharer` starts the chooser for both pager screens.
 

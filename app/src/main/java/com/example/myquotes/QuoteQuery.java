@@ -84,12 +84,17 @@ public final class QuoteQuery {
                 || (fields.contains(Field.CATEGORY) && contains(quote.getCategory()));
     }
 
+    /**
+     * Matching quotes, newest first ({@link Quote#NEWEST_FIRST}). An inactive query (text below
+     * {@link #MIN_LENGTH}) returns every quote, so the search screen doubles as the full list.
+     */
     public List<Quote> filter(List<Quote> quotes) {
         List<Quote> results = new ArrayList<>();
-        if (!isActive() || quotes == null) return results;
+        if (quotes == null) return results;
         for (Quote quote : quotes) {
-            if (matches(quote)) results.add(quote);
+            if (!isActive() || matches(quote)) results.add(quote);
         }
+        results.sort(Quote.NEWEST_FIRST);
         return results;
     }
 

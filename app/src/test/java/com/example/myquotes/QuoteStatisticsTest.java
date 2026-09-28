@@ -5,6 +5,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -75,5 +79,63 @@ public class QuoteStatisticsTest {
         assertEquals(0, s.favoriteCount);
         assertEquals(0, s.withoutCategoryCount);
         assertTrue(s.topAuthors.isEmpty() && s.topSources.isEmpty() && s.categories.isEmpty());
+    }
+
+    private static final ZoneId ZONE = ZoneOffset.UTC;
+    // 2026-09-28 12:00 UTC: window is Oct 2025 .. Sep 2026.
+    private static final long NOW = at(2026, 9, 28, 12);
+
+    private static long at(int year, int month, int day, int hour) {
+        return LocalDateTime.of(year, month, day, hour, 0).toInstant(ZoneOffset.UTC).toEpochMilli();
+    }
+
+    private static Quote added(long addedAt) {
+        Quote quote = q("A", "", "", false);
+        quote.setAddedAt(addedAt);
+        return quote;
+    }
+
+    private static List<Integer> counts(QuoteStatistics s) {
+        List<Integer> out = new ArrayList<>();
+        for (QuoteStatistics.MonthCount m : s.addedPerMonth) out.add(m.count);
+        return out;
+    }
+
+    @Test
+    public void addedPerMonthCoversLastTwelveMonthsOldestFirst() {
+        QuoteStatistics s = QuoteStatistics.of(Collections.emptyList(), NOW, ZONE);
+        assertEquals(12, s.addedPerMonth.size());
+        assertEquals(YearMonth.of(2025, 10), s.addedPerMonth.get(0).month);
+        assertEquals(YearMonth.of(2026, 9), s.addedPerMonth.get(11).month);
+        assertEquals(Collections.nCopies(12, 0), counts(s));
+    }
+
+    @Test
+    public void addedPerMonthBucketsByCalendarMonthAtWindowEdges() {
+        QuoteStatistics s = QuoteStatistics.of(Arrays.asList(
+                added(at(2025, 10, 1, 0)),     // first day of the window
+                added(at(2025, 9, 30, 23)),    // just before the window
+                added(at(2026, 9, 1, 0)),      // current month
+                added(at(2026, 9, 28, 11)),    // current month
+                added(at(2026, 10, 1, 0)),     // future (clock skew): ignored
+                added(at(2026, 3, 15, 12))), NOW, ZONE);
+        assertEquals(Arrays.asList(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2), counts(s));
+        assertEquals(0, s.unknownAddedCount);
+    }
+
+    @Test
+    public void addedPerMonthUsesTheGivenZone() {
+        // 2026-08-31 23:30 UTC is already September in UTC+2.
+        long lateAugustUtc = at(2026, 8, 31, 23) + 30 * 60_000L;
+        QuoteStatistics s = QuoteStatistics.of(Collections.singletonList(added(lateAugustUtc)),
+                NOW, ZoneOffset.ofHours(2));
+        assertEquals(1, (int) counts(s).get(11));
+    }
+
+    @Test
+    public void unknownAddedCountedSeparately() {
+        QuoteStatistics s = QuoteStatistics.of(Arrays.asList(added(0), added(0), added(at(2026, 9, 2, 8))), NOW, ZONE);
+        assertEquals(2, s.unknownAddedCount);
+        assertEquals(1, (int) counts(s).get(11));
     }
 }

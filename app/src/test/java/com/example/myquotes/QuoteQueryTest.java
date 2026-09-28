@@ -52,15 +52,38 @@ public class QuoteQueryTest {
         assertFalse(QuoteQuery.all("se").matches(q));
         assertFalse(QuoteQuery.all(" se ").matches(q));
         assertTrue(QuoteQuery.all("sen").matches(q));
-        assertTrue(QuoteQuery.all("se").filter(Arrays.asList(q)).isEmpty());
     }
 
     @Test
-    public void filterKeepsMatchesInOrder() {
+    public void filterBelowMinimumLengthReturnsEveryQuoteNewestFirst() {
+        Quote older = quote("x", "Plato", "", "");
+        older.setId(1);
+        Quote newer = quote("y", "Kant", "", "");
+        newer.setId(2);
+        assertEquals(Arrays.asList(newer, older), QuoteQuery.all("").filter(Arrays.asList(older, newer)));
+        assertEquals(Arrays.asList(newer, older), QuoteQuery.all("se").filter(Arrays.asList(older, newer)));
+    }
+
+    @Test
+    public void filterReturnsOnlyMatches() {
         Quote other = quote("x", "Plato", "", "");
         List<Quote> result = QuoteQuery.all("seneca").filter(Arrays.asList(other, q));
         assertEquals(1, result.size());
         assertSame(q, result.get(0));
+    }
+
+    @Test
+    public void filterSortsMatchesNewestFirst() {
+        Quote early = quote("a", "Seneca", "", "");
+        early.setId(5);
+        early.setAddedAt(1_000L);
+        Quote late = quote("b", "Seneca", "", "");
+        late.setId(3);
+        late.setAddedAt(2_000L);
+        Quote unknown = quote("c", "Seneca", "", "");
+        unknown.setId(9);
+        assertEquals(Arrays.asList(late, early, unknown),
+                QuoteQuery.all("seneca").filter(Arrays.asList(unknown, early, late)));
     }
 
     @Test

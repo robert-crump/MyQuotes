@@ -81,6 +81,50 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Added per month CardView -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
+                app:cardElevation="2dp"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Added per month"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"
+                        android:textColor="?android:attr/textColorPrimary" />
+
+                    <com.example.myquotes.MonthlyBarChartView
+                        android:id="@+id/chart_added_per_month"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:id="@+id/text_unknown_added"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textStyle="italic"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:gravity="center"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Top 10 Autoren CardView -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
