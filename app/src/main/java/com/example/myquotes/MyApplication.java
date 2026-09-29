@@ -70,7 +70,9 @@ public class MyApplication extends Application {
 
     public void setThemeMode(int mode) {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putInt(KEY_THEME_MODE, mode).apply();
+        // commit, not apply: the README screenshot run restores the setting just before its
+        // process ends, which would drop an asynchronous write.
+        prefs.edit().putInt(KEY_THEME_MODE, mode).commit();
         AppCompatDelegate.setDefaultNightMode(mode);
     }
 

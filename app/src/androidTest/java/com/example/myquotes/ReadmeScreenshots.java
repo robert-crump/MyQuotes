@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.ParcelFileDescriptor;
 
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -19,6 +20,7 @@ import com.example.myquotes.drive.DriveAuth;
 import com.example.myquotes.notifications.QuoteNotifications;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,8 +35,10 @@ import java.util.Random;
 /**
  * Screenshots for the README, taken from the public-domain demo collection on an emulator.
  * Run through {@code ./gradlew readmeScreenshots}, which also sets up a clean status bar and
- * copies the PNGs to {@code docs/screenshots/}. Replaces the app's quotes and categories, so
- * {@link EmulatorOnlyRule} skips it without the argument and refuses real devices.
+ * copies the PNGs to {@code docs/screenshots/}. Every screen is taken in the light theme and again
+ * in the dark one ({@code <name>-dark.png}); the app's theme setting is restored afterwards.
+ * Replaces the app's quotes and categories, so {@link EmulatorOnlyRule} skips it without the
+ * argument and refuses real devices.
  */
 @RunWith(AndroidJUnit4.class)
 public class ReadmeScreenshots {
@@ -56,10 +60,15 @@ public class ReadmeScreenshots {
     private Context context;
     private List<Quote> demoQuotes;
     private ReadmeScreenshotCapture screenshots;
+    // The user's theme setting, put back after the run; null until it has been read.
+    private Integer previousThemeMode;
+    // Appended to every screenshot name: "" for the light set, "-dark" for the dark one.
+    private String suffix = "";
 
     @Before
     public void setUp() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        previousThemeMode = MyApplication.getInstance().getThemeMode();
         screenshots = ReadmeScreenshotCapture.cleared(context);
         // Otherwise MainActivity asks to ignore battery optimizations on every start.
         shell("dumpsys deviceidle whitelist +" + context.getPackageName());
@@ -68,9 +77,26 @@ public class ReadmeScreenshots {
                 () -> DemoCollection.install(context, demoQuotes));
     }
 
+    /** Runs even when a capture fails, so the emulator app isn't left in the screenshot theme. */
+    @After
+    public void restoreTheme() {
+        if (previousThemeMode != null) setThemeMode(previousThemeMode);
+    }
+
     @Test
     public void captureReadmeScreenshots() throws Exception {
-        // Each screen gets its own Activity, closed even when its capture fails.
+        // Forced light, not the setting as found: "Follow system" could be dark on the emulator.
+        setThemeMode(AppCompatDelegate.MODE_NIGHT_NO);
+        suffix = "";
+        captureAllScreens();
+
+        setThemeMode(AppCompatDelegate.MODE_NIGHT_YES);
+        suffix = "-dark";
+        captureAllScreens();
+    }
+
+    /** Each screen gets its own Activity, closed even when its capture fails. */
+    private void captureAllScreens() throws Exception {
         captureQuotesTab();
         captureFavoritesTab();
         captureSearchAndQuoteDialog();
@@ -81,7 +107,7 @@ public class ReadmeScreenshots {
 
     private void captureQuotesTab() throws Exception {
         try (ActivityScenario<MainActivity> ignored = launchMainAt(HEADLINE)) {
-            screenshots.capture("quotes");
+            capture("quotes");
         }
     }
 
@@ -90,7 +116,7 @@ public class ReadmeScreenshots {
         try (ActivityScenario<MainActivity> scenario = launchMainAt(HEADLINE)) {
             scenario.onActivity(activity -> activity.<BottomNavigationView>findViewById(R.id.bottom_nav)
                     .setSelectedItemId(R.id.tab_favorites));
-            screenshots.capture("favorites");
+            capture("favorites");
         }
     }
 
@@ -101,7 +127,7 @@ public class ReadmeScreenshots {
     private void captureSearchAndQuoteDialog() throws Exception {
         try (ActivityScenario<MainActivity> scenario = launchMainAt(HEADLINE)) {
             scenario.onActivity(activity -> activity.showSearch(SEARCH));
-            screenshots.capture("search");
+            capture("search");
 
             scenario.onActivity(activity -> {
                 RecyclerView results = activity.findViewById(R.id.search_scroll);
@@ -109,7 +135,7 @@ public class ReadmeScreenshots {
                 assertNotNull("No search result #" + (DIALOG_RESULT + 1) + " for " + SEARCH.getText(), result);
                 result.itemView.performClick();
             });
-            screenshots.capture("quote-dialog");
+            capture("quote-dialog");
         }
     }
 
@@ -122,13 +148,13 @@ public class ReadmeScreenshots {
         assertTrue("Only " + filled + " of 12 months have demo quotes; the chart would look empty",
                 filled >= MIN_FILLED_MONTHS);
         try (ActivityScenario<StatisticsActivity> ignored = ActivityScenario.launch(StatisticsActivity.class)) {
-            screenshots.capture("statistics");
+            capture("statistics");
         }
     }
 
     private void captureCategories() throws Exception {
         try (ActivityScenario<CategoriesActivity> ignored = ActivityScenario.launch(CategoriesActivity.class)) {
-            screenshots.capture("categories");
+            capture("categories");
         }
     }
 
@@ -138,13 +164,27 @@ public class ReadmeScreenshots {
         assertTrue("A Drive account is connected on this emulator; its email would end up in"
                 + " settings.png. Disconnect it in Settings first.", email == null || email.isEmpty());
         try (ActivityScenario<SettingsActivity> ignored = ActivityScenario.launch(SettingsActivity.class)) {
-            screenshots.capture("settings");
+            capture("settings");
         }
+    }
+
+    private void capture(String name) throws Exception {
+        screenshots.capture(name + suffix);
+    }
+
+    /**
+     * Through the app's own setting, as the Settings screen does. Activities launched afterwards
+     * start in that mode; none is open in between, since every screen closes its scenario.
+     */
+    private static void setThemeMode(int mode) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(
+                () -> MyApplication.getInstance().setThemeMode(mode));
     }
 
     /**
      * Starts MainActivity on the Quotes tab at the given quote, with a freshly seeded deck.
-     * Opening at a quote also keeps the swipe nudge from playing.
+     * Opening at a quote also keeps the swipe nudge from playing. The deck is reseeded on every
+     * launch, so the light and dark screenshots show the same quotes.
      */
     private ActivityScenario<MainActivity> launchMainAt(String quoteTextStart) {
         MyApplication.getInstance().setShuffleRandom(new Random(DECK_SEED));
