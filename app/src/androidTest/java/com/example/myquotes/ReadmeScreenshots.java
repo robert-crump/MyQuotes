@@ -1,17 +1,23 @@
 package com.example.myquotes;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import android.Manifest;
 import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.os.ParcelFileDescriptor;
 
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.GrantPermissionRule;
 
+import com.example.myquotes.drive.DriveAuth;
 import com.example.myquotes.notifications.QuoteNotifications;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -35,6 +41,12 @@ public class ReadmeScreenshots {
     // Seeds the Reading Session shuffle, so the headline's neighbours are the same on every run.
     private static final long DECK_SEED = 1843;
     private static final String HEADLINE = "We are all in the gutter";
+    // Four demo quotes, as if the author line of one of them had been tapped.
+    private static final QuoteQuery SEARCH = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "Jane Austen");
+    // Pride and Prejudice: a different quote than the one the Favorites tab opens at.
+    private static final int DIALOG_RESULT = 3;
+    // Of the 12 months in the Statistics chart, at least this many must have bars.
+    private static final int MIN_FILLED_MONTHS = 10;
 
     @Rule
     public final RuleChain rules = RuleChain
@@ -58,12 +70,75 @@ public class ReadmeScreenshots {
 
     @Test
     public void captureReadmeScreenshots() throws Exception {
+        // Each screen gets its own Activity, closed even when its capture fails.
         captureQuotesTab();
+        captureFavoritesTab();
+        captureSearchAndQuoteDialog();
+        captureStatistics();
+        captureCategories();
+        captureSettings();
     }
 
     private void captureQuotesTab() throws Exception {
         try (ActivityScenario<MainActivity> ignored = launchMainAt(HEADLINE)) {
             screenshots.capture("quotes");
+        }
+    }
+
+    /** Opens at the most recently favorited demo quote. */
+    private void captureFavoritesTab() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = launchMainAt(HEADLINE)) {
+            scenario.onActivity(activity -> activity.<BottomNavigationView>findViewById(R.id.bottom_nav)
+                    .setSelectedItemId(R.id.tab_favorites));
+            screenshots.capture("favorites");
+        }
+    }
+
+    /**
+     * The query goes in the way an author tap puts it there, so the field has no focus: no
+     * keyboard and no suggestion popup over the results.
+     */
+    private void captureSearchAndQuoteDialog() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = launchMainAt(HEADLINE)) {
+            scenario.onActivity(activity -> activity.showSearch(SEARCH));
+            screenshots.capture("search");
+
+            scenario.onActivity(activity -> {
+                RecyclerView results = activity.findViewById(R.id.search_scroll);
+                RecyclerView.ViewHolder result = results.findViewHolderForAdapterPosition(DIALOG_RESULT);
+                assertNotNull("No search result #" + (DIALOG_RESULT + 1) + " for " + SEARCH.getText(), result);
+                result.itemView.performClick();
+            });
+            screenshots.capture("quote-dialog");
+        }
+    }
+
+    private void captureStatistics() throws Exception {
+        List<Quote> installed = MyApplication.getInstance().getQuoteCollection().getQuoteList().getValue();
+        int filled = 0;
+        for (QuoteStatistics.MonthCount month : QuoteStatistics.of(installed).addedPerMonth) {
+            if (month.count > 0) filled++;
+        }
+        assertTrue("Only " + filled + " of 12 months have demo quotes; the chart would look empty",
+                filled >= MIN_FILLED_MONTHS);
+        try (ActivityScenario<StatisticsActivity> ignored = ActivityScenario.launch(StatisticsActivity.class)) {
+            screenshots.capture("statistics");
+        }
+    }
+
+    private void captureCategories() throws Exception {
+        try (ActivityScenario<CategoriesActivity> ignored = ActivityScenario.launch(CategoriesActivity.class)) {
+            screenshots.capture("categories");
+        }
+    }
+
+    /** Refuses to run with a Drive account connected, whose email Settings would show. */
+    private void captureSettings() throws Exception {
+        String email = DriveAuth.getConnectedAccountEmail(context);
+        assertTrue("A Drive account is connected on this emulator; its email would end up in"
+                + " settings.png. Disconnect it in Settings first.", email == null || email.isEmpty());
+        try (ActivityScenario<SettingsActivity> ignored = ActivityScenario.launch(SettingsActivity.class)) {
+            screenshots.capture("settings");
         }
     }
 
