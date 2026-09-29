@@ -2,49 +2,36 @@
 
 [![Android CI](https://github.com/robert-crump/MyQuotes/actions/workflows/android.yml/badge.svg)](https://github.com/robert-crump/MyQuotes/actions/workflows/android.yml)
 
-A personal Android app for managing and enjoying your quote collection.
+Your personal quote collection, one swipe at a time.
 
-## About
+<table>
+  <tr>
+    <td><img src="docs/screenshots/quotes.png" width="200" alt="Quotes tab: swiping through quote cards"></td>
+    <td><img src="docs/screenshots/search.png" width="200" alt="Search tab: all quotes by Jane Austen"></td>
+    <td><img src="docs/screenshots/favorites.png" width="200" alt="Favorites tab showing a favorited quote"></td>
+    <td><img src="docs/screenshots/statistics.png" width="200" alt="Statistics: quotes added per month"></td>
+    <td><img src="docs/screenshots/quotes-dark.png" width="200" alt="Quotes tab in dark mode"></td>
+  </tr>
+</table>
 
-MyQuotes lets you store, browse, and organize quotes. Swipe through your collection, mark favorites, search by keyword or category, and receive a daily quote notification to start your day with inspiration.
+- **Swipe** through your quotes in shuffled order
+- **Favorite** the ones that stay with you
+- **Search** by text, author, source or category
+- **Daily quote** notification in the afternoon
+- **Statistics** on your collection
+- **Back up** automatically to a local folder or Google Drive, or export and import a file
+- **Light and dark** theme
 
-## Features
+<sub>Screenshots use public-domain demo quotes; regenerate with `./gradlew readmeScreenshots` (needs a running emulator).</sub>
 
-- Browse quotes with swipe gestures (ViewPager2)
-- Add, edit, and delete quotes
-- Mark quotes as favorites
-- Filter quotes by category
-- Full-text search
-- Daily quote notification (scheduled around 4 PM)
-- Usage statistics
-- Export and import your collection as JSON (Settings)
+## Build
 
-## Requirements
+Requires Android 14+ (API 34) and Android Studio Meerkat or later.
 
-- Android 14 or higher (API 34+)
-- Android Studio Meerkat or later (to build from source)
+```bash
+git clone https://github.com/robert-crump/MyQuotes.git
+```
 
-## Getting Started
+Open in Android Studio and run. The app starts empty: add quotes or import a backup in Settings.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/robert-crump/MyQuotes.git
-   ```
-2. Open the project in Android Studio.
-3. Build and run on a device or emulator running Android 14+.
-
-> **Note:** The app starts with an empty quote collection. Add quotes manually or import a JSON backup via Settings.
-
-**Screenshots:** `./gradlew readmeScreenshots` fills the app with public-domain demo quotes and saves screenshots to `docs/screenshots/`. It needs a running emulator (Android 14+). It replaces the app's quotes on that emulator and refuses to run on a physical device.
-
-## Built With
-
-- Java
-- AndroidX (AppCompat, ViewPager2, RecyclerView, CardView, ConstraintLayout)
-- Lifecycle ViewModel + LiveData
-- WorkManager (daily notifications)
-- Material Design 3
-
-## Development
-
-This project was developed with assistance from [Claude Code](https://claude.ai/code) by Anthropic.
+Built with Java, AndroidX, WorkManager and Material Design 3. Developed with [Claude Code](https://claude.ai/code).
