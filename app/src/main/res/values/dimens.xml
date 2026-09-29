@@ -3,4 +3,8 @@
     <!-- Quote pagers: visible edge of the neighbour cards, and the gap between cards -->
     <dimen name="pager_peek">24dp</dimen>
     <dimen name="pager_page_margin">8dp</dimen>
+    <!-- Search result dialog: the card as wide as a pager card (peek + page margin) -->
+    <dimen name="quote_dialog_side_margin">32dp</dimen>
+    <!-- How much the screen behind the search result dialog is dimmed (M3 scrim) -->
+    <item name="quote_dialog_dim" format="float" type="dimen">0.32</item>
 </resources>

@@ -89,4 +89,5 @@
     <string name="tab_favorites">Favorites</string>
     <string name="favorites_empty">No favorites yet — tap ♥ on a quote</string>
     <string name="cd_add_quote">Add quote</string>
+    <string name="quote_dialog_close">Close</string>
 </resources>

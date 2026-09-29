@@ -1,0 +1,4 @@
+<resources>
+    <!-- A dark screen needs a stronger dim for the dialog to stand out -->
+    <item name="quote_dialog_dim" format="float" type="dimen">0.6</item>
+</resources>

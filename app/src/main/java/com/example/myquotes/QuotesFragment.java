@@ -69,7 +69,7 @@ public class QuotesFragment extends Fragment {
         viewPager = view.findViewById(R.id.quotes_viewpager);
         PagerPeek.apply(viewPager, R.dimen.pager_peek, R.dimen.pager_page_margin);
 
-        pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
+        pagerAdapter = new QuotePagerAdapter(new QuoteCard.Listener() {
             @Override
             public void onToggleFavorite(Quote quote) {
                 toggleFavorite(quote);
@@ -127,7 +127,7 @@ public class QuotesFragment extends Fragment {
                 super.onPageSelected(position);
                 readingSession.setPosition(pagerAdapter.indexOf(position));
                 host.showFab();
-                // Programmatic jumps (search result, notification) don't count as a swipe.
+                // Programmatic jumps (notification) don't count as a swipe.
                 if (userDragging && !SwipeHint.hasSwiped(requireContext())) {
                     SwipeHint.markSwiped(requireContext());
                 }

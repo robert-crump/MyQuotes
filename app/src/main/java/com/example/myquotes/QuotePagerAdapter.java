@@ -3,9 +3,7 @@ package com.example.myquotes;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.ScrollView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -17,16 +15,7 @@ import java.util.List;
 public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.QuoteViewHolder> {
 
     private List<Quote> quotes = new ArrayList<>();
-    private final QuoteInteractionListener listener;
-
-    public interface QuoteInteractionListener {
-        void onToggleFavorite(Quote quote);
-        void onShareQuote(Quote quote);
-        void onAuthorClick(Quote quote);
-        void onSourceClick(Quote quote);
-        void onCategoryClick(Quote quote);
-        void onEditQuote(Quote quote);
-    }
+    private final QuoteCard.Listener listener;
 
     public interface ScrollDirectionListener {
         void onScrollDown();
@@ -39,7 +28,7 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
         this.scrollDirectionListener = listener;
     }
 
-    public QuotePagerAdapter(QuoteInteractionListener listener) {
+    public QuotePagerAdapter(QuoteCard.Listener listener) {
         this.listener = listener;
     }
 
@@ -100,63 +89,15 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
     }
 
     class QuoteViewHolder extends RecyclerView.ViewHolder {
-        private final TextView textQuote;
-        private final TextView textAuthor;
-        private final TextView textSource;
-        private final TextView textCategory;
-        private final ImageButton buttonFavorite;
-        private final ImageButton buttonShare;
-        private final ImageButton buttonEdit;
+        private final QuoteCard card;
 
         public QuoteViewHolder(@NonNull View itemView) {
             super(itemView);
-            textQuote = itemView.findViewById(R.id.text_quote);
-            textAuthor = itemView.findViewById(R.id.text_author);
-            textSource = itemView.findViewById(R.id.text_source);
-            textCategory = itemView.findViewById(R.id.text_category);
-            buttonFavorite = itemView.findViewById(R.id.button_favorite);
-            buttonShare = itemView.findViewById(R.id.button_share);
-            buttonEdit = itemView.findViewById(R.id.button_edit);
+            card = new QuoteCard(itemView);
         }
 
         public void bind(Quote quote) {
-            textQuote.setText(quote.getQuoteText());
-            bindOptional(textAuthor, quote.getAuthor().isEmpty() ? "" : "— " + quote.getAuthor());
-            bindOptional(textSource, quote.getSource());
-            bindOptional(textCategory, quote.getCategory());
-
-            buttonFavorite.setImageResource(quote.isFavorite()
-                    ? R.drawable.ic_favorite_heart_filled
-                    : R.drawable.ic_favorite_heart);
-
-            // Click Listeners
-            buttonFavorite.setOnClickListener(v -> listener.onToggleFavorite(quote));
-            buttonShare.setOnClickListener(v -> listener.onShareQuote(quote));
-            buttonEdit.setOnClickListener(v -> listener.onEditQuote(quote));
-
-            // Delegate clicks to the listener so the hosting activity handles navigation
-            textAuthor.setOnClickListener(v -> listener.onAuthorClick(quote));
-
-            // Source Click
-            textSource.setOnClickListener(v -> listener.onSourceClick(quote));
-
-            // Category Click
-            textCategory.setOnClickListener(v -> listener.onCategoryClick(quote));
-
-            // Double-tap to toggle favorite
-            final long[] lastTapTime = {0};
-            textQuote.setOnTouchListener((v, event) -> {
-                if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                    long currentTime = System.currentTimeMillis();
-                    if (currentTime - lastTapTime[0] <= 300) {
-                        listener.onToggleFavorite(quote);
-                        lastTapTime[0] = 0;
-                    } else {
-                        lastTapTime[0] = currentTime;
-                    }
-                }
-                return false;
-            });
+            card.bind(quote, listener);
 
             // Scroll direction listener for FAB hide/show
             ScrollView scrollView = (ScrollView) itemView;
@@ -175,12 +116,6 @@ public class QuotePagerAdapter extends RecyclerView.Adapter<QuotePagerAdapter.Qu
                     }
                 }
             });
-        }
-
-        /** Shows {@code text} in {@code view}, or hides the view when the text is empty. */
-        private void bindOptional(TextView view, String text) {
-            view.setText(text);
-            view.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
         }
     }
 }

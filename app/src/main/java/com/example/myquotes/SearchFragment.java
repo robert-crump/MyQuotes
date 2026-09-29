@@ -30,18 +30,14 @@ import java.util.List;
 
 /**
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
- * SearchActivity. Holds one {@link QuoteQuery}; a tapped result goes to the {@link Host}.
+ * SearchActivity. Holds one {@link QuoteQuery}; a tapped result opens in a {@link QuoteDialogFragment}.
  * The filter icon in the search field picks what the text searches: all fields or one; for
  * author, source and category the field suggests existing values.
  */
-public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQuoteClickListener {
+public class SearchFragment extends Fragment
+        implements SearchResultsAdapter.OnQuoteClickListener, QuoteDialogFragment.Host {
     private static final String TAG = "SearchFragment";
     private static final String STATE_QUERY = "search_query_state";
-
-    /** Where a tapped (still existing) result is shown. */
-    public interface Host {
-        void onSearchResultClick(int quoteId);
-    }
 
     /** Filter dialog entries; null is "all fields". */
     private static final QuoteQuery.Field[] FILTERS = {
@@ -129,6 +125,7 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
     }
 
     /** Replaces the current query (text and filter), as an author/source/category tap does. */
+    @Override
     public void applyQuery(QuoteQuery newQuery) {
         query = newQuery;
         if (searchEditText == null) return; // the view picks the query up when it is created
@@ -250,6 +247,7 @@ public class SearchFragment extends Fragment implements SearchResultsAdapter.OnQ
             return;
         }
         hideKeyboard();
-        ((Host) requireActivity()).onSearchResultClick(quote.getId());
+        QuoteDialogFragment.newInstance(quote.getId())
+                .show(getChildFragmentManager(), QuoteDialogFragment.TAG);
     }
 }

@@ -73,6 +73,17 @@
         <item name="android:textColorSecondary">@color/white</item>
     </style>
 
+    <!-- Search result dialog (QuoteDialogFragment): a transparent full-screen window over the
+         dimmed screen; the layout places the card and handles the system bar insets. -->
+    <style name="ThemeOverlay.MyQuotes.QuoteDialog" parent="ThemeOverlay.Material3.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">@dimen/quote_dialog_dim</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
+
     <!-- NoActionBar variant for activities with custom toolbar -->
     <style name="Theme.MyQuotes.NoActionBar">
         <item name="windowActionBar">false</item>

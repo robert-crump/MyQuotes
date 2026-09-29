@@ -25,7 +25,7 @@ import com.example.myquotes.notifications.QuoteNotifications;
  * once, switched with show/hide so each keeps its state) and the add-quote FAB (Quotes only).
  */
 public class MainActivity extends AppCompatActivity
-        implements QuotesFragment.Host, SearchFragment.Host, FavoritesFragment.Host {
+        implements QuotesFragment.Host, FavoritesFragment.Host {
     private static final String TAG = "MainActivity";
     private static final String STATE_TAB = "selected_tab";
 
@@ -157,7 +157,7 @@ public class MainActivity extends AppCompatActivity
         invalidateOptionsMenu();
     }
 
-    /** Opens the Quotes tab at this quote (notification, search result). */
+    /** Opens the Quotes tab at this quote (notification). */
     private void showQuote(int quoteId) {
         selectTab(R.id.tab_quotes);
         quotesFragment.navigateTo(quoteId);
@@ -167,11 +167,6 @@ public class MainActivity extends AppCompatActivity
     public void showSearch(QuoteQuery query) {
         searchFragment.applyQuery(query);
         selectTab(R.id.tab_search);
-    }
-
-    @Override
-    public void onSearchResultClick(int quoteId) {
-        showQuote(quoteId);
     }
 
     @Override

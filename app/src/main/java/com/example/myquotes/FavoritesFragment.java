@@ -56,7 +56,7 @@ public class FavoritesFragment extends Fragment {
         viewPager = view.findViewById(R.id.favorites_viewpager);
         PagerPeek.apply(viewPager, R.dimen.pager_peek, R.dimen.pager_page_margin);
 
-        pagerAdapter = new QuotePagerAdapter(new QuotePagerAdapter.QuoteInteractionListener() {
+        pagerAdapter = new QuotePagerAdapter(new QuoteCard.Listener() {
             @Override
             public void onToggleFavorite(Quote quote) {
                 if (quote != null) {

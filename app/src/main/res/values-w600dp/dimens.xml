@@ -2,4 +2,5 @@
     <dimen name="fab_margin">48dp</dimen>
     <dimen name="pager_peek">48dp</dimen>
     <dimen name="pager_page_margin">16dp</dimen>
+    <dimen name="quote_dialog_side_margin">64dp</dimen>
 </resources>
