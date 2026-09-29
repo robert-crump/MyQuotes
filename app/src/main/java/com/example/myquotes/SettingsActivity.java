@@ -394,17 +394,7 @@ public class SettingsActivity extends AppCompatActivity {
             try {
                 BackupDocument imported = QuoteImporter.readFromUri(this, uri);
 
-                final int totalQuotes = imported.quotes.size();
-                runOnUiThread(() -> {
-                    quoteCollection.setList(imported.quotes);
-                    // Replaced, not merged: a file without history clears it (#37).
-                    QuoteNotifications.replaceHistory(this, imported.history);
-                    Toast.makeText(this,
-                            "Import replaced database with " + totalQuotes + " quotes",
-                            Toast.LENGTH_LONG).show();
-                });
-                Log.d(TAG, "Import successful: replaced database with " + totalQuotes + " quotes");
-
+                runOnUiThread(() -> confirmImport(imported));
             } catch (QuoteCodecException e) {
                 Log.e(TAG, "JSON parsing failed", e);
                 runOnUiThread(() ->
@@ -417,6 +407,38 @@ public class SettingsActivity extends AppCompatActivity {
                 );
             }
         });
+    }
+
+    /** The file parsed; replacing the collection is asked first, unless it's empty. */
+    private void confirmImport(BackupDocument imported) {
+        if (isFinishing() || isDestroyed()) return;
+        List<Quote> current = quoteCollection.getQuoteList().getValue();
+        int currentCount = current != null ? current.size() : 0;
+        if (currentCount == 0) {
+            applyImport(imported);
+            return;
+        }
+        int importedCount = imported.quotes.size();
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.import_confirm_title)
+                .setMessage(getResources().getQuantityString(R.plurals.import_confirm_message,
+                        currentCount, currentCount,
+                        getResources().getQuantityString(R.plurals.settings_quote_count,
+                                importedCount, importedCount)))
+                .setPositiveButton(R.string.import_confirm_replace, (dialog, which) -> applyImport(imported))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void applyImport(BackupDocument imported) {
+        int totalQuotes = imported.quotes.size();
+        quoteCollection.setList(imported.quotes);
+        // Replaced, not merged: a file without history clears it (#37).
+        QuoteNotifications.replaceHistory(this, imported.history);
+        Toast.makeText(this,
+                "Import replaced database with " + totalQuotes + " quotes",
+                Toast.LENGTH_LONG).show();
+        Log.d(TAG, "Import successful: replaced database with " + totalQuotes + " quotes");
     }
 
     @Override

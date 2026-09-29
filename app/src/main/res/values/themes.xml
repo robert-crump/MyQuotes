@@ -64,7 +64,7 @@
     </style>
 
     <!-- Applied to every Toolbar (android:theme): white title, navigation and action icons on
-         the pink app bar. The night variant is empty, so dark-mode bars keep their colours. -->
+         the pink app bar. The night variant uses dark content on the purple bar. -->
     <style name="ThemeOverlay.MyQuotes.AppBar" parent="">
         <item name="colorControlNormal">@color/white</item>
         <item name="colorOnSurface">@color/white</item>

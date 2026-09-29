@@ -6,8 +6,8 @@
          one tinted band. See EdgeToEdgeUtils. -->
     <attr name="statusBarScrimColor" format="color" />
 
-    <!-- Top app bar background on every screen: the brand pink in the light theme, the plain
-         surface in the dark theme. -->
+    <!-- Top app bar background on every screen: the brand pink in the light theme, the brand
+         purple in the dark theme. -->
     <attr name="appBarColor" format="color" />
 
     <!-- App bar (and status-bar scrim) while a list is in selection mode, e.g. Categories: a

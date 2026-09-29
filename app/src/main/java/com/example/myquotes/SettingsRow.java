@@ -21,6 +21,10 @@ final class SettingsRow {
 
     SettingsRow(ItemSettingsRowBinding binding, @DrawableRes int icon, @StringRes int title) {
         this.binding = binding;
+        // Every row's switch shares the id row_switch, so on recreation (e.g. a theme change)
+        // the restored state of one row would land on all of them and fire their listeners,
+        // switching off notifications and disconnecting Drive. The state is set from prefs.
+        binding.rowSwitch.setSaveEnabled(false);
         binding.rowIcon.setImageResource(icon);
         binding.rowTitle.setText(title);
     }

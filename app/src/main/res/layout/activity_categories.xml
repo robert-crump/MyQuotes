@@ -46,9 +46,7 @@
         android:layout_margin="16dp"
         android:contentDescription="Add category"
         android:text=""
-        app:icon="@android:drawable/ic_input_add"
-        app:iconTint="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary"
+        app:icon="@drawable/ic_add_24dp"
         app:shapeAppearanceOverlay="@style/ShapeAppearance.MyApp.FAB" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

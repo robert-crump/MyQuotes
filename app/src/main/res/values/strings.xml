@@ -81,7 +81,7 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_daily_notification">Daily notification</string>
-    <string name="settings_daily_notification_summary">A quote from your collection every day</string>
+    <string name="settings_daily_notification_summary">A quote from your collection</string>
     <string name="settings_export">Export to file</string>
     <string name="settings_export_summary">Save all quotes as a backup file</string>
     <string name="settings_import">Import from file</string>
@@ -94,6 +94,13 @@
         <item quantity="one">%d quote</item>
         <item quantity="other">%d quotes</item>
     </plurals>
+    <string name="import_confirm_title">Replace all quotes?</string>
+    <!-- %2$s is settings_quote_count for the file, e.g. "12 quotes" -->
+    <plurals name="import_confirm_message">
+        <item quantity="one">Your %1$d existing quote will be replaced by the %2$s in this file. This can\'t be undone.</item>
+        <item quantity="other">All %1$d existing quotes will be replaced by the %2$s in this file. This can\'t be undone.</item>
+    </plurals>
+    <string name="import_confirm_replace">Replace</string>
     <!-- Bottom navigation -->
     <string name="tab_quotes">Quotes</string>
     <string name="tab_search">Search</string>

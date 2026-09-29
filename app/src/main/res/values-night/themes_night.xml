@@ -47,20 +47,28 @@
         <item name="android:textColorPrimary">@color/light_text</item>
         <item name="android:textColorSecondary">@color/light_text_secondary</item>
 
-        <!-- Status bar -->
-        <item name="android:statusBarColor">@color/md3_dark_surface</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
-        <item name="statusBarScrimColor">@color/md3_dark_surface</item>
-        <item name="appBarColor">@color/md3_dark_surface</item>
-        <item name="selectionBarColor">@color/md3_dark_primary_container</item>
+        <!-- Status bar and app bar: solid brand purple (colorPrimary, the quote card's
+             quotation mark) with dark content (ThemeOverlay.MyQuotes.AppBar), so the status
+             bar icons are dark too. -->
+        <item name="android:statusBarColor">@color/purple_primary</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="statusBarScrimColor">@color/purple_primary</item>
+        <item name="appBarColor">@color/purple_primary</item>
+        <item name="selectionBarColor">@color/purple_primary_variant</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/dark_background</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
-    <!-- Dark bars keep the theme's own colours (see the light ThemeOverlay.MyQuotes.AppBar). -->
-    <style name="ThemeOverlay.MyQuotes.AppBar" parent="" />
+    <!-- Dark title, navigation and action icons on the purple app bar (onPrimary). -->
+    <style name="ThemeOverlay.MyQuotes.AppBar" parent="">
+        <item name="colorControlNormal">@color/md3_dark_on_primary</item>
+        <item name="colorOnSurface">@color/md3_dark_on_primary</item>
+        <item name="colorOnSurfaceVariant">@color/md3_dark_on_primary</item>
+        <item name="android:textColorPrimary">@color/md3_dark_on_primary</item>
+        <item name="android:textColorSecondary">@color/md3_dark_on_primary</item>
+    </style>
 
     <!-- NoActionBar variant for activities with custom toolbar -->
     <style name="Theme.MyQuotes.NoActionBar">
