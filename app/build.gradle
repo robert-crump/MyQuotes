@@ -98,7 +98,7 @@ abstract class ReadmeScreenshotsTask extends DefaultTask {
             demo(serial, 'enter')
             demo(serial, 'clock', '-e', 'hhmm', '1200')
             demo(serial, 'battery', '-e', 'level', '100', '-e', 'plugged', 'false')
-            demo(serial, 'network', '-e', 'wifi', 'show', '-e', 'level', '4')
+            demo(serial, 'network', '-e', 'wifi', 'show', '-e', 'level', '4', '-e', 'fully', 'true')
             demo(serial, 'notifications', '-e', 'visible', 'false')
             output = runAdb(serial, 'shell', 'am', 'instrument', '-w',
                     '-e', 'readmeScreenshots', 'true', '-e', 'class', testClass.get(),
