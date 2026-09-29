@@ -35,327 +35,93 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="24dp">
 
-            <!-- Library Card -->
-            <com.google.android.material.card.MaterialCardView
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="?attr/colorSurface">
+            <TextView
+                style="@style/Widget.MyQuotes.SettingsHeader"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_library" />
 
-                <!-- No horizontal padding: the rows' ripple spans the full card width -->
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.MyQuotes.SettingsGroup">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="8dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/settings_library"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary"
-                        android:layout_marginStart="16dp"
-                        android:layout_marginEnd="16dp"
-                        android:layout_marginBottom="8dp" />
+                    android:orientation="vertical">
 
                     <include
                         android:id="@+id/row_categories"
-                        layout="@layout/item_settings_nav_row" />
+                        layout="@layout/item_settings_row" />
+
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
                     <include
                         android:id="@+id/row_statistics"
-                        layout="@layout/item_settings_nav_row" />
+                        layout="@layout/item_settings_row" />
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.card.MaterialCardView
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="?attr/colorSurface">
+            <TextView
+                style="@style/Widget.MyQuotes.SettingsHeader"
+                android:text="@string/settings_general" />
+
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.MyQuotes.SettingsGroup">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="General"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary"
-                        android:layout_marginBottom="16dp" />
+                    <include
+                        android:id="@+id/row_theme"
+                        layout="@layout/item_settings_row" />
 
-                    <!-- Daily Notification Switch -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="12dp">
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Daily notification"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary" />
-
-                        <com.google.android.material.switchmaterial.SwitchMaterial
-                            android:id="@+id/switch_daily_notification"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" />
-
-                    </LinearLayout>
+                    <include
+                        android:id="@+id/row_daily_notification"
+                        layout="@layout/item_settings_row" />
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Theme Selection Card -->
-            <com.google.android.material.card.MaterialCardView
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="?attr/colorSurface">
+            <TextView
+                style="@style/Widget.MyQuotes.SettingsHeader"
+                android:text="@string/settings_backup" />
+
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.MyQuotes.SettingsGroup">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="App Theme"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary"
-                        android:layout_marginBottom="16dp" />
+                    <include
+                        android:id="@+id/row_local_backup"
+                        layout="@layout/item_settings_row" />
 
-                    <RadioGroup
-                        android:id="@+id/radio_group_theme"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
-                        <RadioButton
-                            android:id="@+id/radio_theme_light"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Light"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:padding="8dp" />
+                    <include
+                        android:id="@+id/row_drive_backup"
+                        layout="@layout/item_settings_row" />
 
-                        <RadioButton
-                            android:id="@+id/radio_theme_dark"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Dark"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:padding="8dp" />
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
-                        <RadioButton
-                            android:id="@+id/radio_theme_system"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Follow system"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:padding="8dp" />
+                    <include
+                        android:id="@+id/row_export"
+                        layout="@layout/item_settings_row" />
 
-                    </RadioGroup>
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-                app:cardElevation="4dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Database"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="16dp"
-                        android:textColor="?android:attr/textColorPrimary"/>
-
-                    <!-- Local Auto-backup Switch -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="4dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/switch_local_backup"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary" />
-
-                        <com.google.android.material.switchmaterial.SwitchMaterial
-                            android:id="@+id/switch_local_backup"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" />
-
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/text_last_backup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/local_backup_never"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginBottom="16dp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_import"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="8dp"
-                            android:text="Import"
-                            style="@style/Widget.Material3.Button" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_export"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="8dp"
-                            android:text="Backup"
-                            style="@style/Widget.Material3.Button" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Google Drive Card -->
-            <com.google.android.material.card.MaterialCardView
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:shapeAppearance="@style/ShapeAppearance.Material3.Corner.Medium"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="?attr/colorSurface">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Google Drive"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary"
-                        android:layout_marginBottom="16dp" />
-
-                    <!-- Drive Auto-backup Switch -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="4dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/switch_drive_backup"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                            android:textColor="?android:attr/textColorPrimary" />
-
-                        <com.google.android.material.switchmaterial.SwitchMaterial
-                            android:id="@+id/switch_drive_backup"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" />
-
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/text_drive_account"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/drive_not_connected"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginBottom="4dp" />
-
-                    <TextView
-                        android:id="@+id/text_drive_last_backup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/drive_backup_never"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:layout_marginBottom="12dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_drive_disconnect"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/drive_disconnect"
-                        android:visibility="gone"
-                        style="@style/Widget.Material3.Button.TextButton" />
+                    <include
+                        android:id="@+id/row_import"
+                        layout="@layout/item_settings_row" />
 
                 </LinearLayout>
 

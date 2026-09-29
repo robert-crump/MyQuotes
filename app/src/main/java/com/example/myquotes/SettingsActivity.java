@@ -6,25 +6,22 @@ import android.content.IntentSender;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Button;
-import android.widget.CompoundButton;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 
 import com.example.myquotes.backup.BackupFilename;
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
-import com.example.myquotes.databinding.ItemSettingsNavRowBinding;
 import com.example.myquotes.drive.DriveAuth;
 import com.example.myquotes.drive.DriveBackup;
 import com.example.myquotes.notifications.QuoteNotifications;
 import com.google.android.gms.common.api.ApiException;
-import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -33,8 +30,22 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Settings, laid out like Hue and You's: a bold title above each group (Library, General,
+ * Backup), a group being one outlined box of {@link SettingsRow}s. Rows open a screen or a
+ * dialog, or toggle a switch.
+ */
 public class SettingsActivity extends AppCompatActivity {
     private static final String TAG = "SettingsActivity";
+
+    /** App theme dialog entries, in this order. */
+    private static final int[] THEME_MODES = {
+            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
+            AppCompatDelegate.MODE_NIGHT_NO,
+            AppCompatDelegate.MODE_NIGHT_YES};
+    private static final int[] THEME_LABELS = {
+            R.string.settings_theme_system, R.string.settings_theme_light, R.string.settings_theme_dark};
+
     private ActivitySettingsBinding binding;
     private QuoteCollection quoteCollection;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -43,15 +54,11 @@ public class SettingsActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> importLauncher;
     private ActivityResultLauncher<Intent> backupFolderLauncher;
     private ActivityResultLauncher<IntentSenderRequest> driveAuthorizationLauncher;
-    private android.widget.TextView lastBackupTextView;
 
-    private SwitchMaterial switchDriveBackup;
-    private CompoundButton.OnCheckedChangeListener driveSwitchListener;
-    private SwitchMaterial switchDailyNotification;
-    private CompoundButton.OnCheckedChangeListener dailyNotificationListener;
-    private TextView driveAccountTextView;
-    private TextView driveLastBackupTextView;
-    private Button btnDriveDisconnect;
+    private SettingsRow themeRow;
+    private SettingsRow dailyNotificationRow;
+    private SettingsRow localBackupRow;
+    private SettingsRow driveBackupRow;
     private String pendingDriveEmail;
 
     @Override
@@ -95,10 +102,6 @@ public class SettingsActivity extends AppCompatActivity {
                 }
         );
 
-        SwitchMaterial switchLocalBackup = findViewById(R.id.switch_local_backup);
-        lastBackupTextView = findViewById(R.id.text_last_backup);
-        updateLastBackupText();
-
         backupFolderLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -110,68 +113,10 @@ public class SettingsActivity extends AppCompatActivity {
                         updateLastBackupText();
                         Toast.makeText(this, R.string.local_backup_enabled_toast, Toast.LENGTH_SHORT).show();
                     } else {
-                        switchLocalBackup.setChecked(false);
+                        localBackupRow.setCheckedSilently(false);
                     }
                 }
         );
-
-        // Setup buttons
-        Button btnExport = findViewById(R.id.btn_export);
-        Button btnImport = findViewById(R.id.btn_import);
-
-        btnExport.setOnClickListener(v -> startExport());
-        btnImport.setOnClickListener(v -> startImport());
-
-        setupLibrarySection();
-
-        // Setup Daily Notification Switch
-        switchDailyNotification = findViewById(R.id.switch_daily_notification);
-
-        // Set initial state
-        switchDailyNotification.setChecked(QuoteNotifications.isEnabled(this));
-
-        // Set listener
-        dailyNotificationListener = (buttonView, isChecked) -> {
-            if (isChecked) {
-                Toast.makeText(this, "Daily notifications enabled", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Daily notifications disabled", Toast.LENGTH_SHORT).show();
-            }
-
-            QuoteNotifications.setEnabled(this, isChecked);
-        };
-        switchDailyNotification.setOnCheckedChangeListener(dailyNotificationListener);
-
-        // Setup Local Auto-backup Switch
-
-        // Set initial state
-        switchLocalBackup.setChecked(LocalBackup.isEnabled(this));
-
-        // Set listener
-        switchLocalBackup.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                if (LocalBackup.hasFolderSelected(this)) {
-                    LocalBackup.setEnabled(this, true);
-                    Toast.makeText(this, R.string.local_backup_enabled_toast, Toast.LENGTH_SHORT).show();
-                } else {
-                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                    backupFolderLauncher.launch(intent);
-                }
-            } else {
-                LocalBackup.setEnabled(this, false);
-                Toast.makeText(this, R.string.local_backup_disabled_toast, Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // Setup Google Drive Switch
-        switchDriveBackup = findViewById(R.id.switch_drive_backup);
-        driveAccountTextView = findViewById(R.id.text_drive_account);
-        driveLastBackupTextView = findViewById(R.id.text_drive_last_backup);
-        btnDriveDisconnect = findViewById(R.id.btn_drive_disconnect);
-        updateDriveLastBackupText();
 
         driveAuthorizationLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartIntentSenderForResult(),
@@ -180,101 +125,157 @@ public class SettingsActivity extends AppCompatActivity {
                         try {
                             DriveAuth.completeAuthorizationResult(this, result.getData());
                             DriveBackup.connect(this, pendingDriveEmail);
-                            updateDriveConnectionUi();
+                            updateDriveSummary();
                             Toast.makeText(this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
                         } catch (ApiException e) {
                             Log.w(TAG, "Drive authorization consent failed", e);
-                            setDriveSwitchChecked(false);
+                            driveBackupRow.setCheckedSilently(false);
                             Toast.makeText(this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
                         }
                     } else {
-                        setDriveSwitchChecked(false);
+                        driveBackupRow.setCheckedSilently(false);
                     }
                     pendingDriveEmail = null;
                 }
         );
 
-        switchDriveBackup.setChecked(DriveAuth.isEnabled(this));
-        updateDriveConnectionUi();
-
-        driveSwitchListener = (buttonView, isChecked) -> {
-            if (isChecked) {
-                startDriveConnect();
-            } else {
-                DriveBackup.disconnect(this);
-                updateDriveConnectionUi();
-                Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
-            }
-        };
-        switchDriveBackup.setOnCheckedChangeListener(driveSwitchListener);
-
-        btnDriveDisconnect.setOnClickListener(v -> {
-            DriveBackup.disconnect(this);
-            setDriveSwitchChecked(false);
-            updateDriveConnectionUi();
-            Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
-        });
-
-        // Setup Theme RadioGroup
-        android.widget.RadioGroup radioGroupTheme = findViewById(R.id.radio_group_theme);
-        android.widget.RadioButton radioLight = findViewById(R.id.radio_theme_light);
-        android.widget.RadioButton radioDark = findViewById(R.id.radio_theme_dark);
-        android.widget.RadioButton radioSystem = findViewById(R.id.radio_theme_system);
-
-        // Set initial state based on current theme
-        int currentTheme = MyApplication.getInstance().getThemeMode();
-        if (currentTheme == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO) {
-            radioLight.setChecked(true);
-        } else if (currentTheme == androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES) {
-            radioDark.setChecked(true);
-        } else {
-            radioSystem.setChecked(true);
-        }
-
-        // Set listener
-        radioGroupTheme.setOnCheckedChangeListener((group, checkedId) -> {
-            int newMode;
-            if (checkedId == R.id.radio_theme_light) {
-                newMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO;
-            } else if (checkedId == R.id.radio_theme_dark) {
-                newMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
-            } else {
-                newMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
-            }
-            MyApplication.getInstance().setThemeMode(newMode);
-        });
+        setupLibrarySection();
+        setupGeneralSection();
+        setupBackupSection();
     }
 
     // Library rows: Categories and Statistics, each with a live count.
     private void setupLibrarySection() {
-        ItemSettingsNavRowBinding categoriesRow = binding.rowCategories;
-        categoriesRow.rowTitle.setText(R.string.settings_categories);
-        categoriesRow.getRoot().setOnClickListener(
-                v -> startActivity(new Intent(this, CategoriesActivity.class)));
+        SettingsRow categoriesRow = new SettingsRow(binding.rowCategories,
+                R.drawable.ic_category_24dp, R.string.settings_categories)
+                .onClick(v -> startActivity(new Intent(this, CategoriesActivity.class)));
         MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
             int count = names != null ? names.size() : 0;
-            categoriesRow.rowSubtitle.setText(
+            categoriesRow.setSummary(
                     getResources().getQuantityString(R.plurals.settings_category_count, count, count));
         });
 
-        ItemSettingsNavRowBinding statisticsRow = binding.rowStatistics;
-        statisticsRow.rowTitle.setText(R.string.settings_statistics);
-        statisticsRow.getRoot().setOnClickListener(
-                v -> startActivity(new Intent(this, StatisticsActivity.class)));
+        SettingsRow statisticsRow = new SettingsRow(binding.rowStatistics,
+                R.drawable.ic_bar_chart_24dp, R.string.settings_statistics)
+                .onClick(v -> startActivity(new Intent(this, StatisticsActivity.class)));
         quoteCollection.getQuoteList().observe(this, quotes -> {
             int count = quotes != null ? quotes.size() : 0;
-            statisticsRow.rowSubtitle.setText(
+            statisticsRow.setSummary(
                     getResources().getQuantityString(R.plurals.settings_quote_count, count, count));
         });
     }
 
+    // General rows: the app theme (a choice dialog, like Hue and You's) and the daily notification.
+    private void setupGeneralSection() {
+        themeRow = new SettingsRow(binding.rowTheme, R.drawable.ic_palette_24dp, R.string.settings_theme)
+                .onClick(v -> showThemeDialog());
+        themeRow.setSummary(THEME_LABELS[themeIndex()]);
+
+        dailyNotificationRow = new SettingsRow(binding.rowDailyNotification,
+                R.drawable.ic_notifications_24dp, R.string.settings_daily_notification)
+                .withSwitch(QuoteNotifications.isEnabled(this), (buttonView, isChecked) -> {
+                    if (isChecked) {
+                        Toast.makeText(this, "Daily notifications enabled", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "Daily notifications disabled", Toast.LENGTH_SHORT).show();
+                    }
+                    QuoteNotifications.setEnabled(this, isChecked);
+                });
+        dailyNotificationRow.setSummary(R.string.settings_daily_notification_summary);
+    }
+
+    /** Picking an option applies it at once (recreating the activity) and closes the dialog. */
+    private void showThemeDialog() {
+        CharSequence[] labels = new CharSequence[THEME_LABELS.length];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = getText(THEME_LABELS[i]);
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.settings_theme)
+                .setSingleChoiceItems(labels, themeIndex(), (dialog, which) -> {
+                    dialog.dismiss();
+                    themeRow.setSummary(THEME_LABELS[which]);
+                    MyApplication.getInstance().setThemeMode(THEME_MODES[which]);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private int themeIndex() {
+        int mode = MyApplication.getInstance().getThemeMode();
+        for (int i = 0; i < THEME_MODES.length; i++) {
+            if (THEME_MODES[i] == mode) return i;
+        }
+        return 0;
+    }
+
+    // Backup rows: the two auto-backup switches, then manual export and import.
+    private void setupBackupSection() {
+        localBackupRow = new SettingsRow(binding.rowLocalBackup,
+                R.drawable.ic_folder_24dp, R.string.switch_local_backup)
+                .withSwitch(LocalBackup.isEnabled(this), (buttonView, isChecked) -> {
+                    if (isChecked) {
+                        if (LocalBackup.hasFolderSelected(this)) {
+                            LocalBackup.setEnabled(this, true);
+                            Toast.makeText(this, R.string.local_backup_enabled_toast, Toast.LENGTH_SHORT).show();
+                        } else {
+                            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                            backupFolderLauncher.launch(intent);
+                        }
+                    } else {
+                        LocalBackup.setEnabled(this, false);
+                        Toast.makeText(this, R.string.local_backup_disabled_toast, Toast.LENGTH_SHORT).show();
+                    }
+                });
+        updateLastBackupText();
+
+        // Switching Drive off disconnects the account.
+        driveBackupRow = new SettingsRow(binding.rowDriveBackup,
+                R.drawable.ic_cloud_24dp, R.string.switch_drive_backup)
+                .withSwitch(DriveAuth.isEnabled(this), (buttonView, isChecked) -> {
+                    if (isChecked) {
+                        startDriveConnect();
+                    } else {
+                        DriveBackup.disconnect(this);
+                        updateDriveSummary();
+                        Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
+                    }
+                });
+        updateDriveSummary();
+
+        SettingsRow exportRow = new SettingsRow(binding.rowExport,
+                R.drawable.ic_upload_24dp, R.string.settings_export)
+                .onClick(v -> startExport());
+        exportRow.setSummary(R.string.settings_export_summary);
+
+        SettingsRow importRow = new SettingsRow(binding.rowImport,
+                R.drawable.ic_download_24dp, R.string.settings_import)
+                .onClick(v -> startImport());
+        importRow.setSummary(R.string.settings_import_summary);
+    }
+
     private void updateLastBackupText() {
         long lastBackupTime = LocalBackup.getLastBackupTime(this);
-        if (lastBackupTime == 0) {
-            lastBackupTextView.setText(R.string.local_backup_never);
-        } else {
-            lastBackupTextView.setText(formatLastBackup(R.string.local_backup_last_format, lastBackupTime));
+        localBackupRow.setSummary(lastBackupTime == 0
+                ? getString(R.string.local_backup_never)
+                : formatLastBackup(R.string.local_backup_last_format, lastBackupTime));
+    }
+
+    /** The connected account and the last Drive backup, or "Not connected". */
+    private void updateDriveSummary() {
+        String email = DriveAuth.getConnectedAccountEmail(this);
+        if (!DriveAuth.isEnabled(this) || email == null) {
+            driveBackupRow.setSummary(R.string.drive_not_connected);
+            return;
         }
+        long lastBackupTime = DriveBackup.getLastBackupTime(this);
+        String lastBackup = lastBackupTime == 0
+                ? getString(R.string.drive_backup_never)
+                : formatLastBackup(R.string.drive_backup_last_format, lastBackupTime);
+        driveBackupRow.setSummary(getString(R.string.drive_connected_as_format, email) + "\n" + lastBackup);
     }
 
     private String formatLastBackup(int formatRes, long timeMillis) {
@@ -291,25 +292,10 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        setDailyNotificationChecked(QuoteNotifications.isEnabled(this));
+        // Without re-firing the switch listener, which would toast and re-write the flag.
+        dailyNotificationRow.setCheckedSilently(QuoteNotifications.isEnabled(this));
         updateLastBackupText();
-        updateDriveLastBackupText();
-    }
-
-    /** Reflects the flag without firing dailyNotificationListener (which would toast and re-write it). */
-    private void setDailyNotificationChecked(boolean checked) {
-        switchDailyNotification.setOnCheckedChangeListener(null);
-        switchDailyNotification.setChecked(checked);
-        switchDailyNotification.setOnCheckedChangeListener(dailyNotificationListener);
-    }
-
-    private void updateDriveLastBackupText() {
-        long lastBackupTime = DriveBackup.getLastBackupTime(this);
-        if (lastBackupTime == 0) {
-            driveLastBackupTextView.setText(R.string.drive_backup_never);
-        } else {
-            driveLastBackupTextView.setText(formatLastBackup(R.string.drive_backup_last_format, lastBackupTime));
-        }
+        updateDriveSummary();
     }
 
     private void startDriveConnect() {
@@ -322,7 +308,7 @@ public class SettingsActivity extends AppCompatActivity {
                     public void onGranted() {
                         DriveBackup.connect(SettingsActivity.this, pendingDriveEmail);
                         pendingDriveEmail = null;
-                        updateDriveConnectionUi();
+                        updateDriveSummary();
                         Toast.makeText(SettingsActivity.this, R.string.drive_connected_toast, Toast.LENGTH_SHORT).show();
                     }
 
@@ -336,7 +322,7 @@ public class SettingsActivity extends AppCompatActivity {
                     public void onFailed(Exception e) {
                         Log.w(TAG, "Drive authorization failed", e);
                         pendingDriveEmail = null;
-                        setDriveSwitchChecked(false);
+                        driveBackupRow.setCheckedSilently(false);
                         Toast.makeText(SettingsActivity.this, R.string.drive_authorization_failed_toast, Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -344,34 +330,16 @@ public class SettingsActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled() {
-                setDriveSwitchChecked(false);
+                driveBackupRow.setCheckedSilently(false);
             }
 
             @Override
             public void onFailed(Exception e) {
                 Log.w(TAG, "Google sign-in failed", e);
-                setDriveSwitchChecked(false);
+                driveBackupRow.setCheckedSilently(false);
                 Toast.makeText(SettingsActivity.this, R.string.drive_sign_in_failed_toast, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    /** Sets the switch's checked state without re-triggering driveSwitchListener's connect/disconnect side effects. */
-    private void setDriveSwitchChecked(boolean checked) {
-        switchDriveBackup.setOnCheckedChangeListener(null);
-        switchDriveBackup.setChecked(checked);
-        switchDriveBackup.setOnCheckedChangeListener(driveSwitchListener);
-    }
-
-    private void updateDriveConnectionUi() {
-        String email = DriveAuth.getConnectedAccountEmail(this);
-        if (DriveAuth.isEnabled(this) && email != null) {
-            driveAccountTextView.setText(getString(R.string.drive_connected_as_format, email));
-            btnDriveDisconnect.setVisibility(android.view.View.VISIBLE);
-        } else {
-            driveAccountTextView.setText(R.string.drive_not_connected);
-            btnDriveDisconnect.setVisibility(android.view.View.GONE);
-        }
     }
 
     private void startExport() {

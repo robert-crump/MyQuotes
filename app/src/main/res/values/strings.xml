@@ -61,7 +61,6 @@
     <string name="switch_drive_backup">Auto-backup to Google Drive</string>
     <string name="drive_not_connected">Not connected</string>
     <string name="drive_connected_as_format">Connected as %s</string>
-    <string name="drive_disconnect">Disconnect</string>
     <string name="drive_connected_toast">Connected to Google Drive</string>
     <string name="drive_disconnected_toast">Disconnected from Google Drive</string>
     <string name="drive_sign_in_failed_toast">Google sign-in failed</string>
@@ -75,6 +74,18 @@
     <string name="settings_library">Library</string>
     <string name="settings_categories">Categories</string>
     <string name="settings_statistics">Statistics</string>
+    <string name="settings_general">General</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_theme">App theme</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_daily_notification">Daily notification</string>
+    <string name="settings_daily_notification_summary">A quote from your collection every day</string>
+    <string name="settings_export">Export to file</string>
+    <string name="settings_export_summary">Save all quotes as a backup file</string>
+    <string name="settings_import">Import from file</string>
+    <string name="settings_import_summary">Replace all quotes with a backup file</string>
     <plurals name="settings_category_count">
         <item quantity="one">%d category</item>
         <item quantity="other">%d categories</item>
