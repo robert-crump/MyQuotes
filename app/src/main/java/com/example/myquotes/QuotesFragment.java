@@ -60,7 +60,8 @@ public class QuotesFragment extends Fragment {
             @Override
             @SuppressWarnings("unchecked")
             public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
-                return (T) new ReadingSession(quoteCollection);
+                return (T) new ReadingSession(quoteCollection,
+                        MyApplication.getInstance().getShuffleRandom());
             }
         }).get(ReadingSession.class);
         isFirstDeckLoad = true;

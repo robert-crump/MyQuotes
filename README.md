@@ -35,6 +35,8 @@ MyQuotes lets you store, browse, and organize quotes. Swipe through your collect
 
 > **Note:** The app starts with an empty quote collection. Add quotes manually or import a JSON backup via Settings.
 
+**Screenshots:** `./gradlew readmeScreenshots` fills the app with public-domain demo quotes and saves screenshots to `docs/screenshots/`. It needs a running emulator (Android 14+). It replaces the app's quotes on that emulator and refuses to run on a physical device.
+
 ## Built With
 
 - Java

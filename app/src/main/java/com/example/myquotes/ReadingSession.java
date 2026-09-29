@@ -11,12 +11,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 public class ReadingSession extends ViewModel {
     private static final String TAG = "ReadingSession";
 
     private final QuoteCollection collection;
+    private final Random random;
     private final MutableLiveData<List<Quote>> deck = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Quote> currentQuote = new MutableLiveData<>();
     private int currentPosition = 0;
@@ -24,7 +26,13 @@ public class ReadingSession extends ViewModel {
     private final Observer<List<Quote>> collectionObserver = this::onCollectionChanged;
 
     public ReadingSession(QuoteCollection collection) {
+        this(collection, new Random());
+    }
+
+    // The Random shuffles the deck; README screenshots pass a seeded one for a stable deck.
+    public ReadingSession(QuoteCollection collection, Random random) {
         this.collection = collection;
+        this.random = random;
         collection.getQuoteList().observeForever(collectionObserver);
     }
 
@@ -36,7 +44,7 @@ public class ReadingSession extends ViewModel {
         if (currentDeck == null || currentDeck.isEmpty()) {
             if (!newList.isEmpty()) {
                 List<Quote> shuffled = new ArrayList<>(newList);
-                Collections.shuffle(shuffled);
+                Collections.shuffle(shuffled, random);
                 deck.setValue(shuffled);
                 currentPosition = 0;
                 currentQuote.setValue(shuffled.get(0));

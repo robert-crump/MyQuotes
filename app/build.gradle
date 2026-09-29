@@ -66,5 +66,112 @@ dependencies {
     testImplementation 'org.json:json:20231013'
     testImplementation 'androidx.arch.core:core-testing:2.2.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test:rules:1.7.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+}
+// README screenshots from the demo collection (androidTest ReadmeScreenshots), on a running
+// emulator: ./gradlew readmeScreenshots. Not part of CI.
+abstract class ReadmeScreenshotsTask extends DefaultTask {
+    static final String DEMO = 'com.android.systemui.demo'
+
+    @javax.inject.Inject
+    abstract org.gradle.process.ExecOperations getExecOperations()
+
+    @Internal abstract Property<File> getAdbExecutable()
+    @Internal abstract RegularFileProperty getAppApk()
+    @Internal abstract RegularFileProperty getTestApk()
+    @Internal abstract Property<String> getApplicationId()
+    @Internal abstract Property<String> getTestClass()
+    @Internal abstract DirectoryProperty getPullDir()
+    @Internal abstract DirectoryProperty getScreenshotsDir()
+
+    @TaskAction
+    void capture() {
+        String serial = emulatorSerial()
+        logger.lifecycle("Taking README screenshots on $serial")
+        runAdb(serial, 'install', '-r', '-t', appApk.get().asFile.absolutePath)
+        runAdb(serial, 'install', '-r', '-t', testApk.get().asFile.absolutePath)
+
+        runAdb(serial, 'shell', 'settings', 'put', 'global', 'sysui_demo_allowed', '1')
+        String output
+        try {
+            demo(serial, 'enter')
+            demo(serial, 'clock', '-e', 'hhmm', '1200')
+            demo(serial, 'battery', '-e', 'level', '100', '-e', 'plugged', 'false')
+            demo(serial, 'network', '-e', 'wifi', 'show', '-e', 'level', '4')
+            demo(serial, 'notifications', '-e', 'visible', 'false')
+            output = runAdb(serial, 'shell', 'am', 'instrument', '-w',
+                    '-e', 'readmeScreenshots', 'true', '-e', 'class', testClass.get(),
+                    "${applicationId.get()}.test/androidx.test.runner.AndroidJUnitRunner")
+        } finally {
+            demo(serial, 'exit')
+        }
+        logger.lifecycle(output.trim())
+        // am instrument exits 0 even when a test fails.
+        if (output.contains('FAILURES!!!') || !output.contains('OK (')) {
+            throw new GradleException('The README screenshot test failed; see the output above.')
+        }
+
+        File pulled = pullDir.get().asFile
+        pulled.deleteDir()
+        pulled.mkdirs()
+        runAdb(serial, 'pull',
+                "/sdcard/Android/data/${applicationId.get()}/files/readme-screenshots",
+                pulled.absolutePath)
+        File[] pngs = new File(pulled, 'readme-screenshots').listFiles({ File f -> f.name.endsWith('.png') } as FileFilter)
+        if (!pngs) throw new GradleException("No screenshots were pulled from $serial.")
+
+        File target = screenshotsDir.get().asFile
+        target.mkdirs()
+        target.listFiles({ File f -> f.name.endsWith('.png') } as FileFilter).each { it.delete() }
+        pngs.each { File png -> java.nio.file.Files.copy(png.toPath(), new File(target, png.name).toPath()) }
+        logger.lifecycle("Saved ${pngs.collect { it.name }.sort().join(', ')} to $target")
+    }
+
+    /** The one running emulator (or ANDROID_SERIAL); real devices are never used. */
+    String emulatorSerial() {
+        String requested = System.getenv('ANDROID_SERIAL')
+        if (requested) return requested
+        List<String> emulators = runAdb(null, 'devices').readLines()
+                .collect { it.split('\t') }
+                .findAll { it.length == 2 && it[1] == 'device' && it[0].startsWith('emulator-') }
+                .collect { it[0] }
+        if (emulators.isEmpty()) {
+            throw new GradleException('readmeScreenshots needs a running emulator; none found.')
+        }
+        if (emulators.size() > 1) {
+            throw new GradleException("Several emulators are running ($emulators); pick one with ANDROID_SERIAL.")
+        }
+        return emulators[0]
+    }
+
+    void demo(String serial, String command, String... extras) {
+        runAdb(serial, *(['shell', 'am', 'broadcast', '-a', DEMO, '-e', 'command', command] + extras.toList()))
+    }
+
+    String runAdb(String serial, String... args) {
+        List<String> commandLine = [adbExecutable.get().absolutePath]
+        if (serial) commandLine += ['-s', serial]
+        commandLine += args.toList()
+        def out = new ByteArrayOutputStream()
+        execOperations.exec {
+            it.commandLine(commandLine)
+            it.standardOutput = out
+        }
+        return out.toString('UTF-8')
+    }
+}
+
+tasks.register('readmeScreenshots', ReadmeScreenshotsTask) {
+    group = 'documentation'
+    description = 'Takes the README screenshots from the demo quotes on a running emulator.'
+    dependsOn 'assembleDebug', 'assembleDebugAndroidTest'
+    adbExecutable.set(android.adbExecutable)
+    appApk.set(layout.buildDirectory.file('outputs/apk/debug/app-debug.apk'))
+    testApk.set(layout.buildDirectory.file('outputs/apk/androidTest/debug/app-debug-androidTest.apk'))
+    applicationId.set(android.defaultConfig.applicationId)
+    testClass.set('com.example.myquotes.ReadmeScreenshots')
+    pullDir.set(layout.buildDirectory.dir('readme-screenshots'))
+    screenshotsDir.set(rootProject.layout.projectDirectory.dir('docs/screenshots'))
+    outputs.upToDateWhen { false }
 }

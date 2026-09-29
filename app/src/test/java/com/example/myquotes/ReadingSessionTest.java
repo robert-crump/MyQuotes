@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 
 public class ReadingSessionTest {
     @Rule
@@ -107,5 +108,14 @@ public class ReadingSessionTest {
 
         assertEquals(before, deckIds());
         assertEquals("new author", session.getDeck().getValue().get(2).getAuthor());
+    }
+
+    @Test
+    public void sameSeedGivesSameDeck() {
+        seed(20);
+        ReadingSession first = new ReadingSession(collection, new Random(42));
+        ReadingSession second = new ReadingSession(collection, new Random(42));
+
+        assertEquals(first.getDeck().getValue(), second.getDeck().getValue());
     }
 }

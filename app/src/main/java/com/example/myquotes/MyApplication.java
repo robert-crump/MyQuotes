@@ -9,11 +9,14 @@ import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.drive.DriveBackup;
 import com.example.myquotes.notifications.QuoteNotifications;
 
+import java.util.Random;
+
 public class MyApplication extends Application {
     private static MyApplication instance;
     private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
     private Categories categories;
+    private Random shuffleRandom = new Random();
 
     private static final String PREFS_NAME = "AppSettings";
     private static final String KEY_THEME_MODE = "theme_mode";
@@ -47,6 +50,16 @@ public class MyApplication extends Application {
 
     public Categories getCategories() {
         return categories;
+    }
+
+    /** Shuffles each new Reading Session's deck. */
+    public Random getShuffleRandom() {
+        return shuffleRandom;
+    }
+
+    /** For the README screenshot test: a seeded Random gives the same deck on every run. */
+    public void setShuffleRandom(Random random) {
+        shuffleRandom = random;
     }
 
     public void applyTheme() {
