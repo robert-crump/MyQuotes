@@ -94,9 +94,9 @@ public class SuggestionProviderTest {
         assertFalse(onlyAuthor.hasSplit());
     }
 
-    private static Quote qc(String author, String source, String category) {
+    private static Quote qc(String author, String source, String tags) {
         Quote quote = new Quote(1, author, "text", source);
-        quote.setCategory(category);
+        quote.setTags(tags.isEmpty() ? Collections.emptyList() : Arrays.asList(tags.split(" ")));
         return quote;
     }
 
@@ -130,11 +130,28 @@ public class SuggestionProviderTest {
     }
 
     @Test
-    public void fieldSuggestionsCoverCategoriesButNotQuoteTextOrEmptyInput() {
-        List<Quote> quotes = Arrays.asList(qc("A", "", "Stoicism"), qc("B", "", ""));
+    public void fieldSuggestionsCoverHashtagsButNotQuoteTextOrEmptyInput() {
+        List<Quote> quotes = Arrays.asList(qc("A", "", "Stoicism Zen"), qc("B", "", ""));
         assertEquals(Collections.singletonList("Stoicism:1"), values(
-                provider.getFieldSuggestions(quotes, QuoteQuery.Field.CATEGORY, "sto", 6)));
+                provider.getFieldSuggestions(quotes, QuoteQuery.Field.HASHTAGS, "sto", 6)));
         assertTrue(provider.getFieldSuggestions(quotes, QuoteQuery.Field.QUOTE_TEXT, "tex", 6).isEmpty());
-        assertTrue(provider.getFieldSuggestions(quotes, QuoteQuery.Field.CATEGORY, " ", 6).isEmpty());
+        assertTrue(provider.getFieldSuggestions(quotes, QuoteQuery.Field.HASHTAGS, " ", 6).isEmpty());
+    }
+
+    @Test
+    public void tagSuggestionsStartWithTheInputIgnoringHashAndRankByUsage() {
+        List<Quote> quotes = Arrays.asList(
+                qc("A", "", "Love Life"), qc("B", "", "Life Wisdom"), qc("C", "", "Life Love"),
+                qc("D", "", "Light"), qc("E", "", "Belief"));
+        assertEquals(Arrays.asList("Life:3", "Light:1"), values(provider.getTagSuggestions(quotes, "#li", 6)));
+        assertEquals(Arrays.asList("Life:3", "Love:2"), values(provider.getTagSuggestions(quotes, "L", 2)));
+    }
+
+    @Test
+    public void tagSuggestionsForEmptyInputAreTheMostUsed() {
+        List<Quote> quotes = Arrays.asList(
+                qc("A", "", "Love Life"), qc("B", "", "Life Wisdom"), qc("C", "", "Life Love"));
+        assertEquals(Arrays.asList("Life:3", "Love:2", "Wisdom:1"),
+                values(provider.getTagSuggestions(quotes, "", 6)));
     }
 }

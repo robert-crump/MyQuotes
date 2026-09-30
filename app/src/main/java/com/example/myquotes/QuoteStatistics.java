@@ -31,23 +31,24 @@ public final class QuoteStatistics {
     public final int favoriteCount;
     public final List<StatItem> topAuthors;
     public final List<StatItem> topSources;
-    public final List<StatItem> categories;
-    public final int withoutCategoryCount;
+    /** Every hashtag; a quote counts once for each of its tags. */
+    public final List<StatItem> hashtags;
+    public final int withoutHashtagsCount;
     /** The last {@link #MONTHS} calendar months, oldest first, ending with the current one. */
     public final List<MonthCount> addedPerMonth;
     /** Quotes with {@code addedAt == 0} (added before the field existed). */
     public final int unknownAddedCount;
 
     private QuoteStatistics(int total, int favoriteCount, List<StatItem> topAuthors,
-                            List<StatItem> topSources, List<StatItem> categories,
-                            int withoutCategoryCount, List<MonthCount> addedPerMonth,
+                            List<StatItem> topSources, List<StatItem> hashtags,
+                            int withoutHashtagsCount, List<MonthCount> addedPerMonth,
                             int unknownAddedCount) {
         this.total = total;
         this.favoriteCount = favoriteCount;
         this.topAuthors = topAuthors;
         this.topSources = topSources;
-        this.categories = categories;
-        this.withoutCategoryCount = withoutCategoryCount;
+        this.hashtags = hashtags;
+        this.withoutHashtagsCount = withoutHashtagsCount;
         this.addedPerMonth = addedPerMonth;
         this.unknownAddedCount = unknownAddedCount;
     }
@@ -59,20 +60,20 @@ public final class QuoteStatistics {
     static QuoteStatistics of(List<Quote> quotes, long nowMillis, ZoneId zone) {
         if (quotes == null) quotes = Collections.emptyList();
         int favorites = 0;
-        int noCategory = 0;
+        int noHashtags = 0;
         int unknownAdded = 0;
         YearMonth current = YearMonth.from(Instant.ofEpochMilli(nowMillis).atZone(zone));
         YearMonth first = current.minusMonths(MONTHS - 1);
         int[] perMonth = new int[MONTHS];
         Map<String, Integer> authors = new HashMap<>();
         Map<String, Integer> sources = new HashMap<>();
-        Map<String, Integer> categories = new HashMap<>();
+        Map<String, Integer> hashtags = new HashMap<>();
         for (Quote q : quotes) {
             if (q.isFavorite()) favorites++;
             authors.merge(q.getAuthor(), 1, Integer::sum);
             if (!q.getSource().isEmpty()) sources.merge(q.getSource(), 1, Integer::sum);
-            if (q.getCategory().isEmpty()) noCategory++;
-            else categories.merge(q.getCategory(), 1, Integer::sum);
+            if (q.getTags().isEmpty()) noHashtags++;
+            for (String tag : q.getTags()) hashtags.merge(tag, 1, Integer::sum);
             if (q.getAddedAt() == 0) {
                 unknownAdded++;
             } else {
@@ -88,7 +89,7 @@ public final class QuoteStatistics {
         }
         return new QuoteStatistics(quotes.size(), favorites,
                 rank(authors, TOP_LIMIT), rank(sources, TOP_LIMIT),
-                rank(categories, Integer.MAX_VALUE), noCategory,
+                rank(hashtags, Integer.MAX_VALUE), noHashtags,
                 Collections.unmodifiableList(months), unknownAdded);
     }
 

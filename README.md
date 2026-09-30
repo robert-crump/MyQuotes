@@ -8,7 +8,7 @@ Your personal quote collection, one swipe at a time.
   <tr>
     <td><img src="docs/screenshots/quotes.png" width="200" alt="Quotes tab: swiping through quote cards"></td>
     <td><img src="docs/screenshots/search.png" width="200" alt="Search tab: all quotes by Jane Austen"></td>
-    <td><img src="docs/screenshots/favorites.png" width="200" alt="Favorites tab showing a favorited quote"></td>
+    <td><img src="docs/screenshots/hashtags.png" width="200" alt="Hashtags: every tag with its quote count"></td>
     <td><img src="docs/screenshots/statistics.png" width="200" alt="Statistics: quotes added per month"></td>
     <td><img src="docs/screenshots/quotes-dark.png" width="200" alt="Quotes tab in dark mode"></td>
   </tr>
@@ -16,7 +16,8 @@ Your personal quote collection, one swipe at a time.
 
 - **Swipe** through your quotes in shuffled order
 - **Favorite** the ones that stay with you
-- **Search** by text, author, source or category
+- **Tag** quotes with hashtags and tap one to see all its quotes
+- **Search** by text, author, source or hashtag
 - **Daily quote** notification in the afternoon
 - **Statistics** on your collection
 - **Back up** automatically to a local folder or Google Drive, or export and import a file

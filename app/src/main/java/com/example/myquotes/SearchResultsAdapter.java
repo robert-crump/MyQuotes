@@ -77,7 +77,7 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
             String authorSource = author + " - " + source;
             authorSourceTextView.setText(authorSource);
 
-            String snippet = query.snippet(quote.getQuoteText());
+            String snippet = query.snippet(quote);
             quoteSnippetTextView.setText(snippet);
         }
     }

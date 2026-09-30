@@ -37,7 +37,7 @@ import java.util.Random;
  * Run through {@code ./gradlew readmeScreenshots}, which also sets up a clean status bar and
  * copies the PNGs to {@code docs/screenshots/}. Every screen is taken in the light theme and again
  * in the dark one ({@code <name>-dark.png}); the app's theme setting is restored afterwards.
- * Replaces the app's quotes and categories, so {@link EmulatorOnlyRule} skips it without the
+ * Replaces the app's quotes (and so its hashtags), so {@link EmulatorOnlyRule} skips it without the
  * argument and refuses real devices.
  */
 @RunWith(AndroidJUnit4.class)
@@ -101,7 +101,7 @@ public class ReadmeScreenshots {
         captureFavoritesTab();
         captureSearchAndQuoteDialog();
         captureStatistics();
-        captureCategories();
+        captureHashtags();
         captureSettings();
     }
 
@@ -152,9 +152,9 @@ public class ReadmeScreenshots {
         }
     }
 
-    private void captureCategories() throws Exception {
-        try (ActivityScenario<CategoriesActivity> ignored = ActivityScenario.launch(CategoriesActivity.class)) {
-            capture("categories");
+    private void captureHashtags() throws Exception {
+        try (ActivityScenario<HashtagsActivity> ignored = ActivityScenario.launch(HashtagsActivity.class)) {
+            capture("hashtags");
         }
     }
 

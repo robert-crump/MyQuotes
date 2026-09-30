@@ -7,7 +7,7 @@ import androidx.appcompat.widget.Toolbar;
 
 /**
  * Thin pushed host of {@link SearchFragment}, opened only through {@link QuoteQuery#toIntent}
- * (Statistics, Categories); Back returns there. The Search tab in MainActivity is the main entry.
+ * (Statistics, Hashtags); Back returns there. The Search tab in MainActivity is the main entry.
  */
 public class SearchActivity extends AppCompatActivity {
 

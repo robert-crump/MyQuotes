@@ -10,12 +10,13 @@ import java.util.List;
 
 /**
  * The file format for backups and manual export/import (#37): the quote list plus the
- * daily-notification history, as {@code {version: 2, quotes: [...], notificationHistory: {...}}}.
- * Decoding also accepts v1 envelopes and legacy bare arrays; with no history section the history
- * is empty. The Quote Store keeps using plain {@link QuoteCodec}.
+ * daily-notification history, as {@code {version: 3, quotes: [...], notificationHistory: {...}}}.
+ * v3 (#49) writes each quote's {@code "tags"} instead of {@code "category"}. Decoding also
+ * accepts v2 and v1 envelopes and legacy bare arrays (a category becomes one tag); with no
+ * history section the history is empty. The Quote Store keeps using plain {@link QuoteCodec}.
  */
 public final class BackupDocument {
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
 
     public final List<Quote> quotes;
     public final NotificationHistory history;

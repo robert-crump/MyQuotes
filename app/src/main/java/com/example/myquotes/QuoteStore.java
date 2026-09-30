@@ -12,4 +12,7 @@ public interface QuoteStore {
 
     /** Whether quotes have ever been stored (even an empty list). */
     boolean hasStoredQuotes();
+
+    /** Whether the stored data is in an older format that the next save upgrades. */
+    boolean isOldFormat();
 }

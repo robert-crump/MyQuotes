@@ -9,8 +9,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
-import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ListPopupWindow;
 import android.widget.Toast;
@@ -20,6 +18,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
+import java.util.Collections;
 import java.util.List;
 
 public class AddEditActivity extends AppCompatActivity {
@@ -39,7 +38,9 @@ public class AddEditActivity extends AppCompatActivity {
     private EditText editTextAuthor;
     private EditText editTextQuote;
     private EditText editTextSource;
-    private android.widget.AutoCompleteTextView editTextCategory;
+    private static final String STATE_TAGS = "hashtags";
+
+    private HashtagChipField hashtagField;
     private QuoteCollection quoteCollection;
     private SuggestionProvider suggestionProvider;
     private ListPopupWindow authorPopup;
@@ -60,6 +61,10 @@ public class AddEditActivity extends AppCompatActivity {
         setupViewModel();
         setupViews();
         handleIntent();
+        if (savedInstanceState != null) {
+            List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
+            if (tags != null) hashtagField.setTags(tags);
+        }
         setupBackHandling();
     }
 
@@ -79,31 +84,8 @@ public class AddEditActivity extends AppCompatActivity {
         editTextAuthor = findViewById(R.id.edit_text_author);
         editTextQuote = findViewById(R.id.edit_text_quote);
         editTextSource = findViewById(R.id.edit_text_source);
-        editTextCategory = findViewById(R.id.edit_text_category);
-
-        UnfilteredAdapter adapter = new UnfilteredAdapter(this);
-        editTextCategory.setAdapter(adapter);
-        MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
-            adapter.clear();
-            adapter.addAll(names);
-        });
-        editTextCategory.setDropDownHeight(600);
-
-        editTextCategory.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) showCategoryPicker(v);
-        });
-
-        editTextCategory.setOnItemClickListener((parent, view, position, id) -> {
-            editTextCategory.postDelayed(() -> {
-                editTextQuote.requestFocus();
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.showSoftInput(editTextQuote, InputMethodManager.SHOW_IMPLICIT);
-                }
-            }, 100);
-        });
-
-        editTextCategory.setOnClickListener(this::showCategoryPicker);
+        hashtagField = new HashtagChipField(findViewById(R.id.hashtag_field), this,
+                quoteCollection, MyApplication.getInstance().getHashtags());
 
         // The quote field is a fixed 6 lines and scrolls internally; keep drags inside it from
         // being taken over by the surrounding ScrollView while it can still scroll.
@@ -269,14 +251,6 @@ public class AddEditActivity extends AppCompatActivity {
         });
     }
 
-    private void showCategoryPicker(View v) {
-        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-        }
-        editTextCategory.showDropDown();
-    }
-
     private int calcPopupHeight(int suggestionCount, boolean hasDivider) {
         float density = getResources().getDisplayMetrics().density;
         int itemHeightPx = Math.round(48 * density);
@@ -313,7 +287,7 @@ public class AddEditActivity extends AppCompatActivity {
             editTextAuthor.setText(quote.getAuthor());
             editTextQuote.setText(quote.getQuoteText());
             editTextSource.setText(quote.getSource());
-            editTextCategory.setText(quote.getCategory(), false);
+            hashtagField.setTags(quote.getTags());
             isLoadingQuote = false;
             baseline = QuoteFormSnapshot.of(quote);
             Log.d(TAG, "Loaded quote #" + id);
@@ -329,11 +303,12 @@ public class AddEditActivity extends AppCompatActivity {
             return;
         }
 
+        hashtagField.commitPending();
         Quote quote = createQuoteFromInput();
 
         if (isEditMode) {
             quoteCollection.edit(quoteId, quote.getAuthor(), quote.getQuoteText(),
-                    quote.getSource(), quote.getCategory());
+                    quote.getSource(), quote.getTags());
             Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
             finish();
         } else {
@@ -349,7 +324,8 @@ public class AddEditActivity extends AppCompatActivity {
         editTextAuthor.setText("");
         editTextQuote.setText("");
         editTextSource.setText("");
-        editTextCategory.setText("", false);
+        hashtagField.dismissDropDown();
+        hashtagField.setTags(Collections.emptyList());
         editTextAuthor.requestFocus();
     }
 
@@ -372,7 +348,7 @@ public class AddEditActivity extends AppCompatActivity {
     private QuoteFormSnapshot readForm() {
         return new QuoteFormSnapshot(editTextAuthor.getText().toString(),
                 editTextQuote.getText().toString(), editTextSource.getText().toString(),
-                editTextCategory.getText().toString());
+                hashtagField.tagsWithPending());
     }
 
     private Quote createQuoteFromInput() {
@@ -380,35 +356,13 @@ public class AddEditActivity extends AppCompatActivity {
         quote.setAuthor(editTextAuthor.getText().toString().trim());
         quote.setQuoteText(editTextQuote.getText().toString().trim());
         quote.setSource(editTextSource.getText().toString().trim());
-        quote.setCategory(editTextCategory.getText().toString().trim());
+        quote.setTags(hashtagField.tagsWithPending());
         return quote;
     }
 
-    /**
-     * The category picker is a pick-list, not an autocomplete: it always offers the whole
-     * category set. A plain ArrayAdapter would filter it by the field's current text, so an
-     * edited quote's own category hid every other one.
-     */
-    private static final class UnfilteredAdapter extends android.widget.ArrayAdapter<String> {
-        private final android.widget.Filter noFilter = new android.widget.Filter() {
-            @Override
-            protected FilterResults performFiltering(CharSequence constraint) {
-                return null;
-            }
-
-            @Override
-            protected void publishResults(CharSequence constraint, FilterResults results) {
-                notifyDataSetChanged();
-            }
-        };
-
-        UnfilteredAdapter(Context context) {
-            super(context, android.R.layout.simple_dropdown_item_1line, new java.util.ArrayList<>());
-        }
-
-        @Override
-        public android.widget.Filter getFilter() {
-            return noFilter;
-        }
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putStringArrayList(STATE_TAGS, hashtagField.getTags());
     }
 }

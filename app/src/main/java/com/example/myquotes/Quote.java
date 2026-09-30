@@ -1,6 +1,9 @@
 package com.example.myquotes;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 
 public class Quote {
@@ -17,7 +20,7 @@ public class Quote {
     private String author;
     private String quoteText;
     private String source;
-    private String category;
+    private List<String> tags = Collections.emptyList();
 
     private boolean isFavorite = false;
     private long favoritedAt = 0L;
@@ -47,8 +50,11 @@ public class Quote {
     public String getSource() { return source != null ? source : ""; }
     public void setSource(String source) { this.source = source; }
 
-    public String getCategory() { return category != null ? category : ""; }
-    public void setCategory(String category) { this.category = category != null ? category : ""; }
+    /** Never null; normalized, deduplicated ignoring case, alphabetical ({@link Hashtag}). */
+    public List<String> getTags() { return tags; }
+    public void setTags(Collection<String> tags) {
+        this.tags = Collections.unmodifiableList(Hashtag.normalizeAll(tags));
+    }
 
     public boolean isFavorite() { return isFavorite; }
     public void setFavorite(boolean favorite) { isFavorite = favorite; }

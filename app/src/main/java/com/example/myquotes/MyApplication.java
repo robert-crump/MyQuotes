@@ -15,7 +15,7 @@ public class MyApplication extends Application {
     private static MyApplication instance;
     private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
-    private Categories categories;
+    private Hashtags hashtags;
     private Random shuffleRandom = new Random();
 
     private static final String PREFS_NAME = "AppSettings";
@@ -30,7 +30,8 @@ public class MyApplication extends Application {
         quoteStore = new SharedPreferencesQuoteStore(this);
         quoteCollection = new QuoteCollection(quoteStore);
         quoteCollection.loadFromStore();
-        categories = new Categories(new SharedPreferencesCategoryStore(this), quoteCollection);
+        hashtags = new Hashtags(quoteCollection);
+        removeLegacyCategoryList();
         QuoteNotifications.initialize(this);
         LocalBackup.initialize(this);
         DriveBackup.initialize(this);
@@ -48,8 +49,16 @@ public class MyApplication extends Application {
         return quoteCollection;
     }
 
-    public Categories getCategories() {
-        return categories;
+    public Hashtags getHashtags() {
+        return hashtags;
+    }
+
+    // Before #49 the user could keep category names without quotes; tags exist only in use.
+    private void removeLegacyCategoryList() {
+        SharedPreferences legacy = getSharedPreferences("CategoryPrefs", MODE_PRIVATE);
+        if (legacy.contains("saved_categories")) {
+            legacy.edit().remove("saved_categories").apply();
+        }
     }
 
     /** Shuffles each new Reading Session's deck. */

@@ -45,4 +45,9 @@ public class SharedPreferencesQuoteStore implements QuoteStore {
     public boolean hasStoredQuotes() {
         return prefs.contains(KEY_QUOTES_JSON);
     }
+
+    @Override
+    public boolean isOldFormat() {
+        return QuoteCodec.isOldFormat(prefs.getString(KEY_QUOTES_JSON, null));
+    }
 }

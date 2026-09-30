@@ -11,7 +11,8 @@ import java.util.List;
 
 public final class QuoteCodec {
     private static final String TAG = "QuoteCodec";
-    private static final int VERSION = 1;
+    // 2: "tags" array instead of the free-text "category" (#49).
+    private static final int VERSION = 2;
 
     private QuoteCodec() {}
 
@@ -63,7 +64,7 @@ public final class QuoteCodec {
             jsonQuote.put("author", quote.getAuthor());
             jsonQuote.put("quoteText", quote.getQuoteText());
             jsonQuote.put("source", quote.getSource());
-            jsonQuote.put("category", quote.getCategory());
+            jsonQuote.put("tags", new JSONArray(quote.getTags()));
             jsonQuote.put("isFavorite", quote.isFavorite());
             jsonQuote.put("favoritedAt", quote.getFavoritedAt());
             jsonQuote.put("lastShown", quote.getLastShown());
@@ -72,6 +73,34 @@ public final class QuoteCodec {
             quotesArray.put(jsonQuote);
         }
         return quotesArray;
+    }
+
+    /** Whether {@code json} predates the current format (bare array or older envelope). */
+    static boolean isOldFormat(String json) {
+        if (json == null) return false;
+        String trimmed = json.trim();
+        if (trimmed.startsWith("[")) return true;
+        try {
+            return new JSONObject(trimmed).optInt("version", 0) < VERSION;
+        } catch (JSONException e) {
+            return false;
+        }
+    }
+
+    // "tags" when present; otherwise the legacy "category" as a single tag.
+    private static List<String> parseTags(JSONObject jsonQuote) {
+        List<String> tags = new ArrayList<>();
+        JSONArray array = jsonQuote.optJSONArray("tags");
+        if (array != null) {
+            for (int i = 0; i < array.length(); i++) {
+                String tag = array.optString(i, "");
+                if (!tag.isEmpty()) tags.add(tag);
+            }
+        } else {
+            String tag = Hashtag.fromCategory(jsonQuote.optString("category", ""));
+            if (!tag.isEmpty()) tags.add(tag);
+        }
+        return tags;
     }
 
     static List<Quote> parseQuotesArray(JSONArray jsonArray) {
@@ -87,7 +116,6 @@ public final class QuoteCodec {
                 String author = jsonQuote.optString("author", "");
                 String quoteText = jsonQuote.optString("quoteText", "");
                 String source = jsonQuote.optString("source", "");
-                String category = jsonQuote.optString("category", "");
                 boolean isFavorite = jsonQuote.optBoolean("isFavorite", false);
                 long favoritedAt = jsonQuote.optLong("favoritedAt", 0);
                 long lastShown = jsonQuote.optLong("lastShown", 0);
@@ -95,7 +123,7 @@ public final class QuoteCodec {
                 long addedAt = jsonQuote.optLong("addedAt", 0);
 
                 Quote quote = new Quote(id, author, quoteText, source);
-                quote.setCategory(category);
+                quote.setTags(parseTags(jsonQuote));
                 quote.setFavorite(isFavorite);
                 quote.setFavoritedAt(favoritedAt);
                 quote.setLastShown(lastShown);

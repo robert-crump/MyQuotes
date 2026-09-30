@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One tag in the Add/Edit hashtag field (HashtagChipField). Not checkable: the checked look is
+     only used to highlight the chip the next Backspace removes. -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.Chip.Input"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:checkable="false"
+    app:checkedIconVisible="false"
+    app:closeIconVisible="true" />

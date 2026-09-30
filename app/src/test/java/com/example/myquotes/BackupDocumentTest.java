@@ -1,6 +1,7 @@
 package com.example.myquotes;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.example.myquotes.notifications.NotificationHistory;
@@ -16,6 +17,7 @@ public class BackupDocumentTest {
     private static Quote quote(int id) {
         Quote q = new Quote(id, "A" + id, "T" + id, "S" + id);
         q.setAddedAt(500L);
+        q.setTags(Arrays.asList("T" + id));
         return q;
     }
 
@@ -26,11 +28,16 @@ public class BackupDocumentTest {
     }
 
     @Test
-    public void encodesV2EnvelopeWithHistory() throws Exception {
-        String json = new BackupDocument(Arrays.asList(quote(1)), historyFor(1, 900L)).encodePretty();
+    public void encodesV3EnvelopeWithTagsAndHistory() throws Exception {
+        Quote tagged = quote(1);
+        tagged.setTags(Arrays.asList("Zen", "Art"));
+        String json = new BackupDocument(Arrays.asList(tagged), historyFor(1, 900L)).encodePretty();
 
         JSONObject envelope = new JSONObject(json);
-        assertEquals(2, envelope.getInt("version"));
+        assertEquals(3, envelope.getInt("version"));
+        JSONObject quote = envelope.getJSONArray("quotes").getJSONObject(0);
+        assertFalse(quote.has("category"));
+        assertEquals("[\"Art\",\"Zen\"]", quote.getJSONArray("tags").toString());
         assertEquals(1, envelope.getJSONArray("quotes").length());
         assertEquals(3, envelope.getJSONObject("notificationHistory").getJSONObject("1").getInt("notifiedCount"));
         assertTrue("Expected 2-space indent", json.contains("\n  "));
@@ -44,6 +51,7 @@ public class BackupDocumentTest {
 
         assertEquals(2, out.quotes.size());
         assertEquals(500L, out.quotes.get(0).getAddedAt());
+        assertEquals(Arrays.asList("T1"), out.quotes.get(0).getTags());
         NotificationHistory.Entry entry = out.history.entryFor(out.quotes.get(1));
         assertEquals(3, entry.notifiedCount);
         assertEquals(1, entry.clickedCount);
@@ -52,20 +60,35 @@ public class BackupDocumentTest {
 
     @Test
     public void v1EnvelopeDecodesWithEmptyHistory() throws Exception {
-        String v1 = "{\"version\":1,\"quotes\":[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\"}]}";
+        String v1 = "{\"version\":1,\"quotes\":[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\",\"category\":\"Life Wisdom\"}]}";
 
         BackupDocument out = BackupDocument.decode(v1);
 
         assertEquals(1, out.quotes.size());
         assertEquals(0L, out.quotes.get(0).getAddedAt());
+        assertEquals(Arrays.asList("LifeWisdom"), out.quotes.get(0).getTags());
         assertTrue(out.history.isEmpty());
     }
 
     @Test
+    public void v2EnvelopeCategoryBecomesATagAndHistoryIsKept() throws Exception {
+        String v2 = "{\"version\":2,\"quotes\":[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"category\":\"Humor\"},"
+                + "{\"id\":2,\"author\":\"B\",\"quoteText\":\"U\",\"category\":\"\"}],"
+                + "\"notificationHistory\":{\"1\":{\"notifiedCount\":2,\"clickedCount\":0,\"lastNotifiedAt\":5}}}";
+
+        BackupDocument out = BackupDocument.decode(v2);
+
+        assertEquals(Arrays.asList("Humor"), out.quotes.get(0).getTags());
+        assertTrue(out.quotes.get(1).getTags().isEmpty());
+        assertEquals(2, out.history.entryFor(out.quotes.get(0)).notifiedCount);
+    }
+
+    @Test
     public void legacyBareArrayDecodesWithEmptyHistory() throws Exception {
-        BackupDocument out = BackupDocument.decode("[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\"}]");
+        BackupDocument out = BackupDocument.decode("[{\"id\":1,\"author\":\"A\",\"quoteText\":\"T\",\"source\":\"S\",\"category\":\"Art\"}]");
 
         assertEquals(1, out.quotes.size());
+        assertEquals(Arrays.asList("Art"), out.quotes.get(0).getTags());
         assertTrue(out.history.isEmpty());
     }
 

@@ -9,13 +9,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * The public-domain demo quotes the README screenshots are taken from
- * ({@code androidTest/assets/demo_quotes.json}, a v2 Backup Document).
+ * ({@code androidTest/assets/demo_quotes.json}, a v3 Backup Document with hashtags).
  */
 final class DemoCollection {
     private static final String ASSET = "demo_quotes.json";
@@ -45,23 +43,11 @@ final class DemoCollection {
     }
 
     /**
-     * Replaces the Quote Collection and the Category set with the demo ones and marks the deck
-     * as swiped, so the nudge doesn't play. Call on the main thread.
+     * Replaces the Quote Collection (and with it the Hashtag set) with the demo quotes and marks
+     * the deck as swiped, so the nudge doesn't play. Call on the main thread.
      */
     static void install(Context context, List<Quote> quotes) {
-        MyApplication app = MyApplication.getInstance();
-        app.getQuoteCollection().setList(new ArrayList<>(quotes));
-
-        Categories categories = app.getCategories();
-        Set<String> demoNames = new LinkedHashSet<>();
-        for (Quote q : quotes) {
-            if (!q.getCategory().isEmpty()) demoNames.add(q.getCategory());
-        }
-        for (String name : categories.all()) {
-            if (!demoNames.contains(name)) categories.delete(name);
-        }
-        for (String name : demoNames) categories.add(name);
-
+        MyApplication.getInstance().getQuoteCollection().setList(new ArrayList<>(quotes));
         SwipeHint.markSwiped(context);
     }
 

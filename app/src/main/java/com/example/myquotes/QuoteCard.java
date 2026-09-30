@@ -1,9 +1,17 @@
 package com.example.myquotes;
 
+import android.graphics.Color;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.TextPaint;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
 
 /**
  * Binds a Quote to the quote card ({@code view_quote_card}): text, attribution, favorite state,
@@ -12,13 +20,13 @@ import android.widget.TextView;
  */
 public final class QuoteCard {
 
-    /** What the card's buttons and author/source/category links do. */
+    /** What the card's buttons and author/source/hashtag links do. */
     public interface Listener {
         void onToggleFavorite(Quote quote);
         void onShareQuote(Quote quote);
         void onAuthorClick(Quote quote);
         void onSourceClick(Quote quote);
-        void onCategoryClick(Quote quote);
+        void onTagClick(Quote quote, String tag);
         void onEditQuote(Quote quote);
     }
 
@@ -27,7 +35,7 @@ public final class QuoteCard {
     private final TextView textQuote;
     private final TextView textAuthor;
     private final TextView textSource;
-    private final TextView textCategory;
+    private final TextView textHashtags;
     private final ImageButton buttonFavorite;
     private final ImageButton buttonShare;
     private final ImageButton buttonEdit;
@@ -37,7 +45,9 @@ public final class QuoteCard {
         textQuote = root.findViewById(R.id.text_quote);
         textAuthor = root.findViewById(R.id.text_author);
         textSource = root.findViewById(R.id.text_source);
-        textCategory = root.findViewById(R.id.text_category);
+        textHashtags = root.findViewById(R.id.text_hashtags);
+        textHashtags.setMovementMethod(LinkMovementMethod.getInstance());
+        textHashtags.setHighlightColor(Color.TRANSPARENT);
         buttonFavorite = root.findViewById(R.id.button_favorite);
         buttonShare = root.findViewById(R.id.button_share);
         buttonEdit = root.findViewById(R.id.button_edit);
@@ -47,7 +57,7 @@ public final class QuoteCard {
         textQuote.setText(quote.getQuoteText());
         bindOptional(textAuthor, quote.getAuthor().isEmpty() ? "" : "— " + quote.getAuthor());
         bindOptional(textSource, quote.getSource());
-        bindOptional(textCategory, quote.getCategory());
+        bindTags(quote, listener);
 
         buttonFavorite.setImageResource(quote.isFavorite()
                 ? R.drawable.ic_favorite_heart_filled
@@ -58,7 +68,6 @@ public final class QuoteCard {
         buttonEdit.setOnClickListener(v -> listener.onEditQuote(quote));
         textAuthor.setOnClickListener(v -> listener.onAuthorClick(quote));
         textSource.setOnClickListener(v -> listener.onSourceClick(quote));
-        textCategory.setOnClickListener(v -> listener.onCategoryClick(quote));
 
         // Double-tap the text to toggle favorite
         final long[] lastTapTime = {0};
@@ -74,6 +83,32 @@ public final class QuoteCard {
             }
             return false;
         });
+    }
+
+    /**
+     * {@code #A #B #C} (alphabetical, single spaces, wrapping), one link per tag; hidden when the
+     * quote has no tags.
+     */
+    private void bindTags(Quote quote, Listener listener) {
+        SpannableStringBuilder line = new SpannableStringBuilder();
+        for (String tag : quote.getTags()) {
+            if (line.length() > 0) line.append(' ');
+            int start = line.length();
+            line.append(Hashtag.display(tag));
+            line.setSpan(new ClickableSpan() {
+                @Override
+                public void onClick(@NonNull View widget) {
+                    listener.onTagClick(quote, tag);
+                }
+
+                @Override
+                public void updateDrawState(@NonNull TextPaint paint) {
+                    // Styled like the other attribution text: no underline, no link colour.
+                }
+            }, start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        textHashtags.setText(line);
+        textHashtags.setVisibility(line.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     /** Shows {@code text} in {@code view}, or hides the view when the text is empty. */

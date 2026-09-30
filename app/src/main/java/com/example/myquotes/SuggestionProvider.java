@@ -22,15 +22,17 @@ public class SuggestionProvider {
     }
 
     /**
-     * Distinct author, source or category values with a word starting with {@code input}
+     * Distinct author or source values with a word starting with {@code input}
      * (case-insensitive; "fast" finds "Thinking, Fast and Slow"), most-used first, then by
-     * name, at most {@code limit}. Quote text has no suggestions.
+     * name, at most {@code limit}; hashtags as in {@link #getTagSuggestions}. Quote text has no
+     * suggestions, and empty input none either.
      */
     public List<FieldSuggestion> getFieldSuggestions(List<Quote> quotes, QuoteQuery.Field field,
                                                      String input, int limit) {
         String query = input.trim().toLowerCase();
         List<FieldSuggestion> result = new ArrayList<>();
         if (query.isEmpty() || field == QuoteQuery.Field.QUOTE_TEXT) return result;
+        if (field == QuoteQuery.Field.HASHTAGS) return getTagSuggestions(quotes, input, limit);
 
         Map<String, String> displayName = new HashMap<>();
         Map<String, Integer> count = new HashMap<>();
@@ -47,6 +49,26 @@ public class SuggestionProvider {
                 result.add(new FieldSuggestion(e.getValue(), count.get(e.getKey())));
             }
         }
+        return mostUsedFirst(result, limit);
+    }
+
+    /**
+     * Existing hashtags starting with {@code input} (case-insensitive, a leading {@code #}
+     * ignored) with their quote counts, most-used first, then by name, at most {@code limit}.
+     * Empty input lists the most-used tags.
+     */
+    public List<FieldSuggestion> getTagSuggestions(List<Quote> quotes, String input, int limit) {
+        String prefix = Hashtag.key(Hashtag.stripHash(input));
+        List<FieldSuggestion> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : Hashtags.counts(quotes).entrySet()) {
+            if (Hashtag.key(e.getKey()).startsWith(prefix)) {
+                result.add(new FieldSuggestion(e.getKey(), e.getValue()));
+            }
+        }
+        return mostUsedFirst(result, limit);
+    }
+
+    private static List<FieldSuggestion> mostUsedFirst(List<FieldSuggestion> result, int limit) {
         result.sort((a, b) -> {
             int c = Integer.compare(b.count, a.count);
             return c != 0 ? c : a.value.compareToIgnoreCase(b.value);
@@ -58,7 +80,6 @@ public class SuggestionProvider {
         switch (field) {
             case AUTHOR: return quote.getAuthor();
             case SOURCE: return quote.getSource();
-            case CATEGORY: return quote.getCategory();
             default: return quote.getQuoteText();
         }
     }

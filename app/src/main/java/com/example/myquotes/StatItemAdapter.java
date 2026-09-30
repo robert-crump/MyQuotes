@@ -61,8 +61,10 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
                 if (position != RecyclerView.NO_POSITION) {
                     StatItem item = items.get(position);
 
-                    android.content.Intent intent = QuoteQuery.forField(field, item.name)
-                            .toIntent(itemView.getContext());
+                    QuoteQuery query = field == QuoteQuery.Field.HASHTAGS
+                            ? QuoteQuery.forTag(item.name)
+                            : QuoteQuery.forField(field, item.name);
+                    android.content.Intent intent = query.toIntent(itemView.getContext());
                     itemView.getContext().startActivity(intent);
                 }
             });
@@ -70,7 +72,7 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
 
         public void bind(StatItem item, int rank) {
             textRank.setText(String.valueOf(rank));
-            textName.setText(item.name);
+            textName.setText(field == QuoteQuery.Field.HASHTAGS ? Hashtag.display(item.name) : item.name);
             textCount.setText(String.valueOf(item.count));
         }
     }

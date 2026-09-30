@@ -192,7 +192,7 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Kategorien CardView -->
+            <!-- Hashtags histogram -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -210,25 +210,25 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Categories"
+                        android:text="Hashtags"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
                         android:textColor="?android:attr/textColorPrimary" />
 
                     <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/recycler_categories"
+                        android:id="@+id/recycler_hashtags"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:nestedScrollingEnabled="false" />
 
-                    <!-- Anzahl der Zitate ohne Kategorie -->
+                    <!-- Quotes without any hashtag -->
                     <TextView
-                        android:id="@+id/text_no_category"
+                        android:id="@+id/text_no_hashtags"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="Without category: 0"
+                        android:text="Without hashtags: 0"
                         android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
                         android:textStyle="italic"
                         android:textColor="?android:attr/textColorSecondary"

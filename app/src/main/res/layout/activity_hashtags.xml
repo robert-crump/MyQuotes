@@ -29,24 +29,27 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/categories_recyclerView"
+        android:id="@+id/hashtags_recyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingTop="8dp"
-        android:paddingBottom="88dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="24dp"
         android:clipToPadding="false"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <!-- Floating Action Button -->
-    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/fab_add_category"
-        android:layout_width="wrap_content"
+    <!-- Shown when no quote has a hashtag -->
+    <TextView
+        android:id="@+id/hashtags_empty"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:contentDescription="Add category"
-        android:text=""
-        app:icon="@drawable/ic_add_24dp"
-        app:shapeAppearanceOverlay="@style/ShapeAppearance.MyApp.FAB" />
+        android:layout_gravity="center"
+        android:padding="32dp"
+        android:gravity="center"
+        android:text="No hashtags yet. Add them to a quote when you edit it."
+        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        android:textColor="?android:attr/textColorSecondary"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

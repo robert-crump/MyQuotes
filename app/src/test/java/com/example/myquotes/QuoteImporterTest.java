@@ -22,7 +22,7 @@ public class QuoteImporterTest {
     @Test
     public void read_roundTripsPrettyEncoding() throws Exception {
         Quote q = new Quote(7, "Åuthor", "Multi\nline “text”", "Source");
-        q.setCategory("Cat");
+        q.setTags(Arrays.asList("Cat", "Dog"));
         q.setFavorite(true);
         List<Quote> in = Arrays.asList(q, new Quote(8, "B", "T", "S"));
 
@@ -34,7 +34,7 @@ public class QuoteImporterTest {
         assertEquals("Åuthor", out.get(0).getAuthor());
         assertEquals("Multi\nline “text”", out.get(0).getQuoteText());
         assertTrue(out.get(0).isFavorite());
-        assertEquals("Cat", out.get(0).getCategory());
+        assertEquals(Arrays.asList("Cat", "Dog"), out.get(0).getTags());
     }
 
     @Test(expected = QuoteCodecException.class)

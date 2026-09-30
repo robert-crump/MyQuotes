@@ -2,6 +2,7 @@ package com.example.myquotes;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -11,13 +12,13 @@ import java.util.List;
 import org.junit.Test;
 
 public class QuoteQueryTest {
-    private static Quote quote(String text, String author, String source, String category) {
+    private static Quote quote(String text, String author, String source, String tags) {
         Quote q = new Quote(1, author, text, source);
-        q.setCategory(category);
+        q.setTags(tags.isEmpty() ? Arrays.<String>asList() : Arrays.asList(tags.split(" ")));
         return q;
     }
 
-    private final Quote q = quote("Nothing", "Seneca", "Letters", "Stoic");
+    private final Quote q = quote("Nothing", "Seneca", "Letters", "Stoic Life");
 
     private static String repeat(String s, int n) {
         StringBuilder b = new StringBuilder();
@@ -30,7 +31,55 @@ public class QuoteQueryTest {
         assertTrue(QuoteQuery.forField(QuoteQuery.Field.QUOTE_TEXT, "noth").matches(q));
         assertTrue(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen").matches(q));
         assertTrue(QuoteQuery.forField(QuoteQuery.Field.SOURCE, "lett").matches(q));
-        assertTrue(QuoteQuery.forField(QuoteQuery.Field.CATEGORY, "sto").matches(q));
+        assertTrue(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "sto").matches(q));
+    }
+
+    @Test
+    public void typedHashtagQueriesMatchByContainsOnEachTagIgnoringALeadingHash() {
+        assertTrue(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "toi").matches(q));
+        assertTrue(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "#sto").matches(q));
+        assertTrue(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "LIFE").matches(q));
+        assertFalse(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "stoiclife").matches(q));
+        assertTrue(QuoteQuery.all("#life").matches(q));
+        assertFalse(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "sen").matches(q));
+    }
+
+    @Test
+    public void exactTagQueriesMatchWholeTagsIgnoringCase() {
+        QuoteQuery stoic = QuoteQuery.forTag("stoic");
+        assertTrue(stoic.isExact());
+        assertEquals("#stoic", stoic.getText());
+        assertEquals(QuoteQuery.Field.HASHTAGS, stoic.singleField());
+        assertTrue(stoic.matches(q));
+        assertFalse(QuoteQuery.forTag("Sto").matches(q));
+        assertFalse(QuoteQuery.forTag("Seneca").matches(q));
+    }
+
+    @Test
+    public void exactTagQueriesSkipTheMinimumLength() {
+        Quote ai = quote("x", "y", "", "AI Go");
+        assertTrue(QuoteQuery.forTag("AI").isActive());
+        assertTrue(QuoteQuery.forTag("ai").matches(ai));
+        assertTrue(QuoteQuery.forTag("Go").matches(ai));
+        assertFalse(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "ai").matches(ai));
+        assertEquals(Arrays.asList(ai), QuoteQuery.forTag("AI").filter(Arrays.asList(ai, q)));
+    }
+
+    @Test
+    public void retypingAnExactQueryMakesItATypedOne() {
+        QuoteQuery exact = QuoteQuery.forTag("Stoic");
+        assertTrue(exact.withText(" #Stoic ").isExact());
+        assertFalse(exact.withText("#Stoi").isExact());
+        assertFalse(exact.scopedTo(QuoteQuery.Field.HASHTAGS).isExact());
+        assertNotEquals(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "#Stoic"), exact);
+    }
+
+    @Test
+    public void snippetShowsTheTagLineWhenTheMatchIsOnATag() {
+        assertEquals("#Life #Stoic", QuoteQuery.forTag("Stoic").snippet(q));
+        assertEquals("#Life #Stoic", QuoteQuery.all("stoic").snippet(q));
+        assertEquals("Nothing", QuoteQuery.all("noth").snippet(q));
+        assertEquals("Nothing", QuoteQuery.all("seneca").snippet(q));
     }
 
     @Test

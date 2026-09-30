@@ -10,7 +10,7 @@
          purple in the dark theme. -->
     <attr name="appBarColor" format="color" />
 
-    <!-- App bar (and status-bar scrim) while a list is in selection mode, e.g. Categories: a
+    <!-- App bar (and status-bar scrim) while a list is in selection mode, e.g. Hashtags: a
          darker tone than appBarColor so the mode change is obvious. -->
     <attr name="selectionBarColor" format="color" />
 

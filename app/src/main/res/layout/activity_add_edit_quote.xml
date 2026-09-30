@@ -92,28 +92,61 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Category Dropdown -->
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- Hashtags: the tags as input chips, then the text being typed, wrapping onto more
+                 lines (AddEditActivity). Space, Enter, comma or a dropdown pick commits a chip. -->
+            <LinearLayout
+                android:id="@+id/hashtag_field"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
-                android:hint="Category"
-                app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.Material3.TextInputLayout.FilledBox.ExposedDropdownMenu">
+                android:orientation="vertical">
 
-                <AutoCompleteTextView
-                    android:id="@+id/edit_text_category"
+                <TextView
+                    android:id="@+id/label_hashtags"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Hashtags"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chip_group_hashtags"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:paddingTop="28dp"
-                    android:paddingBottom="12dp"
-                    android:inputType="none"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+                    android:layout_marginTop="4dp"
+                    app:chipSpacingHorizontal="6dp"
+                    app:chipSpacingVertical="0dp">
 
-            </com.google.android.material.textfield.TextInputLayout>
+                    <AutoCompleteTextView
+                        android:id="@+id/edit_text_hashtags"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="120dp"
+                        android:background="@null"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp"
+                        android:hint="Add a hashtag"
+                        android:inputType="text|textNoSuggestions"
+                        android:imeOptions="actionDone"
+                        android:maxLines="1"
+                        android:completionThreshold="1"
+                        android:dropDownAnchor="@id/hashtag_field"
+                        android:dropDownWidth="match_parent"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                </com.google.android.material.chip.ChipGroup>
+
+                <View
+                    android:id="@+id/hashtag_underline"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOnSurfaceVariant" />
+
+                <!-- Room for a later "Suggested:" row of tag suggestions. -->
+
+            </LinearLayout>
 
             <!-- Quote Text Input -->
             <com.google.android.material.textfield.TextInputLayout

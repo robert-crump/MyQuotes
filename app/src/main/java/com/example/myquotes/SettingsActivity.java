@@ -144,15 +144,15 @@ public class SettingsActivity extends AppCompatActivity {
         setupBackupSection();
     }
 
-    // Library rows: Categories and Statistics, each with a live count.
+    // Library rows: Hashtags and Statistics, each with a live count.
     private void setupLibrarySection() {
-        SettingsRow categoriesRow = new SettingsRow(binding.rowCategories,
-                R.drawable.ic_category_24dp, R.string.settings_categories)
-                .onClick(v -> startActivity(new Intent(this, CategoriesActivity.class)));
-        MyApplication.getInstance().getCategories().getCategories().observe(this, names -> {
-            int count = names != null ? names.size() : 0;
-            categoriesRow.setSummary(
-                    getResources().getQuantityString(R.plurals.settings_category_count, count, count));
+        SettingsRow hashtagsRow = new SettingsRow(binding.rowHashtags,
+                R.drawable.ic_tag_24dp, R.string.settings_hashtags)
+                .onClick(v -> startActivity(new Intent(this, HashtagsActivity.class)));
+        MyApplication.getInstance().getHashtags().getHashtags().observe(this, tags -> {
+            int count = tags != null ? tags.size() : 0;
+            hashtagsRow.setSummary(
+                    getResources().getQuantityString(R.plurals.settings_hashtag_count, count, count));
         });
 
         SettingsRow statisticsRow = new SettingsRow(binding.rowStatistics,

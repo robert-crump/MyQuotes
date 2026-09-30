@@ -4,13 +4,8 @@
     android:tint="?attr/colorControlNormal"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Material Symbols "tag" (#) -->
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M12,2l-5.5,9h11z" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M17.5,17.5m-4.5,0a4.5,4.5 0,1 0,9 0a4.5,4.5 0,1 0,-9 0" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M3,13.5h8v8H3z" />
+        android:pathData="M20,10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4H20zM14,14h-4v-4h4V14z" />
 </vector>

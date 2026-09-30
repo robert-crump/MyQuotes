@@ -17,10 +17,12 @@ import java.util.Set;
  * Immutable search predicate: trimmed query text (original case preserved for display,
  * matched case-insensitively) plus the fields it is scoped to. Owns matching, the
  * minimum-length rule and result snippets, and is the single protocol for opening
- * SearchActivity (or handing SearchFragment) a query.
+ * SearchActivity (or handing SearchFragment) a query. Typed queries match by contains (on each
+ * hashtag, ignoring a leading {@code #}); an exact query ({@link #forTag}, a tapped tag) matches
+ * whole values and has no minimum length.
  */
 public final class QuoteQuery {
-    public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, CATEGORY }
+    public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, HASHTAGS }
 
     public static final int MIN_LENGTH = 3;
     private static final int SNIPPET_BEFORE = 40;
@@ -29,14 +31,21 @@ public final class QuoteQuery {
 
     static final String EXTRA_TEXT = "search_query";
     static final String EXTRA_FIELDS = "search_fields";
+    static final String EXTRA_EXACT = "search_exact";
 
     private final String text;
     private final EnumSet<Field> fields;
+    private final boolean exact;
 
-    private QuoteQuery(String text, Set<Field> fields) {
+    private QuoteQuery(String text, Set<Field> fields, boolean exact) {
         this.text = text == null ? "" : text.trim();
         this.fields = EnumSet.noneOf(Field.class);
         this.fields.addAll(fields);
+        this.exact = exact;
+    }
+
+    private QuoteQuery(String text, Set<Field> fields) {
+        this(text, fields, false);
     }
 
     /** Query over all four fields, as produced by typing in the search box. */
@@ -47,6 +56,11 @@ public final class QuoteQuery {
     /** Query scoped to a single field, as produced by field-click navigation. */
     public static QuoteQuery forField(Field field, String text) {
         return new QuoteQuery(text, EnumSet.of(field));
+    }
+
+    /** Exact query for one hashtag (a tapped tag); its text is {@code #tag}. */
+    public static QuoteQuery forTag(String tag) {
+        return new QuoteQuery(Hashtag.display(Hashtag.normalize(tag)), EnumSet.of(Field.HASHTAGS), true);
     }
 
     public String getText() {
@@ -61,8 +75,14 @@ public final class QuoteQuery {
         return fields.contains(field);
     }
 
+    public boolean isExact() {
+        return exact;
+    }
+
+    /** New text; an exact query stays exact only while its text is unchanged (not retyped). */
     public QuoteQuery withText(String newText) {
-        return new QuoteQuery(newText, fields);
+        String trimmed = newText == null ? "" : newText.trim();
+        return new QuoteQuery(trimmed, fields, exact && trimmed.equals(text));
     }
 
     /** Same text, scoped to {@code field}, or to all four fields when null (the search filter). */
@@ -77,15 +97,15 @@ public final class QuoteQuery {
     }
 
     public boolean isActive() {
-        return text.length() >= MIN_LENGTH;
+        return exact ? !Hashtag.stripHash(text).isEmpty() : text.length() >= MIN_LENGTH;
     }
 
     public boolean matches(Quote quote) {
         if (!isActive()) return false;
-        return (fields.contains(Field.QUOTE_TEXT) && contains(quote.getQuoteText()))
-                || (fields.contains(Field.AUTHOR) && contains(quote.getAuthor()))
-                || (fields.contains(Field.SOURCE) && contains(quote.getSource()))
-                || (fields.contains(Field.CATEGORY) && contains(quote.getCategory()));
+        return (fields.contains(Field.QUOTE_TEXT) && matchesValue(quote.getQuoteText()))
+                || (fields.contains(Field.AUTHOR) && matchesValue(quote.getAuthor()))
+                || (fields.contains(Field.SOURCE) && matchesValue(quote.getSource()))
+                || (fields.contains(Field.HASHTAGS) && matchesTags(quote.getTags()));
     }
 
     /**
@@ -100,6 +120,19 @@ public final class QuoteQuery {
         }
         results.sort(Quote.NEWEST_FIRST);
         return results;
+    }
+
+    /**
+     * The result line for {@code quote}: its tag line when the match is on a tag and not in the
+     * quote text, otherwise an excerpt of the quote text ({@link #snippet(String)}).
+     */
+    public String snippet(Quote quote) {
+        String quoteText = quote.getQuoteText();
+        boolean inText = fields.contains(Field.QUOTE_TEXT) && isActive() && matchesValue(quoteText);
+        if (!inText && fields.contains(Field.HASHTAGS) && isActive() && matchesTags(quote.getTags())) {
+            return Hashtag.line(quote.getTags());
+        }
+        return snippet(quoteText);
     }
 
     /** Excerpt of {@code quoteText} around the first match, with ellipses where cut. */
@@ -119,8 +152,19 @@ public final class QuoteQuery {
         return snippet;
     }
 
-    private boolean contains(@Nullable String value) {
-        return value != null && value.toLowerCase().contains(text.toLowerCase());
+    private boolean matchesValue(@Nullable String value) {
+        if (value == null) return false;
+        return exact ? value.equalsIgnoreCase(text) : value.toLowerCase().contains(text.toLowerCase());
+    }
+
+    private boolean matchesTags(List<String> tags) {
+        String needle = Hashtag.stripHash(text);
+        if (needle.isEmpty()) return false;
+        String key = Hashtag.key(needle);
+        for (String tag : tags) {
+            if (exact ? tag.equalsIgnoreCase(needle) : Hashtag.key(tag).contains(key)) return true;
+        }
+        return false;
     }
 
     /** The one way to open SearchActivity for a query. */
@@ -147,6 +191,7 @@ public final class QuoteQuery {
         ArrayList<String> names = new ArrayList<>();
         for (Field f : fields) names.add(f.name());
         bundle.putStringArrayList(EXTRA_FIELDS, names);
+        bundle.putBoolean(EXTRA_EXACT, exact);
         return bundle;
     }
 
@@ -166,7 +211,7 @@ public final class QuoteQuery {
                 // unknown field name: skip
             }
         }
-        return new QuoteQuery(text, fields);
+        return new QuoteQuery(text, fields, bundle.getBoolean(EXTRA_EXACT, false));
     }
 
     @Override
@@ -174,11 +219,11 @@ public final class QuoteQuery {
         if (this == o) return true;
         if (!(o instanceof QuoteQuery)) return false;
         QuoteQuery other = (QuoteQuery) o;
-        return text.equals(other.text) && fields.equals(other.fields);
+        return text.equals(other.text) && fields.equals(other.fields) && exact == other.exact;
     }
 
     @Override
     public int hashCode() {
-        return 31 * text.hashCode() + fields.hashCode();
+        return 31 * (31 * text.hashCode() + fields.hashCode()) + (exact ? 1 : 0);
     }
 }

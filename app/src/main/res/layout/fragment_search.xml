@@ -16,7 +16,7 @@
         android:paddingEnd="16dp">
 
         <!-- Search input: the filter icon picks the searched field (all or one); the label
-             names it. For author, source and category the field suggests existing values. -->
+             names it. For author, source and hashtags the field suggests existing values. -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/searchInputLayout"
             android:layout_width="match_parent"

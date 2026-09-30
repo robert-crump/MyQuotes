@@ -87,10 +87,8 @@ public class FavoritesFragment extends Fragment {
             }
 
             @Override
-            public void onCategoryClick(Quote quote) {
-                if (quote != null && !quote.getCategory().isEmpty()) {
-                    host.showSearch(QuoteQuery.forField(QuoteQuery.Field.CATEGORY, quote.getCategory()));
-                }
+            public void onTagClick(Quote quote, String tag) {
+                if (quote != null) host.showSearch(QuoteQuery.forTag(tag));
             }
 
             @Override

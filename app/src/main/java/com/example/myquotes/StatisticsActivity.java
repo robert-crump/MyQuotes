@@ -16,13 +16,13 @@ public class StatisticsActivity extends AppCompatActivity {
 
     private TextView textTotalQuotes;
     private TextView textFavorites;
-    private TextView textNoCategory;
+    private TextView textNoHashtags;
     private TextView textUnknownAdded;
     private MonthlyBarChartView chartAddedPerMonth;
 
     private final StatItemAdapter authorAdapter = new StatItemAdapter(QuoteQuery.Field.AUTHOR);
     private final StatItemAdapter sourceAdapter = new StatItemAdapter(QuoteQuery.Field.SOURCE);
-    private final StatItemAdapter categoryAdapter = new StatItemAdapter(QuoteQuery.Field.CATEGORY);
+    private final StatItemAdapter hashtagAdapter = new StatItemAdapter(QuoteQuery.Field.HASHTAGS);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,13 +51,13 @@ public class StatisticsActivity extends AppCompatActivity {
     private void setupViews() {
         textTotalQuotes = findViewById(R.id.text_total_quotes);
         textFavorites = findViewById(R.id.text_favorites);
-        textNoCategory = findViewById(R.id.text_no_category);
+        textNoHashtags = findViewById(R.id.text_no_hashtags);
         textUnknownAdded = findViewById(R.id.text_unknown_added);
         chartAddedPerMonth = findViewById(R.id.chart_added_per_month);
 
         bindList(R.id.recycler_top_authors, authorAdapter);
         bindList(R.id.recycler_top_sources, sourceAdapter);
-        bindList(R.id.recycler_categories, categoryAdapter);
+        bindList(R.id.recycler_hashtags, hashtagAdapter);
     }
 
     private void bindList(int recyclerId, StatItemAdapter adapter) {
@@ -74,10 +74,10 @@ public class StatisticsActivity extends AppCompatActivity {
         }
         textTotalQuotes.setText("Total Quotes: " + stats.total);
         textFavorites.setText("Favorites: " + stats.favoriteCount);
-        textNoCategory.setText("Without category: " + stats.withoutCategoryCount);
+        textNoHashtags.setText("Without hashtags: " + stats.withoutHashtagsCount);
         authorAdapter.setItems(stats.topAuthors);
         sourceAdapter.setItems(stats.topSources);
-        categoryAdapter.setItems(stats.categories);
+        hashtagAdapter.setItems(stats.hashtags);
         chartAddedPerMonth.setMonths(stats.addedPerMonth);
         textUnknownAdded.setVisibility(stats.unknownAddedCount > 0 ? View.VISIBLE : View.GONE);
         textUnknownAdded.setText(stats.unknownAddedCount

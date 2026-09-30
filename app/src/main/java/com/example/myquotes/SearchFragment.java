@@ -32,7 +32,8 @@ import java.util.List;
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
  * SearchActivity. Holds one {@link QuoteQuery}; a tapped result opens in a {@link QuoteDialogFragment}.
  * The filter icon in the search field picks what the text searches: all fields or one; for
- * author, source and category the field suggests existing values.
+ * author, source and hashtags the field suggests existing values. A tapped hashtag arrives as an
+ * exact query ({@link QuoteQuery#forTag}) showing {@code #Tag}; retyping makes it a typed one.
  */
 public class SearchFragment extends Fragment
         implements SearchResultsAdapter.OnQuoteClickListener, QuoteDialogFragment.Host {
@@ -42,11 +43,11 @@ public class SearchFragment extends Fragment
     /** Filter dialog entries; null is "all fields". */
     private static final QuoteQuery.Field[] FILTERS = {
             null, QuoteQuery.Field.QUOTE_TEXT, QuoteQuery.Field.AUTHOR,
-            QuoteQuery.Field.SOURCE, QuoteQuery.Field.CATEGORY};
-    private static final String[] FILTER_LABELS = {"All fields", "Quote", "Author", "Source", "Category"};
+            QuoteQuery.Field.SOURCE, QuoteQuery.Field.HASHTAGS};
+    private static final String[] FILTER_LABELS = {"All fields", "Quote", "Author", "Source", "Hashtags"};
     private static final String[] FILTER_HINTS = {
             "Search all fields", "Search in quote text", "Search in authors",
-            "Search in sources", "Search in categories"};
+            "Search in sources", "Search in hashtags"};
 
     private TextInputLayout searchInputLayout;
     private MaterialAutoCompleteTextView searchEditText;
@@ -72,7 +73,7 @@ public class SearchFragment extends Fragment
                 ? QuoteQuery.fromBundle(savedInstanceState.getBundle(STATE_QUERY))
                 : QuoteQuery.fromBundle(getArguments());
         // The filter is all fields or exactly one; older multi-field states widen to all.
-        if (restored != null) query = restored.scopedTo(restored.singleField());
+        if (restored != null) query = restored.singleField() != null ? restored : restored.scopedTo(null);
     }
 
     @Nullable
@@ -124,7 +125,7 @@ public class SearchFragment extends Fragment
         searchInputLayout = null;
     }
 
-    /** Replaces the current query (text and filter), as an author/source/category tap does. */
+    /** Replaces the current query (text and filter), as an author/source/hashtag tap does. */
     @Override
     public void applyQuery(QuoteQuery newQuery) {
         query = newQuery;

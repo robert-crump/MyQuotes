@@ -28,7 +28,7 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Hosts SearchFragment when Search is pushed from Statistics / Categories -->
+    <!-- Hosts SearchFragment when Search is pushed from Statistics / Hashtags -->
     <FrameLayout
         android:id="@+id/search_container"
         android:layout_width="match_parent"

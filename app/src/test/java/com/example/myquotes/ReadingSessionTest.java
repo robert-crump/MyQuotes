@@ -104,7 +104,7 @@ public class ReadingSessionTest {
         seed(5);
         List<Integer> before = deckIds();
 
-        collection.edit(before.get(2), "new author", "new text", "s", "c");
+        collection.edit(before.get(2), "new author", "new text", "s", java.util.Collections.singletonList("c"));
 
         assertEquals(before, deckIds());
         assertEquals("new author", session.getDeck().getValue().get(2).getAuthor());

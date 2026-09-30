@@ -16,9 +16,9 @@ import java.util.List;
 
 public class QuoteStatisticsTest {
 
-    private static Quote q(String author, String source, String category, boolean fav) {
+    private static Quote q(String author, String source, String tags, boolean fav) {
         Quote quote = new Quote(1, author, "text", source);
-        quote.setCategory(category);
+        quote.setTags(tags.isEmpty() ? Collections.emptyList() : Arrays.asList(tags.split(" ")));
         quote.setFavorite(fav);
         return quote;
     }
@@ -37,19 +37,28 @@ public class QuoteStatisticsTest {
         assertEquals(2, s.favoriteCount);
         assertEquals(Arrays.asList("A:2", "B:1"), names(s.topAuthors));
         assertEquals(Arrays.asList("S1:2", "S2:1"), names(s.topSources));
-        assertEquals(Arrays.asList("Life:2", "Work:1"), names(s.categories));
+        assertEquals(Arrays.asList("Life:2", "Work:1"), names(s.hashtags));
     }
 
     @Test
-    public void topListsLimitedToTen_categoriesNot() {
+    public void everyTagOfAQuoteIsCountedOnceRankedByCountThenName() {
+        QuoteStatistics s = QuoteStatistics.of(Arrays.asList(
+                q("A", "", "Life Wisdom", false), q("B", "", "Wisdom Zen", false),
+                q("C", "", "Art Life Wisdom", false), q("D", "", "", false)));
+        assertEquals(Arrays.asList("Wisdom:3", "Life:2", "Art:1", "Zen:1"), names(s.hashtags));
+        assertEquals(1, s.withoutHashtagsCount);
+    }
+
+    @Test
+    public void topListsLimitedToTen_hashtagsNot() {
         List<Quote> quotes = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
-            quotes.add(q("author" + i, "src" + i, "cat" + i, false));
+            quotes.add(q("author" + i, "src" + i, "tag" + i, false));
         }
         QuoteStatistics s = QuoteStatistics.of(quotes);
         assertEquals(10, s.topAuthors.size());
         assertEquals(10, s.topSources.size());
-        assertEquals(12, s.categories.size());
+        assertEquals(12, s.hashtags.size());
     }
 
     @Test
@@ -59,10 +68,10 @@ public class QuoteStatisticsTest {
     }
 
     @Test
-    public void emptyCategoryCountedAsWithoutCategory() {
+    public void quoteWithoutTagsCountedAsWithoutHashtags() {
         QuoteStatistics s = QuoteStatistics.of(Arrays.asList(q("A", "", "", false), q("B", "", "X", false)));
-        assertEquals(1, s.withoutCategoryCount);
-        assertEquals(Collections.singletonList("X:1"), names(s.categories));
+        assertEquals(1, s.withoutHashtagsCount);
+        assertEquals(Collections.singletonList("X:1"), names(s.hashtags));
     }
 
     @Test
@@ -77,8 +86,8 @@ public class QuoteStatisticsTest {
         QuoteStatistics s = QuoteStatistics.of(Collections.emptyList());
         assertEquals(0, s.total);
         assertEquals(0, s.favoriteCount);
-        assertEquals(0, s.withoutCategoryCount);
-        assertTrue(s.topAuthors.isEmpty() && s.topSources.isEmpty() && s.categories.isEmpty());
+        assertEquals(0, s.withoutHashtagsCount);
+        assertTrue(s.topAuthors.isEmpty() && s.topSources.isEmpty() && s.hashtags.isEmpty());
     }
 
     private static final ZoneId ZONE = ZoneOffset.UTC;

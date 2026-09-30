@@ -16,7 +16,7 @@ import androidx.fragment.app.DialogFragment;
 /**
  * A search result opened in place: the quote card over the dimmed screen, closed by its X, Back
  * or a tap outside the card. The card is live: it follows the Quote Collection (favorite, edits)
- * and closes when the quote is deleted. An author/source/category tap closes it and hands that
+ * and closes when the quote is deleted. An author/source/hashtag tap closes it and hands that
  * query to the {@link Host} (the parent fragment). Opening a quote here is not a view: it
  * doesn't bump {@code timesShown}/{@code lastShown}.
  */
@@ -24,7 +24,7 @@ public class QuoteDialogFragment extends DialogFragment implements QuoteCard.Lis
     public static final String TAG = "QuoteDialogFragment";
     private static final String ARG_QUOTE_ID = "quote_id";
 
-    /** Runs the query of a tapped author, source or category. */
+    /** Runs the query of a tapped author, source or hashtag. */
     public interface Host {
         void applyQuery(QuoteQuery query);
     }
@@ -119,8 +119,9 @@ public class QuoteDialogFragment extends DialogFragment implements QuoteCard.Lis
     }
 
     @Override
-    public void onCategoryClick(Quote quote) {
-        showField(QuoteQuery.Field.CATEGORY, quote.getCategory());
+    public void onTagClick(Quote quote, String tag) {
+        ((Host) requireParentFragment()).applyQuery(QuoteQuery.forTag(tag));
+        dismiss();
     }
 
     @Override

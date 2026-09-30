@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One tag on the Hashtags screen: #Tag with its quote count below. Laid out in a wrapping flow
+     (FlexboxLayoutManager). Tap opens the tag's quotes; long-press starts selection
+     (HashtagsActivity). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    android:minHeight="48dp"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="@drawable/hashtag_item_background"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/hashtag_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+        android:textColor="?attr/colorPrimary"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/hashtag_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?android:attr/textColorSecondary" />
+
+</LinearLayout>

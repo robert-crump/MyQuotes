@@ -6,6 +6,7 @@ import java.util.List;
 class InMemoryQuoteStore implements QuoteStore {
     List<Quote> saved;
     int saveCount = 0;
+    boolean oldFormat = false;
 
     InMemoryQuoteStore() {
     }
@@ -23,10 +24,16 @@ class InMemoryQuoteStore implements QuoteStore {
     public void save(List<Quote> quotes) {
         saved = new ArrayList<>(quotes);
         saveCount++;
+        oldFormat = false;
     }
 
     @Override
     public boolean hasStoredQuotes() {
         return saved != null;
+    }
+
+    @Override
+    public boolean isOldFormat() {
+        return oldFormat;
     }
 }

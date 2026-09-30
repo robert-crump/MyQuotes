@@ -6,7 +6,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class QuoteCollection {
@@ -22,11 +25,17 @@ public class QuoteCollection {
     // ========== BOOTSTRAP ==========
 
     // Loads the stored quotes into the collection. Called once from MyApplication.onCreate.
+    // Trims fields and unifies tag spellings; saves once if that changed anything or the store
+    // held an older format (e.g. categories from before #49).
     public void loadFromStore() {
         List<Quote> stored = store.load();
-        if (!stored.isEmpty()) {
-            liveQuoteList.setValue(stored);
-            trimFields();
+        if (stored.isEmpty()) return;
+        boolean changed = trim(stored);
+        changed |= unifyTagSpellings(stored);
+        liveQuoteList.setValue(stored);
+        if (changed || store.isOldFormat()) {
+            save(stored);
+            Log.d(TAG, "Saved the loaded quotes in the current format");
         }
     }
 
@@ -46,6 +55,7 @@ public class QuoteCollection {
         List<Quote> current = getCurrentList();
         int maxId = current.stream().mapToInt(Quote::getId).max().orElse(0);
         quote.setId(maxId + 1);
+        quote.setTags(canonicalTags(quote.getTags(), current, null));
         quote.setAddedAt(System.currentTimeMillis());
         List<Quote> updated = new ArrayList<>(current);
         updated.add(quote);
@@ -75,14 +85,14 @@ public class QuoteCollection {
     }
 
     // Replaces the editable fields, keeping favorite, view state and addedAt.
-    public void edit(int id, String author, String text, String source, String category) {
+    public void edit(int id, String author, String text, String source, Collection<String> tags) {
         Quote stored = findById(id);
         if (stored == null) {
             Log.w(TAG, "Quote with ID " + id + " not found");
             return;
         }
         Quote edited = new Quote(id, author, text, source);
-        edited.setCategory(category);
+        edited.setTags(canonicalTags(Hashtag.normalizeAll(tags), getCurrentList(), id));
         edited.setFavorite(stored.isFavorite());
         edited.setFavoritedAt(stored.getFavoritedAt());
         edited.setTimesShown(stored.getTimesShown());
@@ -91,21 +101,27 @@ public class QuoteCollection {
         update(edited);
     }
 
-    // Rewrites the category on every quote that has `oldName`; `newName` may be empty (none).
-    // One emission and one save regardless of how many quotes match. Returns the match count.
-    public int replaceCategory(String oldName, String newName) {
+    // Renames tag `oldTag` (compared ignoring case) on every quote, or removes it when `newTag`
+    // is null or empty. Renaming to a tag that already exists merges: a quote holding both ends
+    // up with it once. One emission and one save regardless of how many quotes match. Returns
+    // the match count.
+    public int replaceTag(String oldTag, String newTag) {
         List<Quote> updated = getCurrentList();
+        String replacement = newTag == null ? "" : Hashtag.normalize(newTag);
         int count = 0;
         for (Quote quote : updated) {
-            if (oldName.equals(quote.getCategory())) {
-                quote.setCategory(newName);
-                count++;
-            }
+            List<String> tags = new ArrayList<>(quote.getTags());
+            int index = Hashtag.indexOf(tags, oldTag);
+            if (index < 0) continue;
+            tags.remove(index);
+            if (!replacement.isEmpty()) tags.add(replacement);
+            quote.setTags(tags);
+            count++;
         }
         if (count > 0) {
             liveQuoteList.setValue(updated);
             save(updated);
-            Log.d(TAG, "Replaced category on " + count + " quotes");
+            Log.d(TAG, "Replaced tag on " + count + " quotes");
         }
         return count;
     }
@@ -123,6 +139,7 @@ public class QuoteCollection {
 
     public void setList(List<Quote> quotes) {
         if (quotes == null) quotes = new ArrayList<>();
+        unifyTagSpellings(quotes);
         liveQuoteList.setValue(quotes);
         save(quotes);
         Log.d(TAG, "Set quote list: " + quotes.size() + " quotes");
@@ -173,32 +190,55 @@ public class QuoteCollection {
         return quote.isFavorite();
     }
 
-    public void trimFields() {
-        List<Quote> quotes = liveQuoteList.getValue();
-        if (quotes == null || quotes.isEmpty()) return;
+    // Trims author and source; returns whether anything changed.
+    private static boolean trim(List<Quote> quotes) {
         boolean changed = false;
         for (Quote quote : quotes) {
             String author = quote.getAuthor();
             String source = quote.getSource();
-            String category = quote.getCategory();
-            if (author != null && !author.equals(author.trim())) {
+            if (!author.equals(author.trim())) {
                 quote.setAuthor(author.trim());
                 changed = true;
             }
-            if (source != null && !source.equals(source.trim())) {
+            if (!source.equals(source.trim())) {
                 quote.setSource(source.trim());
                 changed = true;
             }
-            if (category != null && !category.equals(category.trim())) {
-                quote.setCategory(category.trim());
+        }
+        return changed;
+    }
+
+    // Gives every tag the spelling it first has in the list, so "love" and "Love" never
+    // coexist (old categories, imported files). Returns whether anything changed.
+    private static boolean unifyTagSpellings(List<Quote> quotes) {
+        Map<String, String> spelling = new HashMap<>();
+        boolean changed = false;
+        for (Quote quote : quotes) {
+            List<String> tags = new ArrayList<>();
+            boolean respelled = false;
+            for (String tag : quote.getTags()) {
+                String canonical = spelling.computeIfAbsent(Hashtag.key(tag), k -> tag);
+                tags.add(canonical);
+                respelled |= !canonical.equals(tag);
+            }
+            if (respelled) {
+                quote.setTags(tags);
                 changed = true;
             }
         }
-        if (changed) {
-            liveQuoteList.setValue(quotes);
-            save(quotes);
-            Log.d(TAG, "Trimmed trailing spaces from quote fields");
+        return changed;
+    }
+
+    // `tags` with the spelling each already has on another quote in `quotes` (not `exceptId`).
+    private static List<String> canonicalTags(List<String> tags, List<Quote> quotes, Integer exceptId) {
+        Map<String, String> spelling = new HashMap<>();
+        for (Quote quote : quotes) {
+            if (exceptId != null && exceptId.equals(quote.getId())) continue;
+            for (String tag : quote.getTags()) spelling.putIfAbsent(Hashtag.key(tag), tag);
         }
+        List<String> result = new ArrayList<>();
+        for (String tag : tags) result.add(spelling.getOrDefault(Hashtag.key(tag), tag));
+        return result;
     }
 
     // ========== HELPERS ==========

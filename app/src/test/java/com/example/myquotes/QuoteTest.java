@@ -15,7 +15,7 @@ public class QuoteTest {
         assertEquals("Seneca", q.getAuthor());
         assertEquals("Text", q.getQuoteText());
         assertEquals("Letters", q.getSource());
-        assertEquals("", q.getCategory());
+        assertTrue(q.getTags().isEmpty());
         assertFalse(q.isFavorite());
         assertEquals(0, q.getTimesShown());
     }
@@ -23,11 +23,18 @@ public class QuoteTest {
     @Test
     public void nullFieldsReadBackAsEmptyStrings() {
         Quote q = new Quote(1, null, null, null);
-        q.setCategory(null);
+        q.setTags(null);
         assertEquals("", q.getAuthor());
         assertEquals("", q.getQuoteText());
         assertEquals("", q.getSource());
-        assertEquals("", q.getCategory());
+        assertTrue(q.getTags().isEmpty());
+    }
+
+    @Test
+    public void tagsAreNormalizedDeduplicatedIgnoringCaseAndSorted() {
+        Quote q = new Quote(1, "a", "t", "s");
+        q.setTags(java.util.Arrays.asList("#zen", "Love", "love", "", "art history", "Ärger"));
+        assertEquals(java.util.Arrays.asList("arthistory", "Love", "zen", "Ärger"), q.getTags());
     }
 
     @Test

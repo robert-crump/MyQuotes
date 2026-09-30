@@ -50,8 +50,8 @@
             android:exported="false" />
 
         <activity
-            android:name=".CategoriesActivity"
-            android:label="Categories"
+            android:name=".HashtagsActivity"
+            android:label="Hashtags"
             android:theme="@style/Theme.MyQuotes.NoActionBar"
             android:parentActivityName=".SettingsActivity" />
 
