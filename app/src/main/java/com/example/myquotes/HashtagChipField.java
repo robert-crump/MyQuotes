@@ -40,6 +40,7 @@ final class HashtagChipField {
     private final List<String> tags = new ArrayList<>();
     private boolean rewriting;
     private Chip highlighted;
+    private Runnable onTagsChanged;
 
     HashtagChipField(View root, LifecycleOwner owner, QuoteCollection collection, Hashtags hashtags) {
         context = root.getContext();
@@ -109,6 +110,16 @@ final class HashtagChipField {
         tags.addAll(Hashtag.normalizeAll(newTags));
         setInputText("");
         render();
+    }
+
+    /** Runs after every change to the chips. */
+    void setOnTagsChangedListener(Runnable listener) {
+        onTagsChanged = listener;
+    }
+
+    /** Adds {@code tag} as a chip (a suggestion tap); ignored if the quote already has it. */
+    void addTag(String tag) {
+        add(tag);
     }
 
     /** The committed chips (alphabetical). */
@@ -204,6 +215,7 @@ final class HashtagChipField {
             group.addView(chip, i);
         }
         adapter.setExcludedTags(tags);
+        if (onTagsChanged != null) onTagsChanged.run();
     }
 
     /** Highlights {@code chip} as the next Backspace's target; null clears the highlight. */

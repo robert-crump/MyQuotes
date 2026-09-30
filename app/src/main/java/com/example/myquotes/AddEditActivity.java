@@ -41,6 +41,7 @@ public class AddEditActivity extends AppCompatActivity {
     private static final String STATE_TAGS = "hashtags";
 
     private HashtagChipField hashtagField;
+    private HashtagSuggestionRow hashtagSuggestions;
     private QuoteCollection quoteCollection;
     private SuggestionProvider suggestionProvider;
     private ListPopupWindow authorPopup;
@@ -61,6 +62,8 @@ public class AddEditActivity extends AppCompatActivity {
         setupViewModel();
         setupViews();
         handleIntent();
+        hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
+                quoteCollection, quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
         if (savedInstanceState != null) {
             List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
             if (tags != null) hashtagField.setTags(tags);
@@ -358,6 +361,12 @@ public class AddEditActivity extends AppCompatActivity {
         quote.setSource(editTextSource.getText().toString().trim());
         quote.setTags(hashtagField.tagsWithPending());
         return quote;
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (hashtagSuggestions != null) hashtagSuggestions.release();
+        super.onDestroy();
     }
 
     @Override
