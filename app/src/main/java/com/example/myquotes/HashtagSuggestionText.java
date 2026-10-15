@@ -5,9 +5,9 @@ import java.util.List;
 
 /**
  * Words for the why behind hashtag suggestions (#51, #52), from {@link HashtagSuggester}'s
- * evidence. Pure. Evidence is shown as counts, "(6/9 quotes)": 6 of the 9 quotes containing the
- * word (or by the author) carry the tag. The first count in a list names the unit, the rest are
- * bare "(4/7)".
+ * evidence. Pure. Evidence is shown as counts, "(6/9)": 6 of the 9 quotes containing the word (or
+ * by the author) carry the tag. In the Add/Edit dialog the first count of a line names the unit,
+ * "(6/9 quotes)"; the hashtag sheet's lists are bare.
  */
 final class HashtagSuggestionText {
     /** The top of the "Why these hashtags" dialog. */
@@ -52,19 +52,18 @@ final class HashtagSuggestionText {
         if (profile.words.isEmpty()) {
             lines.add("Words: No word is strong enough yet to serve as a predictor for this hashtag.");
         } else {
-            lines.add("Words: This hashtag is suggested for quotes containing "
-                    + list(profile.words, "quotes") + ".");
+            lines.add("Words: " + list(profile.words) + ".");
         }
         if (!profile.authors.isEmpty()) {
-            lines.add("Author: " + list(profile.authors, null) + ".");
+            lines.add("Author: " + list(profile.authors) + ".");
         }
         return lines;
     }
 
-    /** "gratitude (6/9 quotes), grateful (4/7)": {@code firstUnit} (may be null) on the first only. */
-    private static String list(List<HashtagSuggester.Evidence> evidence, String firstUnit) {
+    /** "gratitude (6/9), grateful (4/7)". */
+    private static String list(List<HashtagSuggester.Evidence> evidence) {
         List<String> parts = new ArrayList<>();
-        for (HashtagSuggester.Evidence e : evidence) parts.add(evidence(e, parts.isEmpty() ? firstUnit : null));
+        for (HashtagSuggester.Evidence e : evidence) parts.add(evidence(e, null));
         return String.join(", ", parts);
     }
 

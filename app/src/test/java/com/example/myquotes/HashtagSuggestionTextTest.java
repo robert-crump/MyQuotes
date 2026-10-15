@@ -41,7 +41,7 @@ public class HashtagSuggestionTextTest {
                 Arrays.asList(evidence("gratitude", 6, 9), evidence("grateful", 4, 7)),
                 Arrays.asList(evidence("Rumi", 4, 5), evidence("Seneca", 3, 4)));
         assertEquals(Arrays.asList(
-                        "Words: This hashtag is suggested for quotes containing gratitude (6/9 quotes), grateful (4/7).",
+                        "Words: gratitude (6/9), grateful (4/7).",
                         "Author: Rumi (4/5), Seneca (3/4)."),
                 HashtagSuggestionText.suggestions(profile));
     }
