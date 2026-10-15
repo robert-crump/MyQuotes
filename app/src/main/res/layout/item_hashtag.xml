@@ -9,8 +9,8 @@
     android:minHeight="48dp"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:paddingStart="14dp"
-    android:paddingEnd="14dp"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
     android:paddingTop="8dp"
     android:paddingBottom="8dp"
     android:background="@drawable/hashtag_item_background"
@@ -22,7 +22,7 @@
         android:id="@+id/hashtag_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
         android:textColor="?attr/colorPrimary"
         android:textStyle="bold" />
 
