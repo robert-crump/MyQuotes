@@ -87,6 +87,16 @@ public class Hashtags {
         collection.replaceTag(tag, null);
     }
 
+    // The tags by quote count, highest first; equal counts alphabetical.
+    static List<String> byCount(Map<String, Integer> counts) {
+        List<String> tags = new ArrayList<>(counts.keySet());
+        tags.sort((a, b) -> {
+            int byCount = Integer.compare(counts.get(b), counts.get(a));
+            return byCount != 0 ? byCount : Hashtag.ORDER.compare(a, b);
+        });
+        return tags;
+    }
+
     // Alphabetical tag → quote count. Quote tags are already deduplicated ignoring case and
     // the collection keeps one spelling per tag.
     static Map<String, Integer> counts(List<Quote> quotes) {

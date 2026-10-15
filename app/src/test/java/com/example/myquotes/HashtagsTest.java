@@ -123,4 +123,14 @@ public class HashtagsTest {
         collection.add(quote(0, "B"));
         assertEquals(Arrays.asList("A", "B"), seen.get(seen.size() - 1));
     }
+
+    @Test
+    public void byCountSortsHighestFirstThenAlphabetically() {
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put("Love", 3);
+        counts.put("art", 5);
+        counts.put("Zen", 3);
+        counts.put("ai", 1);
+        assertEquals(Arrays.asList("art", "Love", "Zen", "ai"), Hashtags.byCount(counts));
+    }
 }

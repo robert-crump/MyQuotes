@@ -1,5 +1,6 @@
 package com.example.myquotes;
 
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputFilter;
@@ -21,10 +22,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.myquotes.databinding.ActivityHashtagsBinding;
 import com.google.android.flexbox.FlexWrap;
 import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -32,10 +35,13 @@ import java.util.Set;
  * that opens the untagged quotes. A tap opens the tag's {@link HashtagSheet} (its quotes, rename,
  * delete, how it is suggested); long-press starts multi-selection with a contextual bar: rename
  * (exactly one; merging into an existing tag asks first) and delete (removes the tags from their
- * quotes, never the quotes). There is no Add action: a tag exists while a quote has it.
+ * quotes, never the quotes). There is no Add action: a tag exists while a quote has it. The
+ * sort button orders the tags A-Z or by highest count (remembered in {@code UiPrefs}).
  */
 public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.Host {
     private static final String STATE_SELECTED = "selected_hashtags";
+    private static final String KEY_SORT_BY_COUNT = "hashtags_sort_by_count";
+    private static final String[] SORT_LABELS = {"A-Z", "Highest count"};
 
     private ActivityHashtagsBinding binding;
     private Hashtags hashtags;
@@ -50,6 +56,7 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
     };
     // Selection saved across recreation, applied once the first Hashtag set arrives.
     private ArrayList<String> pendingSelection;
+    private boolean sortByCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,14 +102,38 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
         if (savedInstanceState != null) {
             pendingSelection = savedInstanceState.getStringArrayList(STATE_SELECTED);
         }
+        sortByCount = uiPrefs().getBoolean(KEY_SORT_BY_COUNT, false);
         hashtags.getHashtags().observe(this, tags -> {
-            adapter.submit(tags, hashtags.quoteCounts(), hashtags.untaggedCount());
+            submitSorted();
             binding.hashtagsEmpty.setVisibility(tags.isEmpty() ? View.VISIBLE : View.GONE);
             if (pendingSelection != null) {
                 adapter.setSelected(pendingSelection);
                 pendingSelection = null;
             }
         });
+    }
+
+    private void submitSorted() {
+        Map<String, Integer> counts = hashtags.quoteCounts();
+        List<String> tags = sortByCount ? Hashtags.byCount(counts) : hashtags.all();
+        adapter.submit(tags, counts, hashtags.untaggedCount());
+    }
+
+    private SharedPreferences uiPrefs() {
+        return getSharedPreferences(SwipeHint.PREFS_NAME, MODE_PRIVATE);
+    }
+
+    private void showSortDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Sort hashtags")
+                .setSingleChoiceItems(SORT_LABELS, sortByCount ? 1 : 0, (dialog, which) -> {
+                    dialog.dismiss();
+                    sortByCount = which == 1;
+                    uiPrefs().edit().putBoolean(KEY_SORT_BY_COUNT, sortByCount).apply();
+                    submitSorted();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override
@@ -135,9 +166,8 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        if (!adapter.getSelected().isEmpty()) {
-            getMenuInflater().inflate(R.menu.menu_hashtag_selection, menu);
-        }
+        getMenuInflater().inflate(adapter.getSelected().isEmpty()
+                ? R.menu.menu_hashtags : R.menu.menu_hashtag_selection, menu);
         return true;
     }
 
@@ -246,6 +276,9 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
         if (id == android.R.id.home) {
             if (selected.isEmpty()) finish();
             else adapter.clearSelection();
+            return true;
+        } else if (id == R.id.action_sort_hashtags) {
+            showSortDialog();
             return true;
         } else if (id == R.id.action_rename_hashtag && selected.size() == 1) {
             showRenameDialog(selected.iterator().next());
