@@ -53,7 +53,8 @@
             android:layout_marginStart="24dp"
             android:layout_marginEnd="24dp"
             android:text="Suggestions"
-            android:textAppearance="@style/TextAppearance.Material3.TitleSmall" />
+            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+            android:textStyle="bold" />
 
         <!-- "Not suggested yet", or the Words and Author paragraphs (filled by HashtagSheet) -->
         <LinearLayout
