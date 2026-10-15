@@ -21,18 +21,27 @@ public class HashtagSuggesterTest {
         return q;
     }
 
-    // Each author once, so the author token supports nothing.
+    // Each author once, so the author is never a reason.
     private void addTagged(int count, String text, String tag) {
-        for (int i = 0; i < count; i++) add("Author " + tag + i, text, tag);
+        for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tag);
     }
 
-    // Unrelated untagged quotes, so the tags' words are rare in the collection.
+    private void addUntagged(int count, String text) {
+        for (int i = 0; i < count; i++) add("Untagged " + quotes.size(), text);
+    }
+
+    // Unrelated untagged quotes.
     private void addFiller(int count) {
-        for (int i = 0; i < count; i++) add("Filler " + i, "money business office market");
+        addUntagged(count, "money business office market");
     }
 
     private List<String> suggest(String text) {
         return HashtagSuggester.fit(quotes).suggest(text, "Someone New", "", Collections.emptyList());
+    }
+
+    private void addEmerson(int withTag, int without) {
+        for (int i = 0; i < withTag; i++) add("Emerson", "trust thyself " + i, "Nature");
+        for (int i = 0; i < without; i++) add("Emerson", "every wall is a door " + i);
     }
 
     @Test
@@ -46,50 +55,53 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void oneMatchingWordIsNotEnoughButTwoAre() {
+    public void oneQualifyingWordIsEnough() {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
-        assertEquals(Collections.emptyList(), suggest("A walk in the forest."));
-        assertEquals(Collections.singletonList("Nature"), suggest("A forest by the river."));
-        assertEquals(Arrays.asList("forest", "river"),
-                HashtagSuggester.fit(quotes).supportingTokens("A forest by the river.", "", "Nature"));
+        assertEquals(Collections.singletonList("Nature"), suggest("A walk in the forest."));
     }
 
     @Test
-    public void theAuthorAloneIsEnoughAtThreeQuotesAndSixtyPercent() {
-        addTagged(5, "forest river mountain", "Nature");
+    public void aWordNeedsFourQuotesWithTheTag() {
+        addTagged(3, "forest", "Nature");
+        addTagged(2, "river", "Nature");
         addFiller(10);
-        add("Emerson", "trust thyself", "Nature");
-        add("Emerson", "hitch your wagon", "Nature");
-        add("Emerson", "every wall is a door");
-        add("Emerson", "nothing great was achieved");
-        add("Emerson", "to be great is to be misunderstood", "Nature");
-        HashtagSuggester model = HashtagSuggester.fit(quotes);
-        assertEquals(Collections.singletonList("Nature"),
-                model.suggest("gold coin", "  emerson ", "", Collections.emptyList()));
+        assertEquals(Collections.emptyList(), suggest("forest"));
+
+        addTagged(1, "forest", "Nature");
+        assertEquals(Collections.singletonList("Nature"), suggest("forest"));
     }
 
     @Test
-    public void theAuthorAloneIsNotEnoughBelowSixtyPercent() {
-        addTagged(5, "forest river mountain", "Nature");
-        addFiller(10);
-        add("Emerson", "trust thyself", "Nature");
-        add("Emerson", "hitch your wagon", "Nature");
-        add("Emerson", "every wall is a door");
-        add("Emerson", "nothing great was achieved");
-        add("Emerson", "to be great is to be misunderstood");
-        HashtagSuggester model = HashtagSuggester.fit(quotes);
-        assertEquals(Collections.emptyList(), model.suggest("gold coin", "Emerson", "", Collections.emptyList()));
+    public void aWordNeedsHalfOfItsQuotesWithTheTag() {
+        addTagged(5, "forest", "Nature");
+        addUntagged(5, "forest");
+        assertEquals(Collections.singletonList("Nature"), suggest("forest"));
+
+        addUntagged(1, "forest");
+        assertEquals(Collections.emptyList(), suggest("forest"));
     }
 
     @Test
-    public void theAuthorAloneIsNotEnoughBelowThreeQuotes() {
+    public void theAuthorIsAReasonAtTwoQuotesAndHalf() {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
-        add("Emerson", "trust thyself", "Nature");
-        add("Emerson", "hitch your wagon", "Nature");
-        HashtagSuggester model = HashtagSuggester.fit(quotes);
-        assertEquals(Collections.emptyList(), model.suggest("gold coin", "Emerson", "", Collections.emptyList()));
+        addEmerson(2, 2);
+        assertEquals(Collections.singletonList("Nature"), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "  emerson ", "", Collections.emptyList()));
+
+        addEmerson(0, 1);
+        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "Emerson", "", Collections.emptyList()));
+    }
+
+    @Test
+    public void anAuthorWithOneTaggedQuoteIsNoReason() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        addEmerson(1, 0);
+        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "Emerson", "", Collections.emptyList()));
     }
 
     @Test
@@ -104,20 +116,29 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void atMostThreeBestScoreFirst() {
-        // Every word is on its own tag's quotes only, so each supporting word adds the same lift:
-        // Zeta has 5 supporting words, Yota 4, Xeno 3, Wolf 2.
-        addTagged(5, "apple banana cherry damson elder", "Zeta");
-        addTagged(5, "grape guava lemon lime", "Yota");
-        addTagged(5, "mango melon olive", "Xeno");
-        addTagged(5, "peach pear", "Wolf");
-        addFiller(10);
-        String text = "peach pear mango melon olive grape guava lemon lime apple banana cherry damson elder";
-        assertEquals(Arrays.asList("Zeta", "Yota", "Xeno"), suggest(text));
+    public void atMostThreeRankedByTheStrongestReasonsShare() {
+        addTagged(5, "grape", "Yota");                       // grape 5/5
+        addTagged(4, "peach", "Wolf");
+        addTagged(1, "plum", "Wolf");
+        addUntagged(3, "peach");                             // peach 4/7
+        addTagged(5, "apple banana cherry", "Zeta");
+        addUntagged(4, "apple banana cherry");               // each 5/9, three of them
+        addTagged(6, "mango", "Xeno");
+        addUntagged(6, "mango");                             // mango 6/12
+        assertEquals(Arrays.asList("Yota", "Wolf", "Zeta"),
+                suggest("mango apple banana cherry peach grape"));
     }
 
     @Test
-    public void equalScoresAreOrderedByTagName() {
+    public void anEqualShareGoesToTheHigherCount() {
+        addTagged(5, "peach", "Beta");                       // 5/5
+        addTagged(4, "mango", "Alpha");
+        addTagged(1, "plum", "Alpha");                       // 4/4
+        assertEquals(Arrays.asList("Beta", "Alpha"), suggest("mango peach"));
+    }
+
+    @Test
+    public void equalStrengthIsOrderedByTagName() {
         addTagged(5, "peach pear", "Beta");
         addTagged(5, "mango melon", "Alpha");
         addFiller(10);
@@ -133,7 +154,7 @@ public class HashtagSuggesterTest {
 
         addTagged(5, "the and forest", "Nature");
         addFiller(10);
-        assertEquals(Collections.emptyList(), suggest("the and forest"));
+        assertEquals(Collections.emptyList(), suggest("the and"));
     }
 
     @Test
@@ -151,6 +172,7 @@ public class HashtagSuggesterTest {
     @Test
     public void fittingWithoutTheEditedQuoteStopsItsOwnWordsFromVoting() {
         addTagged(5, "forest river mountain", "Nature");
+        addTagged(3, "zebra giraffe", "Nature");
         addFiller(10);
         Quote edited = add("Anon", "zebra giraffe savanna", "Nature");
 
@@ -176,26 +198,35 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void explainGivesSupportingWordsAsWrittenWithCounts() {
+    public void explainGivesReasonWordsAsWrittenStrongestFirst() {
         addTagged(5, "forest river mountain", "Nature");
         add("Someone", "a river of money", "Nature");
+        addUntagged(1, "a forest of money");
         addFiller(10);
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("Forests by the River.", "Nobody", "nature");
+                .explain("Forests by the River, a lake.", "Nobody", "nature");
         assertEquals("Nature", why.tag);
-        // "forests" stems to "forest" (5 of 5); "river" is on 6 of 6. Equal lift: by stem.
-        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("forests", 5, 5),
-                new HashtagSuggester.Evidence("river", 6, 6)), why.words);
+        // "river" 6/6, then "forests" (stem "forest") 5/6; "lake" is on no quote.
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("river", 6, 6),
+                new HashtagSuggester.Evidence("forests", 5, 6)), why.words);
         assertEquals(null, why.author);
     }
 
     @Test
-    public void explainNamesTheAuthorWhenTheAuthorExceptionHolds() {
+    public void explainLeavesOutWeakWords() {
+        addTagged(5, "forest river mountain", "Nature");
+        addTagged(1, "time", "Nature");
+        addUntagged(65, "time");
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
+                .explain("forest time", "", "Nature");
+        assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("forest", 5, 5)), why.words);
+    }
+
+    @Test
+    public void explainNamesTheAuthorWhenTheyAreAReason() {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
-        add("Emerson", "trust thyself", "Nature");
-        add("Emerson", "hitch your wagon", "Nature");
-        add("Emerson", "every wall is a door");
+        addEmerson(2, 1);
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", "Nature");
         assertEquals(Collections.emptyList(), why.words);
         assertEquals(new HashtagSuggester.Evidence("Emerson", 2, 3), why.author);
@@ -208,28 +239,37 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void profileShowsTheStrongestWordsInTheirMostFrequentForm() {
+    public void profileShowsEveryReasonWordInItsMostFrequentForm() {
         addTagged(3, "friendships forever", "Friends");
         addTagged(2, "friendship forever loyal", "Friends");
         add("Someone", "loyal dog", "Friends");
+        add("Other", "loyal cat", "Friends");
+        addUntagged(1, "loyal");
         addFiller(10);
         HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("#friends");
         assertTrue(profile.suggestable);
-        assertEquals(6, profile.quotes);
-        // "dog" is on only 1 of its quotes, so it is left out.
+        assertEquals(7, profile.quotes);
+        // "dog" and "cat" are on 1 quote each, so they are left out.
         assertEquals(Arrays.asList(new HashtagSuggester.Evidence("forever", 5, 5),
                 new HashtagSuggester.Evidence("friendships", 5, 5),
-                new HashtagSuggester.Evidence("loyal", 3, 3)), profile.words);
+                new HashtagSuggester.Evidence("loyal", 4, 5)), profile.words);
         assertEquals(Collections.emptyList(), profile.authors);
     }
 
     @Test
-    public void profileListsAuthorsTheExceptionHoldsFor() {
+    public void profileIsNotCappedAtFiveWords() {
+        addTagged(5, "apple banana cherry damson elder grape guava", "Fruit");
+        assertEquals(7, HashtagSuggester.fit(quotes).profile("Fruit").words.size());
+    }
+
+    @Test
+    public void profileListsEveryAuthorWhoIsAReasonStrongestFirst() {
         addTagged(5, "forest river mountain", "Nature");
-        add("Emerson", "trust thyself", "Nature");
-        add("Emerson", "hitch your wagon", "Nature");
-        add("Emerson", "every wall is a door");
-        assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("Emerson", 2, 3)),
+        addEmerson(2, 1);
+        for (int i = 0; i < 3; i++) add("Thoreau", "walden " + i, "Nature");
+        add("Muir", "the mountains are calling", "Nature");
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("Thoreau", 3, 3),
+                        new HashtagSuggester.Evidence("Emerson", 2, 3)),
                 HashtagSuggester.fit(quotes).profile("Nature").authors);
     }
 

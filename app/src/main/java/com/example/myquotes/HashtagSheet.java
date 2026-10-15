@@ -16,8 +16,8 @@ import java.util.List;
 
 /**
  * One tag's bottom sheet on the Hashtags screen (#51), opened by a tap: Show N quotes (the
- * search with the tag filter), Rename, Delete, and what the suggester learned about the tag (a
- * status line and its strongest words with counts; read-only). Rename and delete are the
+ * search with the tag filter), Rename, Delete, and what the suggester learned about the tag (#52:
+ * every word and author that gets it suggested, with counts; read-only). Rename and delete are the
  * Hashtags screen's own dialogs ({@link Host}); the sheet closes before they open. The model is
  * fitted on the whole collection when the sheet opens.
  */
@@ -74,22 +74,16 @@ public class HashtagSheet extends BottomSheetDialogFragment {
         });
 
         HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile(tag);
-        ((TextView) view.findViewById(R.id.sheet_suggestion_status))
-                .setText(HashtagSuggestionText.status(profile));
-        LinearLayout words = view.findViewById(R.id.sheet_suggestion_words);
-        if (profile.suggestable && profile.words.isEmpty()) {
-            words.addView(line("No word stands out for " + Hashtag.display(tag) + " yet."));
-        }
-        for (HashtagSuggester.Evidence word : profile.words) {
-            words.addView(line(HashtagSuggestionText.word(word, tag)));
-        }
+        LinearLayout suggestions = view.findViewById(R.id.sheet_suggestions);
+        for (String text : HashtagSuggestionText.suggestions(profile)) suggestions.addView(paragraph(text));
     }
 
-    private TextView line(String text) {
-        TextView line = new TextView(requireContext());
-        line.setText(text);
-        line.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
-        line.setPadding(0, 4, 0, 4);
-        return line;
+    private TextView paragraph(String text) {
+        TextView paragraph = new TextView(requireContext());
+        paragraph.setText(text);
+        paragraph.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+        int gap = Math.round(4 * getResources().getDisplayMetrics().density);
+        paragraph.setPadding(0, gap, 0, gap);
+        return paragraph;
     }
 }

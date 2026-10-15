@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
  * leaving out the quote being edited; the row refreshes 300 ms after the text or author last
  * changed, and at once when the quote's tags change. Hidden when nothing qualifies.
  * The info button next to the label, or a long-press on a chip, explains all current
- * suggestions in one dialog (#51): each tag's supporting words and author, with counts.
+ * suggestions in one dialog (#51, #52): how suggesting works, then each tag's reasons with counts.
  */
 final class HashtagSuggestionRow {
     private static final long DEBOUNCE_MILLIS = 300;
@@ -118,22 +118,21 @@ final class HashtagSuggestionRow {
         row.setVisibility(suggestions.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** One dialog explaining every shown suggestion: "#Love" then "heart (6 of 8), ...". */
+    /** One dialog explaining every shown suggestion: the intro, then "#Love" and "heart (6/8 quotes), ...". */
     private void showExplanation() {
         if (model == null || shown.isEmpty()) return;
-        SpannableStringBuilder message = new SpannableStringBuilder();
+        SpannableStringBuilder message = new SpannableStringBuilder(HashtagSuggestionText.INTRO);
         for (String tag : shown) {
             HashtagSuggester.Explanation explanation =
                     model.explain(text.getText().toString(), author.getText().toString(), tag);
             if (explanation == null) continue;
+            message.append("\n\n");
             int start = message.length();
             message.append(Hashtag.display(tag));
             message.setSpan(new StyleSpan(Typeface.BOLD), start, message.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            message.append("\n").append(HashtagSuggestionText.explanation(explanation)).append("\n\n");
+            message.append("\n").append(HashtagSuggestionText.explanation(explanation));
         }
-        message.append("(6 of 8) after a word: of your 8 quotes containing it, 6 have the hashtag. "
-                + "The same for an author.");
         new MaterialAlertDialogBuilder(row.getContext())
                 .setTitle("Why these hashtags")
                 .setMessage(message)

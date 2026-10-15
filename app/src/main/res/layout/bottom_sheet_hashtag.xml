@@ -55,23 +55,13 @@
             android:text="Suggestions"
             android:textAppearance="@style/TextAppearance.Material3.TitleSmall" />
 
-        <TextView
-            android:id="@+id/sheet_suggestion_status"
+        <!-- "Not suggested yet", or the Words and Author paragraphs (filled by HashtagSheet) -->
+        <LinearLayout
+            android:id="@+id/sheet_suggestions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="24dp"
             android:layout_marginTop="4dp"
-            android:layout_marginEnd="24dp"
-            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-            android:textColor="?android:attr/textColorSecondary" />
-
-        <!-- The tag's strongest words, one line each (filled by HashtagSheet) -->
-        <LinearLayout
-            android:id="@+id/sheet_suggestion_words"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
-            android:layout_marginTop="8dp"
             android:layout_marginEnd="24dp"
             android:orientation="vertical" />
 

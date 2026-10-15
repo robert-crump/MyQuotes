@@ -4,50 +4,70 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Words for the why behind hashtag suggestions (#51), from {@link HashtagSuggester}'s evidence.
- * Pure. Evidence is shown as counts ("heart (6 of 8)": 6 of the 8 quotes containing the word
- * carry the tag), never as a percentage: the score only ranks.
+ * Words for the why behind hashtag suggestions (#51, #52), from {@link HashtagSuggester}'s
+ * evidence. Pure. Evidence is shown as counts, "(6/9 quotes)": 6 of the 9 quotes containing the
+ * word (or by the author) carry the tag. The first count in a list names the unit, the rest are
+ * bare "(4/7)".
  */
 final class HashtagSuggestionText {
+    /** The top of the "Why these hashtags" dialog. */
+    static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
+            + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
+            + "suggests hashtags that are often used for the author.";
+
     private HashtagSuggestionText() {
     }
 
-    /** "heart (6 of 8)". */
-    static String evidence(HashtagSuggester.Evidence evidence) {
-        return evidence.label + " (" + evidence.withTag + " of " + evidence.total + ")";
+    /** "heart (6/8)", or with {@code unit}: "heart (6/8 quotes)". */
+    static String evidence(HashtagSuggester.Evidence evidence, String unit) {
+        return evidence.label + " (" + evidence.withTag + "/" + evidence.total
+                + (unit == null ? "" : " " + unit) + ")";
     }
 
-    /** "heart (6 of 8), lieben (3 of 4) · by Rumi (4 of 5)"; the Add/Edit popup's line per tag. */
+    /** "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5)"; the dialog's line per tag. */
     static String explanation(HashtagSuggester.Explanation explanation) {
         List<String> parts = new ArrayList<>();
-        for (HashtagSuggester.Evidence word : explanation.words) parts.add(evidence(word));
+        for (HashtagSuggester.Evidence word : explanation.words) {
+            parts.add(evidence(word, parts.isEmpty() ? "quotes" : null));
+        }
         String line = String.join(", ", parts);
         if (explanation.author != null) {
-            String by = "by " + evidence(explanation.author);
+            String by = "by " + evidence(explanation.author, line.isEmpty() ? "quotes" : null);
             line = line.isEmpty() ? by : line + " · " + by;
         }
         return line;
     }
 
-    /** The sheet's status line: whether and how the tag is suggested. */
-    static String status(HashtagSuggester.TagProfile profile) {
+    /**
+     * The sheet's Suggestions section, one paragraph each: why the tag can't be suggested yet, or
+     * its Words line and (when an author qualifies) its Author line.
+     */
+    static List<String> suggestions(HashtagSuggester.TagProfile profile) {
+        List<String> lines = new ArrayList<>();
         if (!profile.suggestable) {
-            return "Not suggested yet: on " + quotes(profile.quotes) + ", needs "
-                    + HashtagSuggester.MIN_QUOTES_PER_TAG + ".";
+            lines.add("Not suggested yet: on " + quotes(profile.quotes) + ", needs "
+                    + HashtagSuggester.MIN_QUOTES_PER_TAG + ".");
+            return lines;
         }
-        StringBuilder status = new StringBuilder("Suggested when a quote shares at least "
-                + HashtagSuggester.MIN_SUPPORTING_TOKENS + " telling words with its quotes.");
-        for (HashtagSuggester.Evidence author : profile.authors) {
-            status.append("\nSuggested for every quote by ").append(author.label).append(" (")
-                    .append(author.withTag).append(" of ").append(author.total).append(" have it).");
+        if (profile.words.isEmpty()) {
+            lines.add("Words: No word is strong enough yet (needs " + HashtagSuggester.MIN_WORD_WITH_TAG
+                    + " quotes and at least half).");
+        } else {
+            lines.add("Words: This hashtag is suggested for quotes containing "
+                    + list(profile.words, "quotes") + ".");
         }
-        return status.toString();
+        if (!profile.authors.isEmpty()) {
+            lines.add("Author: This hashtag is suggested for quotes by the author(s) "
+                    + list(profile.authors, "quotes have that hashtag") + ".");
+        }
+        return lines;
     }
 
-    /** "6 of 8 quotes with “heart” have #Love"; one line per word in the sheet. */
-    static String word(HashtagSuggester.Evidence word, String tag) {
-        return word.withTag + " of " + quotes(word.total) + " with “" + word.label + "” "
-                + (word.withTag == 1 ? "has " : "have ") + Hashtag.display(tag);
+    /** "gratitude (6/9 quotes), grateful (4/7)": {@code firstUnit} on the first only. */
+    private static String list(List<HashtagSuggester.Evidence> evidence, String firstUnit) {
+        List<String> parts = new ArrayList<>();
+        for (HashtagSuggester.Evidence e : evidence) parts.add(evidence(e, parts.isEmpty() ? firstUnit : null));
+        return String.join(", ", parts);
     }
 
     static String quotes(int count) {
