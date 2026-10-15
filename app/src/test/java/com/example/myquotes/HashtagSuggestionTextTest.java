@@ -42,8 +42,7 @@ public class HashtagSuggestionTextTest {
                 Arrays.asList(evidence("Rumi", 4, 5), evidence("Seneca", 3, 4)));
         assertEquals(Arrays.asList(
                         "Words: This hashtag is suggested for quotes containing gratitude (6/9 quotes), grateful (4/7).",
-                        "Author: This hashtag is suggested for quotes by the author(s) "
-                                + "Rumi (4/5 quotes have that hashtag), Seneca (3/4)."),
+                        "Author: Rumi (4/5), Seneca (3/4)."),
                 HashtagSuggestionText.suggestions(profile));
     }
 
@@ -52,9 +51,7 @@ public class HashtagSuggestionTextTest {
         HashtagSuggester.TagProfile profile = new HashtagSuggester.TagProfile("Life", 8, true,
                 Collections.emptyList(), Collections.emptyList());
         assertEquals(Collections.singletonList(
-                        "Words: No word is strong enough yet as a hashtag predictor. Such a word needs to "
-                                + "appear in at least 4 quotes tagged #Life, and at least 50% of all quotes "
-                                + "with that word need to be tagged #Life."),
+                        "Words: No word is strong enough yet to serve as a predictor for this hashtag."),
                 HashtagSuggestionText.suggestions(profile));
     }
 }

@@ -50,23 +50,18 @@ final class HashtagSuggestionText {
             return lines;
         }
         if (profile.words.isEmpty()) {
-            String tag = Hashtag.display(profile.tag);
-            lines.add("Words: No word is strong enough yet as a hashtag predictor. Such a word needs to "
-                    + "appear in at least " + HashtagSuggester.MIN_WORD_WITH_TAG + " quotes tagged " + tag
-                    + ", and at least " + HashtagSuggester.MIN_SHARE_PERCENT
-                    + "% of all quotes with that word need to be tagged " + tag + ".");
+            lines.add("Words: No word is strong enough yet to serve as a predictor for this hashtag.");
         } else {
             lines.add("Words: This hashtag is suggested for quotes containing "
                     + list(profile.words, "quotes") + ".");
         }
         if (!profile.authors.isEmpty()) {
-            lines.add("Author: This hashtag is suggested for quotes by the author(s) "
-                    + list(profile.authors, "quotes have that hashtag") + ".");
+            lines.add("Author: " + list(profile.authors, null) + ".");
         }
         return lines;
     }
 
-    /** "gratitude (6/9 quotes), grateful (4/7)": {@code firstUnit} on the first only. */
+    /** "gratitude (6/9 quotes), grateful (4/7)": {@code firstUnit} (may be null) on the first only. */
     private static String list(List<HashtagSuggester.Evidence> evidence, String firstUnit) {
         List<String> parts = new ArrayList<>();
         for (HashtagSuggester.Evidence e : evidence) parts.add(evidence(e, parts.isEmpty() ? firstUnit : null));
