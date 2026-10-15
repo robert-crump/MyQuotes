@@ -50,8 +50,11 @@ final class HashtagSuggestionText {
             return lines;
         }
         if (profile.words.isEmpty()) {
-            lines.add("Words: No word is strong enough yet (needs " + HashtagSuggester.MIN_WORD_WITH_TAG
-                    + " quotes and at least half).");
+            String tag = Hashtag.display(profile.tag);
+            lines.add("Words: No word is strong enough yet as a hashtag predictor. Such a word needs to "
+                    + "appear in at least " + HashtagSuggester.MIN_WORD_WITH_TAG + " quotes tagged " + tag
+                    + ", and at least " + HashtagSuggester.MIN_SHARE_PERCENT
+                    + "% of all quotes with that word need to be tagged " + tag + ".");
         } else {
             lines.add("Words: This hashtag is suggested for quotes containing "
                     + list(profile.words, "quotes") + ".");

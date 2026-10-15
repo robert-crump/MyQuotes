@@ -52,7 +52,9 @@ public class HashtagSuggestionTextTest {
         HashtagSuggester.TagProfile profile = new HashtagSuggester.TagProfile("Life", 8, true,
                 Collections.emptyList(), Collections.emptyList());
         assertEquals(Collections.singletonList(
-                        "Words: No word is strong enough yet (needs 4 quotes and at least half)."),
+                        "Words: No word is strong enough yet as a hashtag predictor. Such a word needs to "
+                                + "appear in at least 4 quotes tagged #Life, and at least 50% of all quotes "
+                                + "with that word need to be tagged #Life."),
                 HashtagSuggestionText.suggestions(profile));
     }
 }
