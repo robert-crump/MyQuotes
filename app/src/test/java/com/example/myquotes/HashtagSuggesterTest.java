@@ -204,7 +204,7 @@ public class HashtagSuggesterTest {
         addUntagged(1, "a forest of money");
         addFiller(10);
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("Forests by the River, a lake.", "Nobody", "nature");
+                .explain("Forests by the River, a lake.", "Nobody", null, "nature");
         assertEquals("Nature", why.tag);
         // "river" 6/6, then "forests" (stem "forest") 5/6; "lake" is on no quote.
         assertEquals(Arrays.asList(new HashtagSuggester.Evidence("river", 6, 6),
@@ -218,7 +218,7 @@ public class HashtagSuggesterTest {
         addTagged(1, "time", "Nature");
         addUntagged(65, "time");
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("forest time", "", "Nature");
+                .explain("forest time", "", null, "Nature");
         assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("forest", 5, 5)), why.words);
     }
 
@@ -227,7 +227,7 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addEmerson(2, 1);
-        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", "Nature");
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", null, "Nature");
         assertEquals(Collections.emptyList(), why.words);
         assertEquals(new HashtagSuggester.Evidence("Emerson", 2, 3), why.author);
     }
@@ -235,7 +235,7 @@ public class HashtagSuggesterTest {
     @Test
     public void explainIsNullForATagThatCannotBeSuggested() {
         addTagged(4, "forest river mountain", "Nature");
-        assertEquals(null, HashtagSuggester.fit(quotes).explain("forest river", "", "Nature"));
+        assertEquals(null, HashtagSuggester.fit(quotes).explain("forest river", "", null, "Nature"));
     }
 
     @Test
@@ -279,6 +279,88 @@ public class HashtagSuggesterTest {
         HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("Nature");
         assertEquals(false, profile.suggestable);
         assertEquals(3, profile.quotes);
+        assertEquals(Collections.emptyList(), profile.words);
+    }
+    // No words, so only the tags can be a reason.
+    private void addWithTags(int count, String... tags) {
+        for (int i = 0; i < count; i++) add("Tagger " + quotes.size(), "", tags);
+    }
+
+    private List<String> suggestWithTags(String... tags) {
+        return HashtagSuggester.fit(quotes).suggest("gold coin", "Someone New", "", Arrays.asList(tags));
+    }
+
+    @Test
+    public void aTagOfTheQuoteIsAReasonAtFourQuotesAndHalf() {
+        addWithTags(3, "Death", "Life");
+        addWithTags(2, "Life");
+        addWithTags(3, "Death");
+        assertEquals(Collections.emptyList(), suggestWithTags("Death"));        // 3/6
+
+        addWithTags(1, "Death", "Life");
+        assertEquals(Collections.singletonList("Life"), suggestWithTags("death"));  // 4/7
+
+        addWithTags(2, "Death");
+        assertEquals(Collections.emptyList(), suggestWithTags("Death"));        // 4/9
+    }
+
+    @Test
+    public void aCoTagMustStillBeOnFiveQuotes() {
+        addWithTags(4, "Death", "Life");
+        assertEquals(Collections.emptyList(), suggestWithTags("Death"));
+
+        addWithTags(1, "Life");
+        assertEquals(Collections.singletonList("Life"), suggestWithTags("Death"));
+    }
+
+    @Test
+    public void coTagReasonsRankWithWordReasons() {
+        addWithTags(4, "Stoicism", "Philosophy");             // #Stoicism 4/4 for Philosophy
+        addWithTags(1, "Philosophy");
+        addTagged(5, "gold", "Wealth");
+        addUntagged(3, "gold");                               // gold 5/8 for Wealth
+        assertEquals(Arrays.asList("Philosophy", "Wealth"),
+                HashtagSuggester.fit(quotes).suggest("gold", "X", "", Collections.singletonList("Stoicism")));
+    }
+
+    @Test
+    public void aSuggestedTagOnceAddedSuggestsTheNext() {
+        addWithTags(4, "Death", "Life");
+        addWithTags(4, "Life", "Meaning");
+        addWithTags(1, "Meaning");
+        assertEquals(Collections.singletonList("Life"), suggestWithTags("Death"));
+        assertEquals(Collections.singletonList("Meaning"), suggestWithTags("Death", "Life"));
+    }
+
+    @Test
+    public void aChipOnlyTheEditedQuoteHasIsNoReason() {
+        addWithTags(5, "Life");
+        assertEquals(Collections.emptyList(), suggestWithTags("BrandNew"));
+    }
+
+    @Test
+    public void explainNamesTheQuotesTagsThatAreReasons() {
+        addWithTags(4, "Death", "Life");
+        addWithTags(1, "Death");
+        addWithTags(4, "Grief", "Life");
+        addWithTags(1, "Love", "Life");
+        addWithTags(3, "Love");
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
+                .explain("gold coin", "", Arrays.asList("death", "Grief", "Love"), "Life");
+        // #Love 1/4 is too weak.
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("#Grief", 4, 4),
+                new HashtagSuggester.Evidence("#Death", 4, 5)), why.tags);
+    }
+
+    @Test
+    public void profileListsTheTagsThatAreReasonsButNotItself() {
+        addWithTags(4, "Death", "Life");
+        addWithTags(1, "Death");
+        addWithTags(4, "Grief", "Life");
+        addWithTags(2, "Life");
+        HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("Life");
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("#Grief", 4, 4),
+                new HashtagSuggester.Evidence("#Death", 4, 5)), profile.tags);
         assertEquals(Collections.emptyList(), profile.words);
     }
 }

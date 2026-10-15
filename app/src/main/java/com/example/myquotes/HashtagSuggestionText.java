@@ -13,7 +13,8 @@ final class HashtagSuggestionText {
     /** The top of the "Why these hashtags" dialog. */
     static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
             + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
-            + "suggests hashtags that are often used for the author.";
+            + "suggests hashtags that are often used for the author, and hashtags that often appear "
+            + "together with the quote's hashtags.";
 
     private HashtagSuggestionText() {
     }
@@ -24,7 +25,10 @@ final class HashtagSuggestionText {
                 + (unit == null ? "" : " " + unit) + ")";
     }
 
-    /** "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5)"; the dialog's line per tag. */
+    /**
+     * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · with #Death (6/9)"; the dialog's
+     * line per tag.
+     */
     static String explanation(HashtagSuggester.Explanation explanation) {
         List<String> parts = new ArrayList<>();
         for (HashtagSuggester.Evidence word : explanation.words) {
@@ -35,12 +39,20 @@ final class HashtagSuggestionText {
             String by = "by " + evidence(explanation.author, line.isEmpty() ? "quotes" : null);
             line = line.isEmpty() ? by : line + " · " + by;
         }
+        if (!explanation.tags.isEmpty()) {
+            List<String> tags = new ArrayList<>();
+            for (HashtagSuggester.Evidence tag : explanation.tags) {
+                tags.add(evidence(tag, line.isEmpty() && tags.isEmpty() ? "quotes" : null));
+            }
+            String with = "with " + String.join(", ", tags);
+            line = line.isEmpty() ? with : line + " · " + with;
+        }
         return line;
     }
 
     /**
      * The sheet's Suggestions section, one paragraph each: why the tag can't be suggested yet, or
-     * its Words line and (when an author qualifies) its Author line.
+     * its Words line and (when they qualify) its Author and With lines.
      */
     static List<String> suggestions(HashtagSuggester.TagProfile profile) {
         List<String> lines = new ArrayList<>();
@@ -56,6 +68,9 @@ final class HashtagSuggestionText {
         }
         if (!profile.authors.isEmpty()) {
             lines.add("Author: " + list(profile.authors) + ".");
+        }
+        if (!profile.tags.isEmpty()) {
+            lines.add("With: " + list(profile.tags) + ".");
         }
         return lines;
     }

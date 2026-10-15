@@ -124,7 +124,7 @@ final class HashtagSuggestionRow {
         SpannableStringBuilder message = new SpannableStringBuilder(HashtagSuggestionText.INTRO);
         for (String tag : shown) {
             HashtagSuggester.Explanation explanation =
-                    model.explain(text.getText().toString(), author.getText().toString(), tag);
+                    model.explain(text.getText().toString(), author.getText().toString(), field.getTags(), tag);
             if (explanation == null) continue;
             message.append("\n\n");
             int start = message.length();
