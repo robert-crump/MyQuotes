@@ -21,7 +21,7 @@ public class QuoteQueryIntentTest {
     private final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
     @Test
-    public void exactTagQuerySurvivesIntentAndBundle() {
+    public void tagFilterSurvivesIntentAndBundleWithEmptyText() {
         QuoteQuery tag = QuoteQuery.forTag("AI");
 
         QuoteQuery viaIntent = QuoteQuery.fromIntent(tag.toIntent(context));
@@ -29,26 +29,33 @@ public class QuoteQueryIntentTest {
 
         assertEquals(tag, viaIntent);
         assertEquals(tag, viaBundle);
-        assertTrue(viaIntent.isExact());
-        assertEquals("#AI", viaIntent.getText());
-        assertEquals(QuoteQuery.Field.HASHTAGS, viaIntent.singleField());
+        assertEquals("AI", viaIntent.getTag());
+        assertEquals("", viaIntent.getText());
     }
 
     @Test
-    public void typedQueriesStayTyped() {
+    public void untaggedFilterSurvivesIntentAndBundle() {
+        QuoteQuery untagged = QuoteQuery.untagged().withText("seneca");
+
+        assertEquals(untagged, QuoteQuery.fromIntent(untagged.toIntent(context)));
+        assertTrue(QuoteQuery.fromBundle(untagged.toBundle()).isUntagged());
+    }
+
+    @Test
+    public void queriesWithoutAFilterStayUnfiltered() {
         QuoteQuery hashtags = QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "wis");
         QuoteQuery all = QuoteQuery.all("seneca");
 
         assertEquals(hashtags, QuoteQuery.fromIntent(hashtags.toIntent(context)));
-        assertFalse(QuoteQuery.fromBundle(hashtags.toBundle()).isExact());
+        assertFalse(QuoteQuery.fromBundle(hashtags.toBundle()).hasTagFilter());
         assertEquals(all, QuoteQuery.fromBundle(all.toBundle()));
     }
 
     @Test
-    public void bundleWithoutTheExactFlagReadsAsTyped() {
-        Bundle old = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "Seneca").toBundle();
-        old.remove(QuoteQuery.EXTRA_EXACT);
-        assertFalse(QuoteQuery.fromBundle(old).isExact());
+    public void bundleWithoutTheTagReadsAsUnfiltered() {
+        Bundle old = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "Seneca").withTag("Stoic").toBundle();
+        old.remove(QuoteQuery.EXTRA_TAG);
+        assertFalse(QuoteQuery.fromBundle(old).hasTagFilter());
     }
 
     @Test

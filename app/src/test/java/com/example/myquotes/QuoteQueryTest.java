@@ -45,18 +45,18 @@ public class QuoteQueryTest {
     }
 
     @Test
-    public void exactTagQueriesMatchWholeTagsIgnoringCase() {
-        QuoteQuery stoic = QuoteQuery.forTag("stoic");
-        assertTrue(stoic.isExact());
-        assertEquals("#stoic", stoic.getText());
-        assertEquals(QuoteQuery.Field.HASHTAGS, stoic.singleField());
+    public void tagFilterMatchesWholeTagsIgnoringCaseWithEmptyText() {
+        QuoteQuery stoic = QuoteQuery.forTag("#stoic");
+        assertEquals("", stoic.getText());
+        assertEquals("stoic", stoic.getTag());
+        assertEquals(null, stoic.singleField());
         assertTrue(stoic.matches(q));
         assertFalse(QuoteQuery.forTag("Sto").matches(q));
         assertFalse(QuoteQuery.forTag("Seneca").matches(q));
     }
 
     @Test
-    public void exactTagQueriesSkipTheMinimumLength() {
+    public void tagFilterNeedsNoMinimumLength() {
         Quote ai = quote("x", "y", "", "AI Go");
         assertTrue(QuoteQuery.forTag("AI").isActive());
         assertTrue(QuoteQuery.forTag("ai").matches(ai));
@@ -66,17 +66,43 @@ public class QuoteQueryTest {
     }
 
     @Test
-    public void retypingAnExactQueryMakesItATypedOne() {
-        QuoteQuery exact = QuoteQuery.forTag("Stoic");
-        assertTrue(exact.withText(" #Stoic ").isExact());
-        assertFalse(exact.withText("#Stoi").isExact());
-        assertFalse(exact.scopedTo(QuoteQuery.Field.HASHTAGS).isExact());
-        assertNotEquals(QuoteQuery.forField(QuoteQuery.Field.HASHTAGS, "#Stoic"), exact);
+    public void tagFilterCombinesWithTypedText() {
+        Quote other = quote("Something else", "Seneca", "", "Stoic");
+        QuoteQuery stoic = QuoteQuery.forTag("Stoic");
+        assertEquals(Arrays.asList(q), stoic.withText("noth").filter(Arrays.asList(q, other)));
+        // Text below the minimum leaves just the filter.
+        assertEquals(2, stoic.withText("no").filter(Arrays.asList(q, other)).size());
+        assertFalse(stoic.withText("seneca").scopedTo(QuoteQuery.Field.SOURCE).matches(q));
+        assertEquals("Stoic", stoic.withText("x").scopedTo(QuoteQuery.Field.AUTHOR).getTag());
+    }
+
+    @Test
+    public void untaggedFilterMatchesOnlyQuotesWithoutTags() {
+        Quote bare = quote("Nothing at all", "Seneca", "", "");
+        QuoteQuery untagged = QuoteQuery.untagged();
+        assertTrue(untagged.isUntagged());
+        assertTrue(untagged.hasTagFilter());
+        assertEquals(null, untagged.getTag());
+        assertEquals(Arrays.asList(bare), untagged.filter(Arrays.asList(q, bare)));
+        assertEquals(Arrays.asList(bare), untagged.withText("nothing").filter(Arrays.asList(q, bare)));
+    }
+
+    @Test
+    public void removingTheTagFilterKeepsTextAndFields() {
+        QuoteQuery filtered = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen").withTag("Stoic");
+        assertNotEquals(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen"), filtered);
+        assertEquals(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen"), filtered.withoutTagFilter());
+        assertFalse(QuoteQuery.forTag("Stoic").withoutTagFilter().isActive());
+    }
+
+    @Test
+    public void snippetShowsTheQuoteStartWithOnlyTheTagFilter() {
+        assertEquals("Nothing", QuoteQuery.forTag("Stoic").snippet(q));
+        assertEquals("Nothing", QuoteQuery.forTag("Stoic").withText("st").snippet(q));
     }
 
     @Test
     public void snippetShowsTheTagLineWhenTheMatchIsOnATag() {
-        assertEquals("#Life #Stoic", QuoteQuery.forTag("Stoic").snippet(q));
         assertEquals("#Life #Stoic", QuoteQuery.all("stoic").snippet(q));
         assertEquals("Nothing", QuoteQuery.all("noth").snippet(q));
         assertEquals("Nothing", QuoteQuery.all("seneca").snippet(q));

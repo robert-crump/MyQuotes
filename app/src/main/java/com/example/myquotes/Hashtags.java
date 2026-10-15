@@ -36,6 +36,15 @@ public class Hashtags {
         return new HashMap<>(counts(collection.getCurrentList()));
     }
 
+    // Quotes without any tag.
+    public int untaggedCount() {
+        int count = 0;
+        for (Quote quote : collection.getCurrentList()) {
+            if (quote.getTags().isEmpty()) count++;
+        }
+        return count;
+    }
+
     // Quotes carrying at least one of `tags` (compared ignoring case).
     public int quotesWithAny(Collection<String> tags) {
         List<String> wanted = new ArrayList<>(tags);

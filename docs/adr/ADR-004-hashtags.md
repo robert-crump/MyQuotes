@@ -13,7 +13,7 @@ A quote had one free-text Category. A quote often belongs in several places at o
 3. **One spelling per tag.** Tags compare ignoring case, and the spelling that already exists in the collection wins, when typing, on add/edit, on rename (which then merges), and when loading or importing (the first spelling found wins).
 4. **The Hashtag set is in-use-only.** It is the union of the tags on all quotes. There is no stored list and no Add action. `CategoryStore`/`SharedPreferencesCategoryStore` are deleted and the `CategoryPrefs/saved_categories` key is removed on startup. Renaming and deleting go through one batched `QuoteCollection.replaceTag` each.
 5. **Format versions.** `QuoteCodec` writes `"tags": [...]` and no `"category"`, at envelope version 2. `BackupDocument` goes to version 3. Decoding uses `"tags"` when present, and otherwise converts `"category"` (invalid characters dropped, words joined in CamelCase: `"Life Wisdom"` → `LifeWisdom`; empty → no tags). Old prefs, v1/v2 backups and bare arrays all still load. `QuoteCollection.loadFromStore` saves once when the store held the old format, so the store is upgraded on the first start.
-6. **Tapped tags search exactly.** `QuoteQuery` gets an `exact` flag (carried in intents and bundles): a tapped tag matches whole tags ignoring case, with no 3-character minimum. Typed queries keep contains matching, per tag, ignoring a leading `#`.
+6. **Tapped tags search exactly.** *(Superseded by ADR-005: a hashtag filter next to the text.)* `QuoteQuery` gets an `exact` flag (carried in intents and bundles): a tapped tag matches whole tags ignoring case, with no 3-character minimum. Typed queries keep contains matching, per tag, ignoring a leading `#`.
 
 ## Consequences
 

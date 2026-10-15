@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One tag on the Hashtags screen: #Tag with its quote count below. Laid out in a wrapping flow
-     (FlexboxLayoutManager). Tap opens the tag's quotes; long-press starts selection
-     (HashtagsActivity). -->
+     (FlexboxLayoutManager). Tap opens the tag's sheet; long-press starts selection
+     (HashtagsActivity). Also the closing "No hashtag" entry. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"

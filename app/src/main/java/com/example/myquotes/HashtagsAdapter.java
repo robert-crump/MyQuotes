@@ -1,5 +1,6 @@
 package com.example.myquotes;
 
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,16 +20,20 @@ import java.util.Set;
 /**
  * The tags on the Hashtags screen ({@code #Tag} over {@code Nx}) with long-press selection: a
  * long-press selects a tag and starts selection mode, taps then toggle tags, and deselecting the
- * last one ends it. Outside selection mode a tap opens the tag.
+ * last one ends it. Outside selection mode a tap opens the tag. After the tags comes a
+ * "No hashtag" entry with the untagged quote count (when there are any); it opens those quotes
+ * and is never selected.
  */
 public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.HashtagViewHolder> {
     private final List<String> hashtags = new ArrayList<>();
     private Map<String, Integer> counts = Collections.emptyMap();
+    private int untagged;
     private final Set<String> selected = new LinkedHashSet<>();
     private final Listener listener;
 
     public interface Listener {
         void onHashtagClick(String tag);
+        void onUntaggedClick();
         void onSelectionChanged(Set<String> selected);
     }
 
@@ -36,12 +41,16 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         this.listener = listener;
     }
 
-    /** Replaces the tags; selected ones that no longer exist (renamed, deleted) are dropped. */
+    /**
+     * Replaces the tags and the untagged count; selected tags that no longer exist (renamed,
+     * deleted) are dropped.
+     */
     @SuppressWarnings("NotifyDataSetChanged")
-    public void submit(List<String> newHashtags, Map<String, Integer> newCounts) {
+    public void submit(List<String> newHashtags, Map<String, Integer> newCounts, int untaggedCount) {
         hashtags.clear();
         hashtags.addAll(newHashtags);
         counts = newCounts;
+        untagged = untaggedCount;
         boolean selectionChanged = selected.retainAll(newHashtags);
         notifyDataSetChanged();
         if (selectionChanged) listener.onSelectionChanged(getSelected());
@@ -81,12 +90,17 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         view.setOnClickListener(v -> {
             int position = holder.getBindingAdapterPosition();
             if (position == RecyclerView.NO_POSITION) return;
-            if (selected.isEmpty()) listener.onHashtagClick(hashtags.get(position));
-            else toggle(position);
+            if (position == hashtags.size()) {
+                if (selected.isEmpty()) listener.onUntaggedClick();
+            } else if (selected.isEmpty()) {
+                listener.onHashtagClick(hashtags.get(position));
+            } else {
+                toggle(position);
+            }
         });
         view.setOnLongClickListener(v -> {
             int position = holder.getBindingAdapterPosition();
-            if (position == RecyclerView.NO_POSITION) return false;
+            if (position == RecyclerView.NO_POSITION || position == hashtags.size()) return false;
             toggle(position);
             return true;
         });
@@ -95,6 +109,10 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
 
     @Override
     public void onBindViewHolder(@NonNull HashtagViewHolder holder, int position) {
+        if (position == hashtags.size()) {
+            holder.bindUntagged(untagged);
+            return;
+        }
         String tag = hashtags.get(position);
         Integer count = counts.get(tag);
         holder.bind(tag, count != null ? count : 0, selected.contains(tag));
@@ -102,7 +120,7 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
 
     @Override
     public int getItemCount() {
-        return hashtags.size();
+        return hashtags.size() + (untagged > 0 ? 1 : 0);
     }
 
     static class HashtagViewHolder extends RecyclerView.ViewHolder {
@@ -116,12 +134,23 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         }
 
         void bind(String tag, int quoteCount, boolean isSelected) {
+            name.setTypeface(null, Typeface.BOLD);
             name.setText(Hashtag.display(tag));
             count.setText(quoteCount + "x");
             itemView.setSelected(isSelected);
             itemView.setContentDescription(Hashtag.display(tag) + ", "
                     + (quoteCount == 1 ? "1 quote" : quoteCount + " quotes")
                     + (isSelected ? ", selected" : ""));
+        }
+
+        /** "No hashtag" over the count, set apart from the tags: not bold, never selected. */
+        void bindUntagged(int quoteCount) {
+            name.setTypeface(null, Typeface.ITALIC);
+            name.setText("No hashtag");
+            count.setText(quoteCount + "x");
+            itemView.setSelected(false);
+            itemView.setContentDescription("No hashtag, "
+                    + (quoteCount == 1 ? "1 quote" : quoteCount + " quotes"));
         }
     }
 }

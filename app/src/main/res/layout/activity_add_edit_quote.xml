@@ -145,29 +145,46 @@
                     android:background="?attr/colorOnSurfaceVariant" />
 
                 <!-- Tags suggested from the collection (HashtagSuggestionRow); hidden when
-                     nothing qualifies. -->
+                     nothing qualifies. The label sits on top with an info button that explains
+                     the suggestions; below it the chips wrap across the full width. -->
                 <LinearLayout
                     android:id="@+id/hashtag_suggestions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
+                    android:orientation="vertical"
                     android:visibility="gone">
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:text="Suggested:"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Suggested"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <ImageButton
+                            android:id="@+id/button_suggestions_info"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:padding="10dp"
+                            android:scaleType="fitCenter"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:src="@drawable/ic_info_24dp"
+                            android:contentDescription="Why these hashtags are suggested"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
 
                     <com.google.android.material.chip.ChipGroup
                         android:id="@+id/chip_group_suggestions"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
                         app:chipSpacingHorizontal="6dp"
                         app:chipSpacingVertical="0dp" />
 

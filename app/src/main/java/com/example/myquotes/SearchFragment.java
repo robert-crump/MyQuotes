@@ -21,19 +21,23 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
  * SearchActivity. Holds one {@link QuoteQuery}; a tapped result opens in a {@link QuoteDialogFragment}.
  * The filter icon in the search field picks what the text searches: all fields or one; for
- * author, source and hashtags the field suggests existing values. A tapped hashtag arrives as an
- * exact query ({@link QuoteQuery#forTag}) showing {@code #Tag}; retyping makes it a typed one.
+ * author, source and hashtags the field suggests existing values. The hashtag filter (a tag or
+ * "No hashtag", #51) shows as a chip under the field and combines with the text: a tapped
+ * hashtag arrives as {@link QuoteQuery#forTag} with an empty field; the filter dialog's
+ * "Hashtag" button picks one, the chip's x removes it.
  */
 public class SearchFragment extends Fragment
         implements SearchResultsAdapter.OnQuoteClickListener, QuoteDialogFragment.Host {
@@ -53,6 +57,7 @@ public class SearchFragment extends Fragment
     private MaterialAutoCompleteTextView searchEditText;
     private FieldSuggestionAdapter suggestionAdapter;
     private TextView searchResultsCountTextView;
+    private Chip hashtagFilterChip;
     private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes = new ArrayList<>();
@@ -89,6 +94,13 @@ public class SearchFragment extends Fragment
         searchInputLayout = view.findViewById(R.id.searchInputLayout);
         searchEditText = view.findViewById(R.id.searchEditText);
         searchResultsCountTextView = view.findViewById(R.id.searchResultsCountTextView);
+        hashtagFilterChip = view.findViewById(R.id.hashtagFilterChip);
+        hashtagFilterChip.setOnCloseIconClickListener(v -> {
+            query = query.withoutTagFilter();
+            renderFilter();
+            rerunSearch();
+        });
+        hashtagFilterChip.setOnClickListener(v -> showHashtagFilterDialog());
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
@@ -123,6 +135,7 @@ public class SearchFragment extends Fragment
         super.onDestroyView();
         searchEditText = null;
         searchInputLayout = null;
+        hashtagFilterChip = null;
     }
 
     /** Replaces the current query (text and filter), as an author/source/hashtag tap does. */
@@ -198,8 +211,43 @@ public class SearchFragment extends Fragment
                     rerunSearch();
                     focusSearchField();
                 })
+                .setNeutralButton("Hashtag…", (dialog, which) -> showHashtagFilterDialog())
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** Picks the hashtag filter: "No hashtag" or one tag, each with its quote count. */
+    private void showHashtagFilterDialog() {
+        Map<String, Integer> counts = Hashtags.counts(allQuotes);
+        int untagged = 0;
+        for (Quote quote : allQuotes) {
+            if (quote.getTags().isEmpty()) untagged++;
+        }
+        List<String> tags = new ArrayList<>(counts.keySet());
+        String[] labels = new String[tags.size() + 1];
+        labels[0] = "No hashtag (" + untagged + ")";
+        int checked = query.isUntagged() ? 0 : -1;
+        for (int i = 0; i < tags.size(); i++) {
+            labels[i + 1] = Hashtag.display(tags.get(i)) + " (" + counts.get(tags.get(i)) + ")";
+            if (tags.get(i).equalsIgnoreCase(query.getTag())) checked = i + 1;
+        }
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Filter by hashtag")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    query = which == 0 ? query.withUntagged() : query.withTag(tags.get(which - 1));
+                    renderFilter();
+                    rerunSearch();
+                })
+                .setNegativeButton("Cancel", null);
+        if (query.hasTagFilter()) {
+            builder.setNeutralButton("No filter", (dialog, which) -> {
+                query = query.withoutTagFilter();
+                renderFilter();
+                rerunSearch();
+            });
+        }
+        builder.show();
     }
 
     private int filterIndex() {
@@ -220,6 +268,11 @@ public class SearchFragment extends Fragment
                 : androidx.appcompat.R.attr.colorPrimary, value, true);
         searchInputLayout.setStartIconTintList(ColorStateList.valueOf(value.data));
         suggestionAdapter.setField(FILTERS[index]);
+
+        String tag = query.getTag();
+        hashtagFilterChip.setVisibility(query.hasTagFilter() ? View.VISIBLE : View.GONE);
+        hashtagFilterChip.setText(tag != null ? Hashtag.display(tag) : "No hashtag");
+        hashtagFilterChip.setCloseIconContentDescription("Remove hashtag filter");
     }
 
     private void rerunSearch() {

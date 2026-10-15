@@ -174,4 +174,71 @@ public class HashtagSuggesterTest {
         assertEquals(Collections.emptyList(), model.suggest("", "", "", Collections.emptyList()));
         assertEquals(Collections.emptyList(), model.suggest(null, null, null, null));
     }
+
+    @Test
+    public void explainGivesSupportingWordsAsWrittenWithCounts() {
+        addTagged(5, "forest river mountain", "Nature");
+        add("Someone", "a river of money", "Nature");
+        addFiller(10);
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
+                .explain("Forests by the River.", "Nobody", "nature");
+        assertEquals("Nature", why.tag);
+        // "forests" stems to "forest" (5 of 5); "river" is on 6 of 6. Equal lift: by stem.
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("forests", 5, 5),
+                new HashtagSuggester.Evidence("river", 6, 6)), why.words);
+        assertEquals(null, why.author);
+    }
+
+    @Test
+    public void explainNamesTheAuthorWhenTheAuthorExceptionHolds() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        add("Emerson", "trust thyself", "Nature");
+        add("Emerson", "hitch your wagon", "Nature");
+        add("Emerson", "every wall is a door");
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", "Nature");
+        assertEquals(Collections.emptyList(), why.words);
+        assertEquals(new HashtagSuggester.Evidence("Emerson", 2, 3), why.author);
+    }
+
+    @Test
+    public void explainIsNullForATagThatCannotBeSuggested() {
+        addTagged(4, "forest river mountain", "Nature");
+        assertEquals(null, HashtagSuggester.fit(quotes).explain("forest river", "", "Nature"));
+    }
+
+    @Test
+    public void profileShowsTheStrongestWordsInTheirMostFrequentForm() {
+        addTagged(3, "friendships forever", "Friends");
+        addTagged(2, "friendship forever loyal", "Friends");
+        add("Someone", "loyal dog", "Friends");
+        addFiller(10);
+        HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("#friends");
+        assertTrue(profile.suggestable);
+        assertEquals(6, profile.quotes);
+        // "dog" is on only 1 of its quotes, so it is left out.
+        assertEquals(Arrays.asList(new HashtagSuggester.Evidence("forever", 5, 5),
+                new HashtagSuggester.Evidence("friendships", 5, 5),
+                new HashtagSuggester.Evidence("loyal", 3, 3)), profile.words);
+        assertEquals(Collections.emptyList(), profile.authors);
+    }
+
+    @Test
+    public void profileListsAuthorsTheExceptionHoldsFor() {
+        addTagged(5, "forest river mountain", "Nature");
+        add("Emerson", "trust thyself", "Nature");
+        add("Emerson", "hitch your wagon", "Nature");
+        add("Emerson", "every wall is a door");
+        assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("Emerson", 2, 3)),
+                HashtagSuggester.fit(quotes).profile("Nature").authors);
+    }
+
+    @Test
+    public void profileOfASmallTagSaysItIsNotSuggestable() {
+        addTagged(3, "forest river mountain", "Nature");
+        HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("Nature");
+        assertEquals(false, profile.suggestable);
+        assertEquals(3, profile.quotes);
+        assertEquals(Collections.emptyList(), profile.words);
+    }
 }

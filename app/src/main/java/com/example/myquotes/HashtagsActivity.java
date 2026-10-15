@@ -23,16 +23,18 @@ import com.google.android.flexbox.FlexWrap;
 import com.google.android.flexbox.FlexboxLayoutManager;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
 /**
- * The Hashtag set as a wrapping flow of tags with their quote counts. A tap opens the exact tag
- * search; long-press starts multi-selection with a contextual bar: rename (exactly one; merging
- * into an existing tag asks first) and delete (removes the tags from their quotes, never the
- * quotes). There is no Add action: a tag exists while a quote has it.
+ * The Hashtag set as a wrapping flow of tags with their quote counts, then a "No hashtag" entry
+ * that opens the untagged quotes. A tap opens the tag's {@link HashtagSheet} (its quotes, rename,
+ * delete, how it is suggested); long-press starts multi-selection with a contextual bar: rename
+ * (exactly one; merging into an existing tag asks first) and delete (removes the tags from their
+ * quotes, never the quotes). There is no Add action: a tag exists while a quote has it.
  */
-public class HashtagsActivity extends AppCompatActivity {
+public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.Host {
     private static final String STATE_SELECTED = "selected_hashtags";
 
     private ActivityHashtagsBinding binding;
@@ -74,7 +76,12 @@ public class HashtagsActivity extends AppCompatActivity {
         adapter = new HashtagsAdapter(new HashtagsAdapter.Listener() {
             @Override
             public void onHashtagClick(String tag) {
-                startActivity(QuoteQuery.forTag(tag).toIntent(HashtagsActivity.this));
+                HashtagSheet.newInstance(tag).show(getSupportFragmentManager(), HashtagSheet.TAG);
+            }
+
+            @Override
+            public void onUntaggedClick() {
+                startActivity(QuoteQuery.untagged().toIntent(HashtagsActivity.this));
             }
 
             @Override
@@ -89,7 +96,7 @@ public class HashtagsActivity extends AppCompatActivity {
             pendingSelection = savedInstanceState.getStringArrayList(STATE_SELECTED);
         }
         hashtags.getHashtags().observe(this, tags -> {
-            adapter.submit(tags, hashtags.quoteCounts());
+            adapter.submit(tags, hashtags.quoteCounts(), hashtags.untaggedCount());
             binding.hashtagsEmpty.setVisibility(tags.isEmpty() ? View.VISIBLE : View.GONE);
             if (pendingSelection != null) {
                 adapter.setSelected(pendingSelection);
@@ -139,6 +146,16 @@ public class HashtagsActivity extends AppCompatActivity {
         MenuItem rename = menu.findItem(R.id.action_rename_hashtag);
         if (rename != null) rename.setVisible(adapter.getSelected().size() == 1);
         return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
+    public void renameHashtag(String tag) {
+        showRenameDialog(tag);
+    }
+
+    @Override
+    public void deleteHashtag(String tag) {
+        showDeleteDialog(Collections.singleton(tag));
     }
 
     private void showRenameDialog(String oldTag) {

@@ -1,9 +1,13 @@
 package com.example.myquotes;
 
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
@@ -12,6 +16,7 @@ import androidx.lifecycle.LifecycleOwner;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +30,8 @@ import java.util.concurrent.Executors;
  * The model is fitted off the main thread whenever the Quote Collection emits (so on opening),
  * leaving out the quote being edited; the row refreshes 300 ms after the text or author last
  * changed, and at once when the quote's tags change. Hidden when nothing qualifies.
+ * The info button next to the label, or a long-press on a chip, explains all current
+ * suggestions in one dialog (#51): each tag's supporting words and author, with counts.
  */
 final class HashtagSuggestionRow {
     private static final long DEBOUNCE_MILLIS = 300;
@@ -39,6 +46,7 @@ final class HashtagSuggestionRow {
     private final ExecutorService fitter = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::refresh;
     private HashtagSuggester model;
+    private List<String> shown = Collections.emptyList();
 
     /** {@code editedQuoteId} is left out of the model; -1 when adding. */
     HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, int editedQuoteId,
@@ -63,6 +71,7 @@ final class HashtagSuggestionRow {
         author.addTextChangedListener(debounced);
         text.addTextChangedListener(debounced);
         field.setOnTagsChangedListener(this::refresh);
+        root.findViewById(R.id.button_suggestions_info).setOnClickListener(v -> showExplanation());
 
         collection.getQuoteList().observe(owner, quotes -> {
             if (fitter.isShutdown()) return;
@@ -92,6 +101,7 @@ final class HashtagSuggestionRow {
         List<String> suggestions = model == null ? Collections.emptyList()
                 : model.suggest(text.getText().toString(), author.getText().toString(),
                         source.getText().toString(), field.getTags());
+        shown = suggestions;
         group.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(group.getContext());
         for (String tag : suggestions) {
@@ -99,8 +109,35 @@ final class HashtagSuggestionRow {
             chip.setText(Hashtag.display(tag));
             chip.setContentDescription("Add " + Hashtag.display(tag));
             chip.setOnClickListener(v -> field.addTag(tag));
+            chip.setOnLongClickListener(v -> {
+                showExplanation();
+                return true;
+            });
             group.addView(chip);
         }
         row.setVisibility(suggestions.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /** One dialog explaining every shown suggestion: "#Love" then "heart (6 of 8), ...". */
+    private void showExplanation() {
+        if (model == null || shown.isEmpty()) return;
+        SpannableStringBuilder message = new SpannableStringBuilder();
+        for (String tag : shown) {
+            HashtagSuggester.Explanation explanation =
+                    model.explain(text.getText().toString(), author.getText().toString(), tag);
+            if (explanation == null) continue;
+            int start = message.length();
+            message.append(Hashtag.display(tag));
+            message.setSpan(new StyleSpan(Typeface.BOLD), start, message.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            message.append("\n").append(HashtagSuggestionText.explanation(explanation)).append("\n\n");
+        }
+        message.append("(6 of 8) after a word: of your 8 quotes containing it, 6 have the hashtag. "
+                + "The same for an author.");
+        new MaterialAlertDialogBuilder(row.getContext())
+                .setTitle("Why these hashtags")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
     }
 }

@@ -46,6 +46,17 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- The hashtag filter (a tag or "No hashtag"), combined with the text; x removes it -->
+        <com.google.android.material.chip.Chip
+            android:id="@+id/hashtagFilterChip"
+            style="@style/Widget.Material3.Chip.Input"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:checkable="false"
+            app:closeIconVisible="true"
+            android:visibility="gone" />
+
         <!-- Suchergebnis-Zähler -->
         <TextView
             android:id="@+id/searchResultsCountTextView"

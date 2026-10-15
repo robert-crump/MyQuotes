@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 /**
  * Suggests hashtags for a quote being added or edited (#50), learned from the user's own
@@ -31,6 +32,11 @@ import java.util.Set;
  * </ul>
  * At most {@link #MAX_SUGGESTIONS}, best score first, ties by tag name; tags the quote already
  * has are left out (ignoring case).
+ * <p>
+ * The why (#51): {@link #explain} gives a suggestion's supporting words and author with their
+ * counts ("6 of 8 quotes with <i>heart</i> have the tag"), {@link #profile} what the model learned
+ * about a tag overall. Stems are shown as a real word: the quote's own word in {@code explain},
+ * otherwise the collection's most frequent word with that stem.
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
@@ -41,6 +47,8 @@ public final class HashtagSuggester {
     static final int MIN_WORD_LENGTH = 3;
     static final int STEM_LENGTH = 6;
     static final String AUTHOR_PREFIX = "author:";
+    static final int PROFILE_WORDS = 5;
+    static final int PROFILE_MIN_TOGETHER = 2;
 
     private static final Set<String> STOPWORDS = new HashSet<>(Arrays.asList(
             // English
@@ -88,6 +96,78 @@ public final class HashtagSuggester {
     private final Map<String, Integer> tokenCounts = new HashMap<>();
     // Per eligible tag (lowercase key): quotes carrying it, and per token the quotes with both.
     private final Map<String, TagStats> tags = new HashMap<>();
+    // Quotes per tag (lowercase key), eligible or not.
+    private final Map<String, Integer> tagQuotes = new HashMap<>();
+    // Per stem, how often each full word occurred; per author token, its first spelling.
+    private final Map<String, Map<String, Integer>> surfaceWords = new HashMap<>();
+    private final Map<String, String> authorNames = new HashMap<>();
+
+    /**
+     * One piece of evidence: {@code withTag} of the {@code total} quotes that contain the word
+     * (or are by the author) carry the tag.
+     */
+    public static final class Evidence {
+        public final String label;
+        public final int withTag;
+        public final int total;
+
+        Evidence(String label, int withTag, int total) {
+            this.label = label;
+            this.withTag = withTag;
+            this.total = total;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Evidence)) return false;
+            Evidence other = (Evidence) o;
+            return label.equals(other.label) && withTag == other.withTag && total == other.total;
+        }
+
+        @Override
+        public int hashCode() {
+            return (label.hashCode() * 31 + withTag) * 31 + total;
+        }
+
+        @Override
+        public String toString() {
+            return label + " " + withTag + "/" + total;
+        }
+    }
+
+    /** Why a tag is suggested for one quote: its supporting words (strongest first) and author. */
+    public static final class Explanation {
+        public final String tag;
+        public final List<Evidence> words;
+        /** The author when it supports the tag or the author exception holds; else null. */
+        public final Evidence author;
+
+        Explanation(String tag, List<Evidence> words, Evidence author) {
+            this.tag = tag;
+            this.words = words;
+            this.author = author;
+        }
+    }
+
+    /** What the model learned about one tag (the Hashtags sheet). */
+    public static final class TagProfile {
+        public final String tag;
+        public final int quotes;
+        /** On at least {@link #MIN_QUOTES_PER_TAG} quotes, so it can be suggested at all. */
+        public final boolean suggestable;
+        /** Up to {@link #PROFILE_WORDS} words, strongest first, each on at least 2 of its quotes. */
+        public final List<Evidence> words;
+        /** Authors for whom the author exception holds: suggested for every quote by them. */
+        public final List<Evidence> authors;
+
+        TagProfile(String tag, int quotes, boolean suggestable, List<Evidence> words, List<Evidence> authors) {
+            this.tag = tag;
+            this.quotes = quotes;
+            this.suggestable = suggestable;
+            this.words = words;
+            this.authors = authors;
+        }
+    }
 
     private static final class TagStats {
         final String spelling;
@@ -112,11 +192,16 @@ public final class HashtagSuggester {
             Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor());
             quoteTokens.add(tokens);
             for (String token : tokens) model.tokenCounts.merge(token, 1, Integer::sum);
+            forEachWord(quote.getQuoteText(), (stem, word) -> model.surfaceWords
+                    .computeIfAbsent(stem, k -> new HashMap<>()).merge(word, 1, Integer::sum));
+            String authorToken = authorToken(quote.getAuthor());
+            if (authorToken != null) model.authorNames.putIfAbsent(authorToken, quote.getAuthor().trim());
             for (String tag : quote.getTags()) {
                 all.computeIfAbsent(Hashtag.key(tag), k -> new TagStats(tag)).quotes++;
             }
         }
         for (Map.Entry<String, TagStats> entry : all.entrySet()) {
+            model.tagQuotes.put(entry.getKey(), entry.getValue().quotes);
             if (entry.getValue().quotes >= MIN_QUOTES_PER_TAG) model.tags.put(entry.getKey(), entry.getValue());
         }
         for (int i = 0; i < quotes.size(); i++) {
@@ -176,6 +261,89 @@ public final class HashtagSuggester {
         return supporting;
     }
 
+    /**
+     * Why {@code tag} is suggested for this quote: its supporting words, strongest first, shown
+     * as they are written in {@code text}, and the author when it supports the tag or the author
+     * exception holds. Null when the tag can't be suggested at all (on too few quotes).
+     */
+    public Explanation explain(String text, String author, String tag) {
+        TagStats stats = tags.get(Hashtag.key(Hashtag.normalize(tag)));
+        if (stats == null) return null;
+        Map<String, String> ownWords = new HashMap<>();
+        forEachWord(text, ownWords::putIfAbsent);
+
+        List<String> supporting = new ArrayList<>();
+        for (String token : tokens(text, null)) {
+            if (logLift(stats, token) > 0) supporting.add(token);
+        }
+        sortByLift(stats, supporting);
+        List<Evidence> words = new ArrayList<>();
+        for (String token : supporting) {
+            words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token))));
+        }
+        String authorToken = authorToken(author);
+        Evidence authorEvidence = null;
+        if (authorToken != null && (logLift(stats, authorToken) > 0 || authorException(stats, authorToken))) {
+            authorEvidence = evidence(stats, authorToken, author.trim());
+        }
+        return new Explanation(stats.spelling, words, authorEvidence);
+    }
+
+    /** What the model learned about {@code tag}; a tag no quote has gets a profile with 0 quotes. */
+    public TagProfile profile(String tag) {
+        String key = Hashtag.key(Hashtag.normalize(tag));
+        int quotes = tagQuotes.getOrDefault(key, 0);
+        TagStats stats = tags.get(key);
+        if (stats == null) {
+            return new TagProfile(tag, quotes, false, Collections.emptyList(), Collections.emptyList());
+        }
+        List<String> wordTokens = new ArrayList<>();
+        List<Evidence> authors = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : stats.tokens.entrySet()) {
+            String token = entry.getKey();
+            if (token.startsWith(AUTHOR_PREFIX)) {
+                if (authorException(stats, token)) authors.add(evidence(stats, token, authorNames.get(token)));
+            } else if (entry.getValue() >= PROFILE_MIN_TOGETHER && logLift(stats, token) > 0) {
+                wordTokens.add(token);
+            }
+        }
+        sortByLift(stats, wordTokens);
+        List<Evidence> words = new ArrayList<>();
+        for (String token : wordTokens.subList(0, Math.min(PROFILE_WORDS, wordTokens.size()))) {
+            words.add(evidence(stats, token, displayWord(token)));
+        }
+        authors.sort((a, b) -> a.withTag != b.withTag ? b.withTag - a.withTag : a.label.compareTo(b.label));
+        return new TagProfile(stats.spelling, quotes, true, words, authors);
+    }
+
+    private Evidence evidence(TagStats stats, String token, String label) {
+        return new Evidence(label, stats.tokens.getOrDefault(token, 0), tokenCounts.getOrDefault(token, 0));
+    }
+
+    /** Strongest lift first, ties by token. */
+    private void sortByLift(TagStats stats, List<String> tokens) {
+        tokens.sort((a, b) -> {
+            int byLift = Double.compare(logLift(stats, b), logLift(stats, a));
+            return byLift != 0 ? byLift : a.compareTo(b);
+        });
+    }
+
+    /** The collection's most frequent full word for {@code stem} (ties alphabetical), or the stem. */
+    String displayWord(String stem) {
+        Map<String, Integer> words = surfaceWords.get(stem);
+        if (words == null) return stem;
+        String best = stem;
+        int bestCount = 0;
+        for (Map.Entry<String, Integer> entry : words.entrySet()) {
+            int count = entry.getValue();
+            if (count > bestCount || (count == bestCount && entry.getKey().compareTo(best) < 0)) {
+                best = entry.getKey();
+                bestCount = count;
+            }
+        }
+        return best;
+    }
+
     /** log(P(w|t) / P(w)) with add-one smoothing; 0 for a token never seen with t. */
     private double logLift(TagStats stats, String token) {
         Integer together = stats.tokens.get(token);
@@ -197,29 +365,35 @@ public final class HashtagSuggester {
     /** The quote's tokens: stemmed content words of {@code text}, plus the author token. */
     static Set<String> tokens(String text, String author) {
         Set<String> tokens = new LinkedHashSet<>();
-        if (text != null) {
-            StringBuilder word = new StringBuilder();
-            String lower = text.toLowerCase(Locale.ROOT);
-            for (int i = 0; i <= lower.length(); ) {
-                int cp = i < lower.length() ? lower.codePointAt(i) : ' ';
-                if (Character.isLetter(cp)) {
-                    word.appendCodePoint(cp);
-                } else if (word.length() > 0) {
-                    addWord(tokens, word.toString());
-                    word.setLength(0);
-                }
-                i += Character.charCount(cp);
-            }
-        }
+        forEachWord(text, (stem, word) -> tokens.add(stem));
         String authorToken = authorToken(author);
         if (authorToken != null) tokens.add(authorToken);
         return tokens;
     }
 
-    private static void addWord(Set<String> tokens, String word) {
-        int length = word.codePointCount(0, word.length());
-        if (length < MIN_WORD_LENGTH || STOPWORDS.contains(word)) return;
-        tokens.add(length <= STEM_LENGTH ? word : word.substring(0, word.offsetByCodePoints(0, STEM_LENGTH)));
+    /**
+     * Each content word of {@code text} (lowercased; stopwords and words under
+     * {@link #MIN_WORD_LENGTH} letters dropped) with its stem, its first {@link #STEM_LENGTH}
+     * letters.
+     */
+    private static void forEachWord(String text, BiConsumer<String, String> action) {
+        if (text == null) return;
+        StringBuilder word = new StringBuilder();
+        String lower = text.toLowerCase(Locale.ROOT);
+        for (int i = 0; i <= lower.length(); ) {
+            int cp = i < lower.length() ? lower.codePointAt(i) : ' ';
+            if (Character.isLetter(cp)) {
+                word.appendCodePoint(cp);
+            } else if (word.length() > 0) {
+                String w = word.toString();
+                int length = w.codePointCount(0, w.length());
+                if (length >= MIN_WORD_LENGTH && !STOPWORDS.contains(w)) {
+                    action.accept(length <= STEM_LENGTH ? w : w.substring(0, w.offsetByCodePoints(0, STEM_LENGTH)), w);
+                }
+                word.setLength(0);
+            }
+            i += Character.charCount(cp);
+        }
     }
 
     /** {@code author:<name>}, lowercased with whitespace collapsed; null when there is no author. */

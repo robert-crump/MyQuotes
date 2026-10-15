@@ -48,6 +48,22 @@
     </style>
 
     <!-- CardView Style -->
+    <!-- An action row in a bottom sheet: icon then label, full width, 56dp tall -->
+    <style name="Widget.MyQuotes.SheetAction" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+        <item name="android:drawablePadding">16dp</item>
+        <item name="android:drawableTint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.Material3.BodyLarge</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+    </style>
+
     <style name="CardViewStyle" parent="CardView">
         <item name="cardBackgroundColor">?attr/colorSurface</item>
         <item name="cardCornerRadius">12dp</item>
