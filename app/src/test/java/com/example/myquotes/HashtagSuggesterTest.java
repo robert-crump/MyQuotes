@@ -363,4 +363,40 @@ public class HashtagSuggesterTest {
                 new HashtagSuggester.Evidence("#Death", 4, 5)), profile.tags);
         assertEquals(Collections.emptyList(), profile.words);
     }
+
+    @Test
+    public void suggestionsForCountAnUntaggedQuoteAsIfItWereLeftOut() {
+        addTagged(5, "forest walk", "Nature");
+        // Two "forest" quotes without the tag, one of them the quote.
+        addUntagged(1, "forest gold");
+        Quote quote = add("Someone New", "forest silver");
+        addFiller(10);
+        // With the quote "forest" is 5/7; without it 5/6, as the editor would count it.
+        assertEquals(Collections.singletonList(new HashtagSuggester.Suggestion("Nature",
+                        new HashtagSuggester.Evidence("forest", 5, 6))),
+                HashtagSuggester.fit(quotes).suggestionsFor(quote));
+    }
+
+    @Test
+    public void suggestionsForMatchTheEditorAtTheThreshold() {
+        addTagged(4, "forest walk", "Nature");
+        addTagged(1, "lake", "Nature");
+        addUntagged(4, "forest gold");
+        Quote quote = add("Someone New", "forest silver");
+        addFiller(10);
+        // With the quote "forest" is 4/9, below half; the editor, without it, sees 4/8.
+        List<Quote> others = new ArrayList<>(quotes);
+        others.remove(quote);
+        assertEquals(Collections.singletonList("Nature"),
+                HashtagSuggester.fit(others).suggest(quote.getQuoteText(), quote.getAuthor(), "", Collections.emptyList()));
+        assertEquals(Collections.singletonList(new HashtagSuggester.Suggestion("Nature",
+                        new HashtagSuggester.Evidence("forest", 4, 8))),
+                HashtagSuggester.fit(quotes).suggestionsFor(quote));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void suggestionsForRejectATaggedQuote() {
+        Quote quote = add("Someone", "forest", "Nature");
+        HashtagSuggester.fit(quotes).suggestionsFor(quote);
+    }
 }

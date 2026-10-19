@@ -41,6 +41,10 @@ import java.util.function.BiConsumer;
  * quotes with <i>gratitude</i> have the tag"), {@link #profile} every reason the model knows for
  * a tag. Stems are shown as a real word: the quote's own word in {@code explain}, otherwise the
  * collection's most frequent word with that stem.
+ * <p>
+ * The "No hashtag" list (#53) ranks untagged quotes by {@link #suggestionsFor}: the same
+ * suggestions, each with its strongest reason, for a quote that is part of the fitted collection,
+ * counted as if it were left out (as the editor fits without the quote being edited).
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
@@ -140,7 +144,7 @@ public final class HashtagSuggester {
     }
 
     /** Higher share first, then higher count; equal strength is 0. */
-    private static int byStrength(Evidence a, Evidence b) {
+    static int byStrength(Evidence a, Evidence b) {
         int byShare = Long.compare((long) b.withTag * a.total, (long) a.withTag * b.total);
         return byShare != 0 ? byShare : b.withTag - a.withTag;
     }
@@ -165,6 +169,34 @@ public final class HashtagSuggester {
             this.words = words;
             this.author = author;
             this.tags = tags;
+        }
+    }
+
+    /** A suggested tag and its strongest reason ("#Love (6/8)" in the "No hashtag" list). */
+    public static final class Suggestion {
+        public final String tag;
+        public final Evidence strongest;
+
+        Suggestion(String tag, Evidence strongest) {
+            this.tag = tag;
+            this.strongest = strongest;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Suggestion)) return false;
+            Suggestion other = (Suggestion) o;
+            return tag.equals(other.tag) && strongest.equals(other.strongest);
+        }
+
+        @Override
+        public int hashCode() {
+            return tag.hashCode() * 31 + strongest.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return tag + " (" + strongest + ")";
         }
     }
 
@@ -250,25 +282,43 @@ public final class HashtagSuggester {
             for (String tag : existingTags) excluded.add(Hashtag.key(Hashtag.normalize(tag)));
         }
 
-        List<String> ranked = new ArrayList<>();
-        Map<String, Evidence> strongest = new HashMap<>();
+        List<String> tags = new ArrayList<>();
+        for (Suggestion suggestion : suggestions(tokens, excluded, 0)) tags.add(suggestion.tag);
+        return tags;
+    }
+
+    /**
+     * What {@link #suggest} gives {@code quote}, an untagged quote of the fitted collection, if it
+     * were fitted without it: up to {@link #MAX_SUGGESTIONS}, best first, each with its strongest
+     * reason. Leaving an untagged quote out only lowers the counts of its own tokens by one.
+     */
+    public List<Suggestion> suggestionsFor(Quote quote) {
+        if (!quote.getTags().isEmpty()) {
+            throw new IllegalArgumentException("Quote #" + quote.getId() + " has hashtags");
+        }
+        return suggestions(tokens(quote.getQuoteText(), quote.getAuthor()), Collections.emptySet(), 1);
+    }
+
+    /**
+     * The best tags for {@code tokens}, none of {@code excluded}, with {@code self} quotes left out
+     * of each token's count.
+     */
+    private List<Suggestion> suggestions(Set<String> tokens, Set<String> excluded, int self) {
+        List<Suggestion> ranked = new ArrayList<>();
         for (Map.Entry<String, TagStats> entry : tags.entrySet()) {
             if (excluded.contains(entry.getKey())) continue;
             TagStats stats = entry.getValue();
             Evidence best = null;
             for (String token : tokens) {
-                if (!isReason(stats, token)) continue;
-                Evidence evidence = evidence(stats, token, token);
+                if (!isReason(stats, token, self)) continue;
+                Evidence evidence = evidence(stats, token, token, self);
                 if (best == null || byStrength(evidence, best) < 0) best = evidence;
             }
-            if (best != null) {
-                ranked.add(stats.spelling);
-                strongest.put(stats.spelling, best);
-            }
+            if (best != null) ranked.add(new Suggestion(stats.spelling, best));
         }
         ranked.sort((a, b) -> {
-            int byStrength = byStrength(strongest.get(a), strongest.get(b));
-            return byStrength != 0 ? byStrength : Hashtag.ORDER.compare(a, b);
+            int byStrength = byStrength(a.strongest, b.strongest);
+            return byStrength != 0 ? byStrength : Hashtag.ORDER.compare(a.tag, b.tag);
         });
         return new ArrayList<>(ranked.subList(0, Math.min(MAX_SUGGESTIONS, ranked.size())));
     }
@@ -346,7 +396,11 @@ public final class HashtagSuggester {
     }
 
     private Evidence evidence(TagStats stats, String token, String label) {
-        return new Evidence(label, stats.tokens.getOrDefault(token, 0), tokenCounts.getOrDefault(token, 0));
+        return evidence(stats, token, label, 0);
+    }
+
+    private Evidence evidence(TagStats stats, String token, String label, int self) {
+        return new Evidence(label, stats.tokens.getOrDefault(token, 0), tokenCounts.getOrDefault(token, 0) - self);
     }
 
     /** The collection's most frequent full word for {@code stem} (ties alphabetical), or the stem. */
@@ -372,12 +426,17 @@ public final class HashtagSuggester {
      * {@link #MIN_SHARE_PERCENT}% of the quotes with the token.
      */
     private boolean isReason(TagStats stats, String token) {
+        return isReason(stats, token, 0);
+    }
+
+    /** {@link #isReason(TagStats, String)} with {@code self} quotes left out of the token's count. */
+    private boolean isReason(TagStats stats, String token, int self) {
         if (token == null) return false;
         int together = stats.tokens.getOrDefault(token, 0);
         int min = token.startsWith(AUTHOR_PREFIX) ? MIN_AUTHOR_WITH_TAG
                 : token.startsWith(TAG_PREFIX) ? MIN_TAG_WITH_TAG : MIN_WORD_WITH_TAG;
         if (together < min) return false;
-        return together * 100 >= MIN_SHARE_PERCENT * tokenCounts.getOrDefault(token, 0);
+        return together * 100 >= MIN_SHARE_PERCENT * (tokenCounts.getOrDefault(token, 0) - self);
     }
 
     /** The quote's tokens: stemmed content words of {@code text}, plus the author token. */

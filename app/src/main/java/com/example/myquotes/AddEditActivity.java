@@ -3,6 +3,8 @@ package com.example.myquotes;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -11,6 +13,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.EditText;
 import android.widget.ListPopupWindow;
+import android.widget.ScrollView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -20,13 +23,24 @@ import androidx.appcompat.widget.Toolbar;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
+/**
+ * Adds or edits a quote. Opened from the "No hashtag" list ({@link #taggingRunIntent}) it runs a
+ * tagging run (#53, {@link TaggingRun}): saving a quote that had no hashtags with some asks once
+ * "Continue with next untagged quote?", and from then on each save loads the next quote in place
+ * (best suggestions first, re-ranked with the refitted model). Skip moves on without saving; a
+ * save that leaves the quote untagged skips it. Back ends the run.
+ */
 public class AddEditActivity extends AppCompatActivity {
     private static final String TAG = "AddEditActivity";
     public static final String EXTRA_ACTION = "ACTION";
     public static final String EXTRA_QUOTE_ID = "QUOTE_ID";
     public static final String ACTION_ADD = "ADD_QUOTE";
     public static final String ACTION_EDIT = "EDIT_QUOTE";
+    static final String EXTRA_TAGGING_RUN = "TAGGING_RUN";
 
     /** Intent that opens the editor for the quote with {@code quoteId}. */
     public static Intent editIntent(Context context, int quoteId) {
@@ -35,10 +49,17 @@ public class AddEditActivity extends AppCompatActivity {
                 .putExtra(EXTRA_QUOTE_ID, quoteId);
     }
 
+    /** The editor for {@code quoteId} as the start of a tagging run through {@code query}'s untagged quotes. */
+    public static Intent taggingRunIntent(Context context, int quoteId, QuoteQuery query) {
+        return editIntent(context, quoteId).putExtra(EXTRA_TAGGING_RUN, new TaggingRun(query).toBundle());
+    }
+
     private EditText editTextAuthor;
     private EditText editTextQuote;
     private EditText editTextSource;
     private static final String STATE_TAGS = "hashtags";
+    private static final String STATE_QUOTE_ID = "quote_id";
+    private static final String STATE_RUN = "tagging_run";
 
     private HashtagChipField hashtagField;
     private HashtagSuggestionRow hashtagSuggestions;
@@ -52,6 +73,11 @@ public class AddEditActivity extends AppCompatActivity {
     // What the form held when opened (empty for Add, the loaded quote for Edit); closing with a
     // form that differs from it asks for confirmation.
     private QuoteFormSnapshot baseline = QuoteFormSnapshot.EMPTY;
+    // The tagging run when opened from the "No hashtag" list; else null.
+    private TaggingRun run;
+    private boolean loadedUntagged;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService runFitter = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +87,10 @@ public class AddEditActivity extends AppCompatActivity {
         setupToolbar();
         setupViewModel();
         setupViews();
-        handleIntent();
+        run = TaggingRun.fromBundle(savedInstanceState != null
+                ? savedInstanceState.getBundle(STATE_RUN)
+                : getIntent().getBundleExtra(EXTRA_TAGGING_RUN));
+        handleIntent(savedInstanceState);
         hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
                 quoteCollection, quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
         if (savedInstanceState != null) {
@@ -112,16 +141,16 @@ public class AddEditActivity extends AppCompatActivity {
                 if (readForm().equals(baseline)) {
                     finish();
                 } else {
-                    showDiscardDialog();
+                    showDiscardDialog(AddEditActivity.this::finish);
                 }
             }
         });
     }
 
-    private void showDiscardDialog() {
+    private void showDiscardDialog(Runnable onDiscard) {
         new AlertDialog.Builder(this)
                 .setTitle("Discard changes?")
-                .setPositiveButton("Discard", (dialog, which) -> finish())
+                .setPositiveButton("Discard", (dialog, which) -> onDiscard.run())
                 .setNegativeButton("Keep editing", null)
                 .show();
     }
@@ -149,6 +178,7 @@ public class AddEditActivity extends AppCompatActivity {
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         menu.findItem(R.id.action_delete).setVisible(isEditMode);
+        menu.findItem(R.id.action_skip).setVisible(run != null);
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -156,6 +186,13 @@ public class AddEditActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_save) {
             saveQuote();
+            return true;
+        } else if (item.getItemId() == R.id.action_skip) {
+            if (readForm().equals(baseline)) {
+                skipQuote();
+            } else {
+                showDiscardDialog(this::skipQuote);
+            }
             return true;
         } else if (item.getItemId() == R.id.action_delete) {
             showDeleteDialog();
@@ -264,7 +301,7 @@ public class AddEditActivity extends AppCompatActivity {
         return height;
     }
 
-    private void handleIntent() {
+    private void handleIntent(Bundle savedInstanceState) {
         Intent intent = getIntent();
         if (intent == null) return;
 
@@ -273,10 +310,12 @@ public class AddEditActivity extends AppCompatActivity {
         if (ACTION_EDIT.equals(action)) {
             isEditMode = true;
             quoteId = intent.getIntExtra(EXTRA_QUOTE_ID, -1);
+            // A tagging run may have moved on to another quote.
+            if (savedInstanceState != null) quoteId = savedInstanceState.getInt(STATE_QUOTE_ID, quoteId);
 
             if (quoteId != -1) {
                 loadQuote(quoteId);
-                setTitle("Edit quote");
+                updateTitle();
             }
         } else {
             setTitle("Add quote");
@@ -293,6 +332,7 @@ public class AddEditActivity extends AppCompatActivity {
             hashtagField.setTags(quote.getTags());
             isLoadingQuote = false;
             baseline = QuoteFormSnapshot.of(quote);
+            loadedUntagged = quote.getTags().isEmpty();
             Log.d(TAG, "Loaded quote #" + id);
         } else {
             Log.w(TAG, "Quote not found: " + id);
@@ -312,13 +352,99 @@ public class AddEditActivity extends AppCompatActivity {
         if (isEditMode) {
             quoteCollection.edit(quoteId, quote.getAuthor(), quote.getQuoteText(),
                     quote.getSource(), quote.getTags());
-            Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
-            finish();
+            if (run != null && loadedUntagged) {
+                continueRun(!quote.getTags().isEmpty());
+                return;
+            }
+            finishWith("Quote updated");
         } else {
             quoteCollection.add(quote);
             Toast.makeText(this, "Quote added", Toast.LENGTH_SHORT).show();
             clearForm();
         }
+    }
+
+    /** "Edit quote", or during a tagging run "Edit quote · 12 left". */
+    private void updateTitle() {
+        setTitle(run == null ? "Edit quote"
+                : "Edit quote · " + run.remaining(quoteCollection.getCurrentList()) + " left");
+    }
+
+    private void finishWith(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        finish();
+    }
+
+    /**
+     * After a save in a tagging run: a quote that got hashtags asks once whether to continue, then
+     * the next quote opens; one left untagged is skipped once the user has said to continue.
+     */
+    private void continueRun(boolean tagged) {
+        if (!tagged) {
+            if (!run.isContinued()) {
+                finishWith("Quote updated");
+                return;
+            }
+            run.skip(quoteId);
+        }
+        baseline = readForm();
+        withNextQuote(next -> {
+            if (next == null) {
+                finishWith(run.isContinued() ? "No more untagged quotes" : "Quote updated");
+            } else if (run.isContinued()) {
+                Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
+                showQuote(next);
+            } else {
+                new AlertDialog.Builder(this)
+                        .setTitle("Continue with next untagged quote?")
+                        .setPositiveButton("Continue", (dialog, which) -> {
+                            run.setContinued();
+                            showQuote(next);
+                        })
+                        .setNegativeButton("Back to list", (dialog, which) -> finishWith("Quote updated"))
+                        .setOnCancelListener(dialog -> finishWith("Quote updated"))
+                        .show();
+            }
+        });
+    }
+
+    /** Leaves the quote untagged for the rest of the run and opens the next one. */
+    private void skipQuote() {
+        run.skip(quoteId);
+        run.setContinued();
+        withNextQuote(next -> {
+            if (next == null) {
+                finishWith("No more untagged quotes");
+            } else {
+                showQuote(next);
+            }
+        });
+    }
+
+    /** Fits the model on the collection as it is now (after the save), then picks the run's next quote. */
+    private void withNextQuote(Consumer<Quote> action) {
+        List<Quote> quotes = quoteCollection.getCurrentList();
+        runFitter.execute(() -> {
+            HashtagSuggester model = HashtagSuggester.fit(quotes);
+            main.post(() -> {
+                if (isDestroyed()) return;
+                action.accept(run.next(quotes, model));
+            });
+        });
+    }
+
+    /** Loads {@code next} into the form in place of the current quote. */
+    private void showQuote(Quote next) {
+        authorPopup.dismiss();
+        sourcePopup.dismiss();
+        hashtagField.dismissDropDown();
+        editTextAuthor.setError(null);
+        editTextQuote.setError(null);
+        quoteId = next.getId();
+        loadQuote(quoteId);
+        hashtagSuggestions.setEditedQuoteId(quoteId);
+        ((ScrollView) findViewById(R.id.scroll_form)).scrollTo(0, 0);
+        updateTitle();
     }
 
     private void clearForm() {
@@ -366,6 +492,8 @@ public class AddEditActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (hashtagSuggestions != null) hashtagSuggestions.release();
+        runFitter.shutdownNow();
+        main.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 
@@ -373,5 +501,7 @@ public class AddEditActivity extends AppCompatActivity {
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putStringArrayList(STATE_TAGS, hashtagField.getTags());
+        outState.putInt(STATE_QUOTE_ID, quoteId);
+        if (run != null) outState.putBundle(STATE_RUN, run.toBundle());
     }
 }

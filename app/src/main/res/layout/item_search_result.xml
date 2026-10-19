@@ -60,6 +60,16 @@
                 android:ellipsize="end"
                 android:lineSpacingExtra="2dp" />
 
+            <!-- "No hashtag" list: the top suggestions with their counts (#53) -->
+            <TextView
+                android:id="@+id/text_suggestions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone" />
+
         </LinearLayout>
 
     </LinearLayout>

@@ -3,6 +3,8 @@ package com.example.myquotes;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -17,6 +19,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -27,8 +30,11 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
@@ -38,6 +44,11 @@ import java.util.Map;
  * "No hashtag", #51) shows as a chip under the field and combines with the text: a tapped
  * hashtag arrives as {@link QuoteQuery#forTag} with an empty field; the filter dialog's
  * "Hashtag" button picks one, the chip's x removes it.
+ * <p>
+ * With the "No hashtag" filter (#53) the results are ranked by {@link UntaggedRanking}, each with
+ * a "Suggested:" line, from a model fitted off the main thread on the current collection; the
+ * results wait for it. Editing a quote from there starts a tagging run in the editor
+ * ({@link AddEditActivity#taggingRunIntent}).
  */
 public class SearchFragment extends Fragment
         implements SearchResultsAdapter.OnQuoteClickListener, QuoteDialogFragment.Host {
@@ -61,6 +72,12 @@ public class SearchFragment extends Fragment
     private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes = new ArrayList<>();
+    // The "No hashtag" ranking's model: fitted on fittedFor, or being fitted on fitting.
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private ExecutorService fitter;
+    private HashtagSuggester untaggedModel;
+    private List<Quote> fittedFor;
+    private List<Quote> fitting;
 
     private QuoteQuery query = QuoteQuery.all("");
 
@@ -74,6 +91,7 @@ public class SearchFragment extends Fragment
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        fitter = Executors.newSingleThreadExecutor();
         QuoteQuery restored = savedInstanceState != null
                 ? QuoteQuery.fromBundle(savedInstanceState.getBundle(STATE_QUERY))
                 : QuoteQuery.fromBundle(getArguments());
@@ -128,6 +146,13 @@ public class SearchFragment extends Fragment
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBundle(STATE_QUERY, query.toBundle());
+    }
+
+    @Override
+    public void onDestroy() {
+        fitter.shutdownNow();
+        main.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     @Override
@@ -279,8 +304,38 @@ public class SearchFragment extends Fragment
         if (searchEditText == null) return;
         query = query.withText(searchEditText.getText().toString());
         List<Quote> results = query.filter(allQuotes);
-        adapter.updateResults(results, query);
+        Map<Integer, List<HashtagSuggester.Suggestion>> suggestions = null;
+        if (query.isUntagged()) {
+            if (fittedFor != allQuotes) {
+                fitUntaggedModel(); // reruns the search when the model is ready
+                return;
+            }
+            List<UntaggedRanking.Entry> ranked = UntaggedRanking.rank(results, untaggedModel);
+            results = new ArrayList<>();
+            suggestions = new HashMap<>();
+            for (UntaggedRanking.Entry entry : ranked) {
+                results.add(entry.quote);
+                suggestions.put(entry.quote.getId(), entry.suggestions);
+            }
+        }
+        adapter.updateResults(results, query, suggestions);
         updateResultCount(results.size());
+    }
+
+    /** Fits the "No hashtag" ranking's model on the current collection, off the main thread. */
+    private void fitUntaggedModel() {
+        List<Quote> quotes = allQuotes;
+        if (fitting == quotes || fitter.isShutdown()) return;
+        fitting = quotes;
+        fitter.execute(() -> {
+            HashtagSuggester fitted = HashtagSuggester.fit(quotes);
+            main.post(() -> {
+                if (fitter.isShutdown() || quotes != allQuotes) return;
+                untaggedModel = fitted;
+                fittedFor = quotes;
+                rerunSearch();
+            });
+        });
     }
 
     private void updateResultCount(int count) {
@@ -303,5 +358,20 @@ public class SearchFragment extends Fragment
         hideKeyboard();
         QuoteDialogFragment.newInstance(quote.getId())
                 .show(getChildFragmentManager(), QuoteDialogFragment.TAG);
+    }
+
+    /**
+     * From the quote dialog. In the "No hashtag" list this starts a tagging run, which returns to
+     * the list, so the dialog closes.
+     */
+    @Override
+    public void editQuote(Quote quote) {
+        if (!query.isUntagged()) {
+            startActivity(AddEditActivity.editIntent(requireContext(), quote.getId()));
+            return;
+        }
+        startActivity(AddEditActivity.taggingRunIntent(requireContext(), quote.getId(), query));
+        Fragment dialog = getChildFragmentManager().findFragmentByTag(QuoteDialogFragment.TAG);
+        if (dialog instanceof DialogFragment) ((DialogFragment) dialog).dismiss();
     }
 }

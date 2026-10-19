@@ -45,6 +45,8 @@ final class HashtagSuggestionRow {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService fitter = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::refresh;
+    private final QuoteCollection collection;
+    private int editedQuoteId;
     private HashtagSuggester model;
     private List<String> shown = Collections.emptyList();
 
@@ -57,6 +59,8 @@ final class HashtagSuggestionRow {
         this.text = text;
         this.source = source;
         this.field = field;
+        this.collection = collection;
+        this.editedQuoteId = editedQuoteId;
 
         TextWatcher debounced = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -73,19 +77,30 @@ final class HashtagSuggestionRow {
         field.setOnTagsChangedListener(this::refresh);
         root.findViewById(R.id.button_suggestions_info).setOnClickListener(v -> showExplanation());
 
-        collection.getQuoteList().observe(owner, quotes -> {
-            if (fitter.isShutdown()) return;
-            List<Quote> others = new ArrayList<>();
-            for (Quote quote : quotes) {
-                if (quote.getId() == null || quote.getId() != editedQuoteId) others.add(quote);
-            }
-            fitter.execute(() -> {
-                HashtagSuggester fitted = HashtagSuggester.fit(others);
-                main.post(() -> {
-                    if (fitter.isShutdown()) return;
-                    model = fitted;
-                    refresh();
-                });
+        collection.getQuoteList().observe(owner, this::fit);
+    }
+
+    /** The editor now shows another quote (the tagging run, #53): refits without it. */
+    void setEditedQuoteId(int quoteId) {
+        editedQuoteId = quoteId;
+        model = null;
+        refresh();
+        fit(collection.getQuoteList().getValue());
+    }
+
+    private void fit(List<Quote> quotes) {
+        if (fitter.isShutdown() || quotes == null) return;
+        int leftOut = editedQuoteId;
+        List<Quote> others = new ArrayList<>();
+        for (Quote quote : quotes) {
+            if (quote.getId() == null || quote.getId() != leftOut) others.add(quote);
+        }
+        fitter.execute(() -> {
+            HashtagSuggester fitted = HashtagSuggester.fit(others);
+            main.post(() -> {
+                if (fitter.isShutdown() || leftOut != editedQuoteId) return;
+                model = fitted;
+                refresh();
             });
         });
     }

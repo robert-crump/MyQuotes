@@ -64,4 +64,16 @@ public class HashtagSuggestionTextTest {
                         "Words: No word is strong enough yet to serve as a predictor for this hashtag."),
                 HashtagSuggestionText.suggestions(profile));
     }
+
+    @Test
+    public void suggestedLineShowsEachTagWithItsStrongestCounts() {
+        assertEquals("Suggested: #Gratitude (10/11) #Love (6/8)", HashtagSuggestionText.suggestedLine(Arrays.asList(
+                new HashtagSuggester.Suggestion("Gratitude", evidence("grateful", 10, 11)),
+                new HashtagSuggester.Suggestion("Love", evidence("Rumi", 6, 8)))));
+    }
+
+    @Test
+    public void suggestedLineIsNullWithoutSuggestions() {
+        assertEquals(null, HashtagSuggestionText.suggestedLine(Collections.emptyList()));
+    }
 }

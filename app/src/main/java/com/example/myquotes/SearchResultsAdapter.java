@@ -10,10 +10,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdapter.ViewHolder> {
     private List<Quote> quotes = new ArrayList<>();
     private QuoteQuery query = QuoteQuery.all("");
+    // Per quote id, its hashtag suggestions (the "No hashtag" list, #53); null elsewhere.
+    private Map<Integer, List<HashtagSuggester.Suggestion>> suggestions;
     private OnQuoteClickListener clickListener;
 
     public interface OnQuoteClickListener {
@@ -25,9 +28,11 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
         this.clickListener = listener;
     }
 
-    public void updateResults(List<Quote> newQuotes, QuoteQuery query) {
+    public void updateResults(List<Quote> newQuotes, QuoteQuery query,
+                              Map<Integer, List<HashtagSuggester.Suggestion>> suggestions) {
         this.quotes = newQuotes;
         this.query = query;
+        this.suggestions = suggestions;
         notifyDataSetChanged();
     }
 
@@ -54,12 +59,14 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
         private final TextView searchResultNumber;
         private final TextView authorSourceTextView;
         private final TextView quoteSnippetTextView;
+        private final TextView suggestionsTextView;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             searchResultNumber = itemView.findViewById(R.id.text_search_result_number);
             authorSourceTextView = itemView.findViewById(R.id.text_author_source);
             quoteSnippetTextView = itemView.findViewById(R.id.text_quote_snippet);
+            suggestionsTextView = itemView.findViewById(R.id.text_suggestions);
 
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
@@ -79,6 +86,12 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
 
             String snippet = query.snippet(quote);
             quoteSnippetTextView.setText(snippet);
+
+            List<HashtagSuggester.Suggestion> quoteSuggestions =
+                    suggestions == null ? null : suggestions.get(quote.getId());
+            String line = quoteSuggestions == null ? null : HashtagSuggestionText.suggestedLine(quoteSuggestions);
+            suggestionsTextView.setText(line);
+            suggestionsTextView.setVisibility(line == null ? View.GONE : View.VISIBLE);
         }
     }
 }

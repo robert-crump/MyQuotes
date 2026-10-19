@@ -75,6 +75,19 @@ final class HashtagSuggestionText {
         return lines;
     }
 
+    /**
+     * The "No hashtag" list's line (#53): "Suggested: #Gratitude (10/11) #Love (6/8)", each tag
+     * with the counts of its strongest reason; null when there are no suggestions.
+     */
+    static String suggestedLine(List<HashtagSuggester.Suggestion> suggestions) {
+        if (suggestions.isEmpty()) return null;
+        List<String> parts = new ArrayList<>();
+        for (HashtagSuggester.Suggestion s : suggestions) {
+            parts.add(Hashtag.display(s.tag) + " (" + s.strongest.withTag + "/" + s.strongest.total + ")");
+        }
+        return "Suggested: " + String.join(" ", parts);
+    }
+
     /** "gratitude (6/9), grateful (4/7)". */
     private static String list(List<HashtagSuggester.Evidence> evidence) {
         List<String> parts = new ArrayList<>();

@@ -24,9 +24,11 @@ public class QuoteDialogFragment extends DialogFragment implements QuoteCard.Lis
     public static final String TAG = "QuoteDialogFragment";
     private static final String ARG_QUOTE_ID = "quote_id";
 
-    /** Runs the query of a tapped author, source or hashtag. */
+    /** Runs the query of a tapped author, source or hashtag, and opens the editor. */
     public interface Host {
         void applyQuery(QuoteQuery query);
+
+        void editQuote(Quote quote);
     }
 
     private QuoteCollection quoteCollection;
@@ -126,7 +128,7 @@ public class QuoteDialogFragment extends DialogFragment implements QuoteCard.Lis
 
     @Override
     public void onEditQuote(Quote quote) {
-        startActivity(AddEditActivity.editIntent(requireContext(), quote.getId()));
+        ((Host) requireParentFragment()).editQuote(quote);
     }
 
     private void showField(QuoteQuery.Field field, String value) {
