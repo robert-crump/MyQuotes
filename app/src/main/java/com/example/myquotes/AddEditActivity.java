@@ -31,8 +31,8 @@ import java.util.function.Consumer;
  * Adds or edits a quote. Opened from the "No hashtag" list ({@link #taggingRunIntent}) it runs a
  * tagging run (#53, {@link TaggingRun}): saving a quote that had no hashtags with some asks once
  * "Continue with next untagged quote?", and from then on each save loads the next quote in place
- * (best suggestions first, re-ranked with the refitted model). Skip moves on without saving; a
- * save that leaves the quote untagged skips it. Back ends the run.
+ * (best suggestions first, re-ranked with the refitted model). Skip moves on without saving, and
+ * so does Delete after deleting; a save that leaves the quote untagged skips it. Back ends the run.
  */
 public class AddEditActivity extends AppCompatActivity {
     private static final String TAG = "AddEditActivity";
@@ -155,7 +155,8 @@ public class AddEditActivity extends AppCompatActivity {
                 .show();
     }
 
-    // Deleting closes the editor straight away: the quote is gone, so any unsaved edits are moot.
+    // Deleting closes the editor straight away, or in a tagging run moves on like Skip: the quote
+    // is gone, so any unsaved edits are moot.
     private void showDeleteDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Quote")
@@ -163,7 +164,11 @@ public class AddEditActivity extends AppCompatActivity {
                 .setPositiveButton("Delete", (dialog, which) -> {
                     quoteCollection.deleteById(quoteId);
                     Toast.makeText(this, "Quote deleted", Toast.LENGTH_SHORT).show();
-                    finish();
+                    if (run != null) {
+                        moveOn();
+                    } else {
+                        finish();
+                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -411,6 +416,11 @@ public class AddEditActivity extends AppCompatActivity {
     /** Leaves the quote untagged for the rest of the run and opens the next one. */
     private void skipQuote() {
         run.skip(quoteId);
+        moveOn();
+    }
+
+    /** Opens the run's next quote without asking (Skip, Delete), or ends the run when none is left. */
+    private void moveOn() {
         run.setContinued();
         withNextQuote(next -> {
             if (next == null) {
