@@ -1,15 +1,18 @@
 package com.example.myquotes;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AutoCompleteTextView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.lifecycle.LifecycleOwner;
@@ -27,7 +30,9 @@ import java.util.List;
  * typing; a tag the quote already has is ignored, and one that exists elsewhere in the collection
  * keeps its spelling. A chip's × removes it; Backspace in the empty field highlights the last
  * chip, a second Backspace removes it. The dropdown lists existing tags starting with the input,
- * most-used first, at most 6, with counts (the most-used ones for empty input).
+ * most-used first, at most 6, with counts (the most-used ones for empty input). It opens below
+ * the field ({@link DropDownBelowTextView}); while the field has focus the form is scrolled to put
+ * it at the top, with blank space added below the form when it is too short to scroll that far.
  */
 final class HashtagChipField {
     private final Context context;
@@ -35,6 +40,10 @@ final class HashtagChipField {
     private final AutoCompleteTextView input;
     private final TextView label;
     private final View underline;
+    private final View field;
+    private final ScrollView scroll;
+    private final View form;
+    private final int formPaddingBottom;
     private final Hashtags hashtags;
     private final FieldSuggestionAdapter adapter;
     private final List<String> tags = new ArrayList<>();
@@ -48,6 +57,10 @@ final class HashtagChipField {
         input = root.findViewById(R.id.edit_text_hashtags);
         label = root.findViewById(R.id.label_hashtags);
         underline = root.findViewById(R.id.hashtag_underline);
+        field = root;
+        scroll = enclosingScrollView(root);
+        form = scroll.getChildAt(0);
+        formPaddingBottom = form.getPaddingBottom();
         this.hashtags = hashtags;
 
         adapter = new FieldSuggestionAdapter(context);
@@ -93,8 +106,21 @@ final class HashtagChipField {
                     : com.google.android.material.R.attr.colorOnSurfaceVariant);
             label.setTextColor(color);
             underline.setBackgroundColor(color);
-            if (hasFocus) showMostUsed();
-            else highlight(null);
+            if (hasFocus) {
+                liftField();
+                showMostUsed();
+            } else {
+                highlight(null);
+                setFormExtraBottom(0);
+            }
+        });
+        // The keyboard coming or going resizes the form's viewport: lift again. Scrolling moves the
+        // space below the field: refit the open dropdown to it.
+        scroll.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+            if (b - t != oldB - oldT && input.hasFocus()) liftField();
+        });
+        scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (input.isPopupShowing()) input.showDropDown();
         });
         // A tap on the field outside the chips and the text goes to the text.
         group.setOnClickListener(v -> {
@@ -229,6 +255,33 @@ final class HashtagChipField {
             chip.setCheckable(true);
             chip.setChecked(true);
         }
+    }
+
+    /** Scrolls the form so the field sits at the top, leaving the dropdown room below it. */
+    private void liftField() {
+        Rect bounds = new Rect();
+        field.getDrawingRect(bounds);
+        scroll.offsetDescendantRectToMyCoords(field, bounds);
+        int top = bounds.top;
+        int viewport = scroll.getHeight() - scroll.getPaddingTop() - scroll.getPaddingBottom();
+        int natural = form.getHeight() - (form.getPaddingBottom() - formPaddingBottom);
+        setFormExtraBottom(Math.max(0, top + viewport - natural));
+        // After the padding is laid out; not smooth, since the text keeping its cursor in view
+        // would cancel the animation halfway.
+        scroll.post(() -> scroll.scrollTo(0, top));
+    }
+
+    private void setFormExtraBottom(int extra) {
+        if (form.getPaddingBottom() == formPaddingBottom + extra) return;
+        form.setPadding(form.getPaddingLeft(), form.getPaddingTop(), form.getPaddingRight(),
+                formPaddingBottom + extra);
+    }
+
+    private static ScrollView enclosingScrollView(View view) {
+        for (ViewParent p = view.getParent(); p != null; p = p.getParent()) {
+            if (p instanceof ScrollView) return (ScrollView) p;
+        }
+        throw new IllegalStateException("The hashtag field must sit in a ScrollView");
     }
 
     private void showMostUsed() {

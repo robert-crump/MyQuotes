@@ -94,7 +94,8 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Hashtags: the tags as input chips, then the text being typed, wrapping onto more
-                 lines (AddEditActivity). Space, Enter, comma or a dropdown pick commits a chip. -->
+                 lines (AddEditActivity). Space, Enter, comma or a dropdown pick commits a chip. The
+                 dropdown opens right under the underline, over the Suggested row. -->
             <LinearLayout
                 android:id="@+id/hashtag_field"
                 android:layout_width="match_parent"
@@ -119,7 +120,7 @@
                     app:chipSpacingHorizontal="6dp"
                     app:chipSpacingVertical="0dp">
 
-                    <AutoCompleteTextView
+                    <com.example.myquotes.DropDownBelowTextView
                         android:id="@+id/edit_text_hashtags"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
@@ -132,7 +133,7 @@
                         android:imeOptions="actionDone"
                         android:maxLines="1"
                         android:completionThreshold="1"
-                        android:dropDownAnchor="@id/hashtag_field"
+                        android:dropDownAnchor="@id/hashtag_underline"
                         android:dropDownWidth="match_parent"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
