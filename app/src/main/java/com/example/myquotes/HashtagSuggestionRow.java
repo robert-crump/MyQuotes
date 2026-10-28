@@ -28,8 +28,8 @@ import java.util.concurrent.Executors;
  * The Add/Edit "Suggested:" row ({@code hashtag_suggestions}) under the hashtag field (#50): up
  * to 3 tags from {@link HashtagSuggester}, as assist chips with a +. A tap adds the tag as a chip.
  * The model is fitted off the main thread whenever the Quote Collection emits (so on opening),
- * leaving out the quote being edited; the row refreshes 300 ms after the text or author last
- * changed, and at once when the quote's tags change. Hidden when nothing qualifies.
+ * leaving out the quote being edited; the row refreshes 300 ms after the text, author or source
+ * last changed, and at once when the quote's tags change. Hidden when nothing qualifies.
  * The info button next to the label, or a long-press on a chip, explains all current
  * suggestions in one dialog (#51, #52): how suggesting works, then each tag's reasons with counts.
  */
@@ -74,6 +74,7 @@ final class HashtagSuggestionRow {
         };
         author.addTextChangedListener(debounced);
         text.addTextChangedListener(debounced);
+        source.addTextChangedListener(debounced);
         field.setOnTagsChangedListener(this::refresh);
         root.findViewById(R.id.button_suggestions_info).setOnClickListener(v -> showExplanation());
 
@@ -139,7 +140,8 @@ final class HashtagSuggestionRow {
         SpannableStringBuilder message = new SpannableStringBuilder(HashtagSuggestionText.INTRO);
         for (String tag : shown) {
             HashtagSuggester.Explanation explanation =
-                    model.explain(text.getText().toString(), author.getText().toString(), field.getTags(), tag);
+                    model.explain(text.getText().toString(), author.getText().toString(),
+                            source.getText().toString(), field.getTags(), tag);
             if (explanation == null) continue;
             message.append("\n\n");
             int start = message.length();

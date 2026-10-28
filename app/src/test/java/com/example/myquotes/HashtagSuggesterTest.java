@@ -105,6 +105,65 @@ public class HashtagSuggesterTest {
                 .suggest("gold coin", "Emerson", "", Collections.emptyList()));
     }
 
+    private void addMeditations(int withTag, int without) {
+        for (int i = 0; i < withTag; i++) {
+            add("Author " + quotes.size(), "trust thyself " + i, "Nature").setSource("Meditations");
+        }
+        for (int i = 0; i < without; i++) add("Author " + quotes.size(), "every wall is a door " + i).setSource("Meditations");
+    }
+
+    @Test
+    public void theSourceIsAReasonAtTwoQuotesAndFortyPercent() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        addMeditations(2, 3);
+        assertEquals(Collections.singletonList("Nature"), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "Someone New", "  meditations ", Collections.emptyList()));
+
+        addMeditations(0, 1);
+        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "Someone New", "Meditations", Collections.emptyList()));
+    }
+
+    @Test
+    public void aSourceWithOneTaggedQuoteIsNoReason() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        addMeditations(1, 0);
+        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
+                .suggest("gold coin", "Someone New", "Meditations", Collections.emptyList()));
+    }
+
+    @Test
+    public void explainNamesTheSourceWhenItIsAReason() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        addMeditations(2, 1);
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
+                .explain("gold coin", "Nobody", " Meditations ", null, "Nature");
+        assertEquals(new HashtagSuggester.Evidence("Meditations", 2, 3), why.source);
+    }
+
+    @Test
+    public void profileListsEverySourceThatIsAReason() {
+        addTagged(5, "forest river mountain", "Nature");
+        addMeditations(2, 1);
+        assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("Meditations", 2, 3)),
+                HashtagSuggester.fit(quotes).profile("Nature").sources);
+    }
+
+    @Test
+    public void suggestionsForCountTheSource() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        addMeditations(2, 0);
+        Quote quote = add("Someone New", "gold coin");
+        quote.setSource("Meditations");
+        assertEquals(Collections.singletonList(new HashtagSuggester.Suggestion("Nature",
+                        new HashtagSuggester.Evidence("source:meditations", 2, 2))),
+                HashtagSuggester.fit(quotes).suggestionsFor(quote));
+    }
+
     @Test
     public void tagsTheQuoteHasAreExcludedIgnoringCase() {
         addTagged(5, "forest river mountain", "Nature");
@@ -149,9 +208,9 @@ public class HashtagSuggesterTest {
     @Test
     public void stopwordsAndShortWordsDoNotCount() {
         assertEquals(new LinkedHashSet<>(Collections.singletonList("forest")),
-                HashtagSuggester.tokens("The forest is where we go, and they are ours.", null));
+                HashtagSuggester.tokens("The forest is where we go, and they are ours.", null, null));
         assertEquals(new LinkedHashSet<>(Arrays.asList("wald", "baum")),
-                HashtagSuggester.tokens("Der Wald und die Bäume, ich bin immer da.", ""));
+                HashtagSuggester.tokens("Der Wald und die Bäume, ich bin immer da.", "", null));
 
         addTagged(5, "the and forest", "Nature");
         addFiller(10);
@@ -161,11 +220,11 @@ public class HashtagSuggesterTest {
     @Test
     public void theStemMergesWordForms() {
         assertEquals(new LinkedHashSet<>(Collections.singletonList("love")),
-                HashtagSuggester.tokens("Love, loved and loving.", null));
+                HashtagSuggester.tokens("Love, loved and loving.", null, null));
         assertEquals(new LinkedHashSet<>(Collections.singletonList("happi")),
-                HashtagSuggester.tokens("Happiness is being happy.", null));
-        assertEquals(new LinkedHashSet<>(Arrays.asList("lieb", "author:goethe")),
-                HashtagSuggester.tokens("Die Liebe und lieben", " Goethe "));
+                HashtagSuggester.tokens("Happiness is being happy.", null, null));
+        assertEquals(new LinkedHashSet<>(Arrays.asList("lieb", "author:goethe", "source:faust")),
+                HashtagSuggester.tokens("Die Liebe und lieben", " Goethe ", " Faust "));
 
         addTagged(5, "true love lasts", "Love");
         addFiller(10);
@@ -176,13 +235,13 @@ public class HashtagSuggesterTest {
     public void theLanguageWithMoreStopwordsPicksTheStemmer() {
         // German: "leben" → "leb", "sterben" → "sterb".
         assertEquals(new LinkedHashSet<>(Arrays.asList("leb", "sterb")),
-                HashtagSuggester.tokens("Wir leben und wir sterben.", null));
+                HashtagSuggester.tokens("Wir leben und wir sterben.", null, null));
         // English: "living" → "live", "dying" → "die".
         assertEquals(new LinkedHashSet<>(Arrays.asList("live", "die")),
-                HashtagSuggester.tokens("We are living and we are dying.", null));
+                HashtagSuggester.tokens("We are living and we are dying.", null, null));
         // No stopwords at all: English.
         assertEquals(new LinkedHashSet<>(Collections.singletonList("live")),
-                HashtagSuggester.tokens("Living!", null));
+                HashtagSuggester.tokens("Living!", null, null));
     }
 
     @Test
@@ -220,7 +279,7 @@ public class HashtagSuggesterTest {
         addUntagged(1, "a forest of money");
         addFiller(10);
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("Forests by the River, a lake.", "Nobody", null, "nature");
+                .explain("Forests by the River, a lake.", "Nobody", "", null, "nature");
         assertEquals("Nature", why.tag);
         // "river" 6/6, then "forests" (stem "forest") 5/6; "lake" is on no quote.
         assertEquals(Arrays.asList(new HashtagSuggester.Evidence("river", 6, 6),
@@ -234,7 +293,7 @@ public class HashtagSuggesterTest {
         addTagged(1, "time", "Nature");
         addUntagged(65, "time");
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("forest time", "", null, "Nature");
+                .explain("forest time", "", "", null, "Nature");
         assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("forest", 5, 5)), why.words);
     }
 
@@ -243,7 +302,7 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addEmerson(2, 1);
-        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", null, "Nature");
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explain("gold coin", " Emerson ", "", null, "Nature");
         assertEquals(Collections.emptyList(), why.words);
         assertEquals(new HashtagSuggester.Evidence("Emerson", 2, 3), why.author);
     }
@@ -251,7 +310,7 @@ public class HashtagSuggesterTest {
     @Test
     public void explainIsNullForATagThatCannotBeSuggested() {
         addTagged(4, "forest river mountain", "Nature");
-        assertEquals(null, HashtagSuggester.fit(quotes).explain("forest river", "", null, "Nature"));
+        assertEquals(null, HashtagSuggester.fit(quotes).explain("forest river", "", "", null, "Nature"));
     }
 
     @Test
@@ -365,7 +424,7 @@ public class HashtagSuggesterTest {
         addWithTags(1, "Love", "Life");
         addWithTags(3, "Love");
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes)
-                .explain("gold coin", "", Arrays.asList("death", "Grief", "Love"), "Life");
+                .explain("gold coin", "", "", Arrays.asList("death", "Grief", "Love"), "Life");
         // #Love 1/4 is too weak.
         assertEquals(Arrays.asList(new HashtagSuggester.Evidence("#Grief", 4, 4),
                 new HashtagSuggester.Evidence("#Death", 4, 5)), why.tags);

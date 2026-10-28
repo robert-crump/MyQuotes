@@ -6,15 +6,15 @@ import java.util.List;
 /**
  * Words for the why behind hashtag suggestions (#51, #52), from {@link HashtagSuggester}'s
  * evidence. Pure. Evidence is shown as counts, "(6/9)": 6 of the 9 quotes containing the word (or
- * by the author) carry the tag. In the Add/Edit dialog the first count of a line names the unit,
+ * by the author, or from the source) carry the tag. In the Add/Edit dialog the first count of a line names the unit,
  * "(6/9 quotes)"; the hashtag sheet's lists are bare.
  */
 final class HashtagSuggestionText {
     /** The top of the "Why these hashtags" dialog. */
     static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
             + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
-            + "suggests hashtags that are often used for the author, and hashtags that often appear "
-            + "together with the quote's hashtags.";
+            + "suggests hashtags that are often used for the author or the source, and hashtags that "
+            + "often appear together with the quote's hashtags.";
 
     private HashtagSuggestionText() {
     }
@@ -26,8 +26,8 @@ final class HashtagSuggestionText {
     }
 
     /**
-     * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · with #Death (6/9)"; the dialog's
-     * line per tag.
+     * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · from Masnavi (3/4) · with #Death (6/9)";
+     * the dialog's line per tag.
      */
     static String explanation(HashtagSuggester.Explanation explanation) {
         List<String> parts = new ArrayList<>();
@@ -38,6 +38,10 @@ final class HashtagSuggestionText {
         if (explanation.author != null) {
             String by = "by " + evidence(explanation.author, line.isEmpty() ? "quotes" : null);
             line = line.isEmpty() ? by : line + " · " + by;
+        }
+        if (explanation.source != null) {
+            String from = "from " + evidence(explanation.source, line.isEmpty() ? "quotes" : null);
+            line = line.isEmpty() ? from : line + " · " + from;
         }
         if (!explanation.tags.isEmpty()) {
             List<String> tags = new ArrayList<>();
@@ -52,7 +56,7 @@ final class HashtagSuggestionText {
 
     /**
      * The sheet's Suggestions section, one paragraph each: why the tag can't be suggested yet, or
-     * its Words line and (when they qualify) its Author and With lines.
+     * its Words line and (when they qualify) its Author, Source and With lines.
      */
     static List<String> suggestions(HashtagSuggester.TagProfile profile) {
         List<String> lines = new ArrayList<>();
@@ -68,6 +72,9 @@ final class HashtagSuggestionText {
         }
         if (!profile.authors.isEmpty()) {
             lines.add("Author: " + list(profile.authors) + ".");
+        }
+        if (!profile.sources.isEmpty()) {
+            lines.add("Source: " + list(profile.sources) + ".");
         }
         if (!profile.tags.isEmpty()) {
             lines.add("With: " + list(profile.tags) + ".");

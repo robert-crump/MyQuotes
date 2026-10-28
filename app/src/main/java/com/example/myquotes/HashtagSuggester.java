@@ -26,14 +26,15 @@ import java.util.function.BiConsumer;
  *   <li><b>Tokens</b>: the quote text lowercased and split on non-letters; words shorter than
  *       {@link #MIN_WORD_LENGTH} and English/German stopwords dropped; the rest stemmed with the
  *       Snowball stemmer of the quote's language (German when it has more German than English
- *       stopwords, else English). Plus one {@code author:<name>} token. The
- *       source is not used. A quote counts each token once. In {@link #fit}, each of the quote's
+ *       stopwords, else English). Plus one {@code author:<name>} and one {@code source:<name>}
+ *       token. A quote counts each token once. In {@link #fit}, each of the quote's
  *       tags adds a {@code tag:<key>} token; in {@link #suggest}, each of {@code existingTags}.</li>
  *   <li><b>Reasons</b>: a word of the quote is a reason for tag t when at least
  *       {@link #MIN_WORD_WITH_TAG} quotes contain it and have t, and that is at least
  *       {@link #MIN_SHARE_PERCENT}% of the quotes containing it. The author is a reason when at
  *       least {@link #MIN_AUTHOR_WITH_TAG} of their quotes have t, and that is at least
- *       {@link #MIN_SHARE_PERCENT}% of their quotes. A tag u of the quote is a reason when at least
+ *       {@link #MIN_SHARE_PERCENT}% of their quotes; the source likewise, at least
+ *       {@link #MIN_SOURCE_WITH_TAG} of its quotes. A tag u of the quote is a reason when at least
  *       {@link #MIN_TAG_WITH_TAG} quotes have both u and t, and that is at least
  *       {@link #MIN_SHARE_PERCENT}% of the quotes with u.</li>
  *   <li><b>Eligibility</b>: t is on at least {@link #MIN_QUOTES_PER_TAG} quotes and the quote
@@ -55,11 +56,13 @@ public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
     static final int MIN_WORD_WITH_TAG = 3;
     static final int MIN_AUTHOR_WITH_TAG = 2;
+    static final int MIN_SOURCE_WITH_TAG = 2;
     static final int MIN_TAG_WITH_TAG = 4;
     static final int MIN_SHARE_PERCENT = 40;
     static final int MAX_SUGGESTIONS = 3;
     static final int MIN_WORD_LENGTH = 3;
     static final String AUTHOR_PREFIX = "author:";
+    static final String SOURCE_PREFIX = "source:";
     static final String TAG_PREFIX = "tag:";
 
     private static final Set<String> ENGLISH_STOPWORDS = new HashSet<>(Arrays.asList(
@@ -114,9 +117,10 @@ public final class HashtagSuggester {
     // Quotes per tag (lowercase key), eligible or not, and its spelling.
     private final Map<String, Integer> tagQuotes = new HashMap<>();
     private final Map<String, String> tagSpellings = new HashMap<>();
-    // Per stem, how often each full word occurred; per author token, its first spelling.
+    // Per stem, how often each full word occurred; per author or source token, its first spelling.
     private final Map<String, Map<String, Integer>> surfaceWords = new HashMap<>();
     private final Map<String, String> authorNames = new HashMap<>();
+    private final Map<String, String> sourceNames = new HashMap<>();
 
     /**
      * One piece of evidence: {@code withTag} of the {@code total} quotes that contain the word
@@ -163,19 +167,22 @@ public final class HashtagSuggester {
         return byStrength != 0 ? byStrength : a.label.compareTo(b.label);
     };
 
-    /** Why a tag is suggested for one quote: its reason words, author and tags (strongest first). */
+    /** Why a tag is suggested for one quote: its reason words, author, source and tags (strongest first). */
     public static final class Explanation {
         public final String tag;
         public final List<Evidence> words;
         /** The author when they are a reason for the tag; else null. */
         public final Evidence author;
+        /** The source when it is a reason for the tag; else null. */
+        public final Evidence source;
         /** The quote's tags that are a reason for the tag, labelled {@code #Tag}. */
         public final List<Evidence> tags;
 
-        Explanation(String tag, List<Evidence> words, Evidence author, List<Evidence> tags) {
+        Explanation(String tag, List<Evidence> words, Evidence author, Evidence source, List<Evidence> tags) {
             this.tag = tag;
             this.words = words;
             this.author = author;
+            this.source = source;
             this.tags = tags;
         }
     }
@@ -218,16 +225,19 @@ public final class HashtagSuggester {
         public final List<Evidence> words;
         /** Every author who is a reason for the tag, strongest first. */
         public final List<Evidence> authors;
+        /** Every source that is a reason for the tag, strongest first. */
+        public final List<Evidence> sources;
         /** Every other tag that is a reason for the tag, labelled {@code #Tag}, strongest first. */
         public final List<Evidence> tags;
 
         TagProfile(String tag, int quotes, boolean suggestable, List<Evidence> words, List<Evidence> authors,
-                List<Evidence> tags) {
+                List<Evidence> sources, List<Evidence> tags) {
             this.tag = tag;
             this.quotes = quotes;
             this.suggestable = suggestable;
             this.words = words;
             this.authors = authors;
+            this.sources = sources;
             this.tags = tags;
         }
     }
@@ -251,7 +261,7 @@ public final class HashtagSuggester {
         Map<String, TagStats> all = new HashMap<>();
         List<Set<String>> quoteTokens = new ArrayList<>(quotes.size());
         for (Quote quote : quotes) {
-            Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor());
+            Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
             addTagTokens(tokens, quote.getTags());
             quoteTokens.add(tokens);
             for (String token : tokens) model.tokenCounts.merge(token, 1, Integer::sum);
@@ -259,6 +269,8 @@ public final class HashtagSuggester {
                     .computeIfAbsent(stem, k -> new HashMap<>()).merge(word, 1, Integer::sum));
             String authorToken = authorToken(quote.getAuthor());
             if (authorToken != null) model.authorNames.putIfAbsent(authorToken, quote.getAuthor().trim());
+            String sourceToken = sourceToken(quote.getSource());
+            if (sourceToken != null) model.sourceNames.putIfAbsent(sourceToken, quote.getSource().trim());
             for (String tag : quote.getTags()) {
                 all.computeIfAbsent(Hashtag.key(tag), k -> new TagStats(tag)).quotes++;
             }
@@ -283,7 +295,7 @@ public final class HashtagSuggester {
      * {@code existingTags}, which are reasons for other tags.
      */
     public List<String> suggest(String text, String author, String source, Collection<String> existingTags) {
-        Set<String> tokens = tokens(text, author);
+        Set<String> tokens = tokens(text, author, source);
         addTagTokens(tokens, existingTags);
         Set<String> excluded = new HashSet<>();
         if (existingTags != null) {
@@ -304,7 +316,8 @@ public final class HashtagSuggester {
         if (!quote.getTags().isEmpty()) {
             throw new IllegalArgumentException("Quote #" + quote.getId() + " has hashtags");
         }
-        return suggestions(tokens(quote.getQuoteText(), quote.getAuthor()), Collections.emptySet(), 1);
+        return suggestions(tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource()),
+                Collections.emptySet(), 1);
     }
 
     /**
@@ -333,18 +346,19 @@ public final class HashtagSuggester {
 
     /**
      * Why {@code tag} is suggested for this quote: its reason words, strongest first, shown as
-     * they are written in {@code text}, the author when they are a reason, and those of the
-     * quote's tags ({@code quoteTags}) that are a reason, strongest first. Null when the tag can't be
-     * suggested at all (on too few quotes).
+     * they are written in {@code text}, the author and the source when they are a reason, and those
+     * of the quote's tags ({@code quoteTags}) that are a reason, strongest first. Null when the tag
+     * can't be suggested at all (on too few quotes).
      */
-    public Explanation explain(String text, String author, Collection<String> quoteTags, String tag) {
+    public Explanation explain(String text, String author, String source, Collection<String> quoteTags,
+                               String tag) {
         TagStats stats = tags.get(Hashtag.key(Hashtag.normalize(tag)));
         if (stats == null) return null;
         Map<String, String> ownWords = new HashMap<>();
         forEachWord(text, ownWords::putIfAbsent);
 
         List<Evidence> words = new ArrayList<>();
-        for (String token : tokens(text, null)) {
+        for (String token : tokens(text, null, null)) {
             if (isReason(stats, token)) {
                 words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token))));
             }
@@ -353,6 +367,9 @@ public final class HashtagSuggester {
         String authorToken = authorToken(author);
         Evidence authorEvidence = null;
         if (isReason(stats, authorToken)) authorEvidence = evidence(stats, authorToken, author.trim());
+        String sourceToken = sourceToken(source);
+        Evidence sourceEvidence = null;
+        if (isReason(stats, sourceToken)) sourceEvidence = evidence(stats, sourceToken, source.trim());
         Set<String> tagTokens = new LinkedHashSet<>();
         addTagTokens(tagTokens, quoteTags);
         List<Evidence> tagEvidence = new ArrayList<>();
@@ -360,7 +377,7 @@ public final class HashtagSuggester {
             if (isTagReason(stats, token)) tagEvidence.add(evidence(stats, token, tagLabel(token)));
         }
         tagEvidence.sort(STRONGEST_FIRST);
-        return new Explanation(stats.spelling, words, authorEvidence, tagEvidence);
+        return new Explanation(stats.spelling, words, authorEvidence, sourceEvidence, tagEvidence);
     }
 
     /** What the model learned about {@code tag}; a tag no quote has gets a profile with 0 quotes. */
@@ -370,10 +387,11 @@ public final class HashtagSuggester {
         TagStats stats = tags.get(key);
         if (stats == null) {
             return new TagProfile(tag, quotes, false, Collections.emptyList(), Collections.emptyList(),
-                    Collections.emptyList());
+                    Collections.emptyList(), Collections.emptyList());
         }
         List<Evidence> words = new ArrayList<>();
         List<Evidence> authors = new ArrayList<>();
+        List<Evidence> sources = new ArrayList<>();
         List<Evidence> tagEvidence = new ArrayList<>();
         for (String token : stats.tokens.keySet()) {
             if (token.startsWith(TAG_PREFIX)) {
@@ -382,14 +400,17 @@ public final class HashtagSuggester {
                 continue;
             } else if (token.startsWith(AUTHOR_PREFIX)) {
                 authors.add(evidence(stats, token, authorNames.get(token)));
+            } else if (token.startsWith(SOURCE_PREFIX)) {
+                sources.add(evidence(stats, token, sourceNames.get(token)));
             } else {
                 words.add(evidence(stats, token, displayWord(token)));
             }
         }
         words.sort(STRONGEST_FIRST);
         authors.sort(STRONGEST_FIRST);
+        sources.sort(STRONGEST_FIRST);
         tagEvidence.sort(STRONGEST_FIRST);
-        return new TagProfile(stats.spelling, quotes, true, words, authors, tagEvidence);
+        return new TagProfile(stats.spelling, quotes, true, words, authors, sources, tagEvidence);
     }
 
     /** Whether the tag token is a reason for the tag; a tag is never a reason for itself. */
@@ -428,9 +449,9 @@ public final class HashtagSuggester {
     }
 
     /**
-     * Whether {@code token} (a word stem, the author token or a tag token) is a reason for the tag:
-     * on at least {@link #MIN_WORD_WITH_TAG} (author: {@link #MIN_AUTHOR_WITH_TAG}, tag:
-     * {@link #MIN_TAG_WITH_TAG}) of the tag's quotes, and the tag is on at least
+     * Whether {@code token} (a word stem, the author or source token or a tag token) is a reason for
+     * the tag: on at least {@link #MIN_WORD_WITH_TAG} (author: {@link #MIN_AUTHOR_WITH_TAG}, source:
+     * {@link #MIN_SOURCE_WITH_TAG}, tag: {@link #MIN_TAG_WITH_TAG}) of the tag's quotes, and the tag is on at least
      * {@link #MIN_SHARE_PERCENT}% of the quotes with the token.
      */
     private boolean isReason(TagStats stats, String token) {
@@ -442,17 +463,20 @@ public final class HashtagSuggester {
         if (token == null) return false;
         int together = stats.tokens.getOrDefault(token, 0);
         int min = token.startsWith(AUTHOR_PREFIX) ? MIN_AUTHOR_WITH_TAG
+                : token.startsWith(SOURCE_PREFIX) ? MIN_SOURCE_WITH_TAG
                 : token.startsWith(TAG_PREFIX) ? MIN_TAG_WITH_TAG : MIN_WORD_WITH_TAG;
         if (together < min) return false;
         return together * 100 >= MIN_SHARE_PERCENT * (tokenCounts.getOrDefault(token, 0) - self);
     }
 
-    /** The quote's tokens: stemmed content words of {@code text}, plus the author token. */
-    static Set<String> tokens(String text, String author) {
+    /** The quote's tokens: stemmed content words of {@code text}, plus the author and source tokens. */
+    static Set<String> tokens(String text, String author, String source) {
         Set<String> tokens = new LinkedHashSet<>();
         forEachWord(text, (stem, word) -> tokens.add(stem));
         String authorToken = authorToken(author);
         if (authorToken != null) tokens.add(authorToken);
+        String sourceToken = sourceToken(source);
+        if (sourceToken != null) tokens.add(sourceToken);
         return tokens;
     }
 
@@ -514,8 +538,17 @@ public final class HashtagSuggester {
 
     /** {@code author:<name>}, lowercased with whitespace collapsed; null when there is no author. */
     static String authorToken(String author) {
-        if (author == null) return null;
-        String name = author.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
-        return name.isEmpty() ? null : AUTHOR_PREFIX + name;
+        return nameToken(AUTHOR_PREFIX, author);
+    }
+
+    /** {@code source:<name>}, like {@link #authorToken}; null when there is no source. */
+    static String sourceToken(String source) {
+        return nameToken(SOURCE_PREFIX, source);
+    }
+
+    private static String nameToken(String prefix, String name) {
+        if (name == null) return null;
+        String key = name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return key.isEmpty() ? null : prefix + key;
     }
 }
