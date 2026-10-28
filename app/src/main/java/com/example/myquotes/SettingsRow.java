@@ -61,6 +61,12 @@ final class SettingsRow {
         binding.rowSwitch.setOnCheckedChangeListener(switchListener);
     }
 
+    /** A disabled row ignores taps and is drawn faded. */
+    void setEnabled(boolean enabled) {
+        binding.getRoot().setEnabled(enabled);
+        binding.getRoot().setAlpha(enabled ? 1f : 0.38f);
+    }
+
     void setSummary(CharSequence summary) {
         binding.rowSubtitle.setText(summary);
         binding.rowSubtitle.setVisibility(summary.length() == 0 ? View.GONE : View.VISIBLE);

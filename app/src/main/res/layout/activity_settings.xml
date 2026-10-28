@@ -114,6 +114,12 @@
                     <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
 
                     <include
+                        android:id="@+id/row_backup_now"
+                        layout="@layout/item_settings_row" />
+
+                    <com.google.android.material.divider.MaterialDivider style="@style/Widget.MyQuotes.SettingsDivider" />
+
+                    <include
                         android:id="@+id/row_export"
                         layout="@layout/item_settings_row" />
 

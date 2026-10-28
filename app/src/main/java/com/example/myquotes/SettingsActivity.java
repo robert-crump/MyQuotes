@@ -15,6 +15,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.example.myquotes.backup.BackupFilename;
+import com.example.myquotes.backup.BackupRun;
+import com.example.myquotes.backup.BackupTarget;
+import com.example.myquotes.backup.Backups;
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.databinding.ActivitySettingsBinding;
 import com.example.myquotes.drive.DriveAuth;
@@ -24,6 +27,7 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +37,8 @@ import java.util.concurrent.Executors;
 /**
  * Settings, laid out like Hue and You's: a bold title above each group (Library, General,
  * Backup), a group being one outlined box of {@link SettingsRow}s. Rows open a screen or a
- * dialog, or toggle a switch.
+ * dialog, or toggle a switch. "Back up now" runs a backup to every auto-backup that is on, the way
+ * the daily one does ({@link Backups#runOnce}), and toasts the outcome instead of notifying.
  */
 public class SettingsActivity extends AppCompatActivity {
     private static final String TAG = "SettingsActivity";
@@ -59,6 +64,8 @@ public class SettingsActivity extends AppCompatActivity {
     private SettingsRow dailyNotificationRow;
     private SettingsRow localBackupRow;
     private SettingsRow driveBackupRow;
+    private SettingsRow backupNowRow;
+    private boolean backingUp;
     private String pendingDriveEmail;
 
     @Override
@@ -227,10 +234,10 @@ public class SettingsActivity extends AppCompatActivity {
                         }
                     } else {
                         LocalBackup.setEnabled(this, false);
+                        updateBackupNowRow();
                         Toast.makeText(this, R.string.local_backup_disabled_toast, Toast.LENGTH_SHORT).show();
                     }
                 });
-        updateLastBackupText();
 
         // Switching Drive off disconnects the account.
         driveBackupRow = new SettingsRow(binding.rowDriveBackup,
@@ -244,6 +251,11 @@ public class SettingsActivity extends AppCompatActivity {
                         Toast.makeText(this, R.string.drive_disconnected_toast, Toast.LENGTH_SHORT).show();
                     }
                 });
+
+        backupNowRow = new SettingsRow(binding.rowBackupNow,
+                R.drawable.ic_backup_24dp, R.string.settings_backup_now)
+                .onClick(v -> backUpNow());
+        updateLastBackupText();
         updateDriveSummary();
 
         SettingsRow exportRow = new SettingsRow(binding.rowExport,
@@ -262,11 +274,13 @@ public class SettingsActivity extends AppCompatActivity {
         localBackupRow.setSummary(lastBackupTime == 0
                 ? getString(R.string.local_backup_never)
                 : formatLastBackup(R.string.local_backup_last_format, lastBackupTime));
+        updateBackupNowRow();
     }
 
     /** The connected account and the last Drive backup, or "Not connected". */
     private void updateDriveSummary() {
         String email = DriveAuth.getConnectedAccountEmail(this);
+        updateBackupNowRow();
         if (!DriveAuth.isEnabled(this) || email == null) {
             driveBackupRow.setSummary(R.string.drive_not_connected);
             return;
@@ -276,6 +290,76 @@ public class SettingsActivity extends AppCompatActivity {
                 ? getString(R.string.drive_backup_never)
                 : formatLastBackup(R.string.drive_backup_last_format, lastBackupTime);
         driveBackupRow.setSummary(getString(R.string.drive_connected_as_format, email) + "\n" + lastBackup);
+    }
+
+    /** "To your local folder and Google Drive", "Backing up…", or disabled while no auto-backup is on. */
+    private void updateBackupNowRow() {
+        List<BackupTarget> targets = readyTargets();
+        backupNowRow.setEnabled(!backingUp && !targets.isEmpty());
+        if (backingUp) {
+            backupNowRow.setSummary(R.string.backup_now_running);
+        } else if (targets.isEmpty()) {
+            backupNowRow.setSummary(R.string.backup_now_off);
+        } else {
+            backupNowRow.setSummary(getString(R.string.backup_now_to_format,
+                    targets.size() == 2 ? getString(R.string.backup_now_both) : targetName(targets.get(0))));
+        }
+    }
+
+    private List<BackupTarget> readyTargets() {
+        List<BackupTarget> targets = new ArrayList<>();
+        for (BackupTarget target : BackupTarget.values()) {
+            if (Backups.isReady(this, target)) targets.add(target);
+        }
+        return targets;
+    }
+
+    private String targetName(BackupTarget target) {
+        return getString(target == BackupTarget.LOCAL ? R.string.backup_now_local : R.string.backup_now_drive);
+    }
+
+    /** Backs up to each auto-backup that is on, one after the other, then toasts a line per target. */
+    private void backUpNow() {
+        List<Quote> quotes = quoteCollection.getQuoteList().getValue();
+        if (quotes == null || quotes.isEmpty()) {
+            Toast.makeText(this, R.string.backup_now_no_quotes, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<BackupTarget> targets = readyTargets();
+        if (targets.isEmpty()) return;
+        backingUp = true;
+        updateBackupNowRow();
+        ioExecutor.execute(() -> {
+            List<String> lines = new ArrayList<>();
+            boolean failed = false;
+            for (BackupTarget target : targets) {
+                BackupRun.Outcome outcome = Backups.runOnce(this, target);
+                if (outcome == null) continue;
+                String name = targetName(target);
+                if (outcome.kind == BackupRun.Kind.WRITTEN) {
+                    lines.add(getString(R.string.backup_now_written_format, name));
+                } else if (outcome.kind == BackupRun.Kind.SKIPPED_UNCHANGED) {
+                    lines.add(getString(R.string.backup_now_unchanged_format, name));
+                } else {
+                    Log.e(TAG, target + " backup failed", outcome.cause);
+                    String reason = outcome.cause.getMessage() != null
+                            ? outcome.cause.getMessage() : outcome.cause.getClass().getSimpleName();
+                    lines.add(getString(R.string.backup_now_failed_format, name, reason));
+                    failed = true;
+                }
+            }
+            boolean anyFailed = failed;
+            runOnUiThread(() -> {
+                backingUp = false;
+                if (isFinishing() || isDestroyed()) return;
+                updateLastBackupText();
+                updateDriveSummary();
+                if (!lines.isEmpty()) {
+                    Toast.makeText(this, String.join("\n", lines),
+                            anyFailed ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
     }
 
     private String formatLastBackup(int formatRes, long timeMillis) {

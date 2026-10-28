@@ -7,15 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import com.example.myquotes.BackupDocument;
-import com.example.myquotes.Quote;
-import com.example.myquotes.MyApplication;
-import com.example.myquotes.drive.DriveBackup;
-import com.example.myquotes.notifications.QuoteNotifications;
-
-import java.util.List;
-
-/** Runs one {@link BackupRun} for the {@link BackupTarget} named in the input data, then re-arms. */
+/** Runs one backup ({@link Backups#runOnce}) for the {@link BackupTarget} named in the input data, then re-arms. */
 // Must be public: WorkManager instantiates it via reflection.
 public class BackupWorker extends Worker {
     private static final String TAG = "BackupWorker";
@@ -32,22 +24,17 @@ public class BackupWorker extends Worker {
         BackupTarget target = BackupTarget.fromId(getInputData().getString(BackupScheduler.KEY_TARGET));
         if (target == null) return Result.success();
 
-        BackupDestination destination = target == BackupTarget.LOCAL
-                ? LocalBackup.destinationIfReady(context)
-                : DriveBackup.destinationIfConnected(context);
-        if (destination == null) {
+        if (!Backups.isReady(context, target)) {
             Log.d(TAG, target.id + " backup is disabled or not set up, ending chain");
             return Result.success();
         }
 
-        List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
-        if (!quotes.isEmpty()) {
-            BackupDocument document = new BackupDocument(quotes, QuoteNotifications.loadHistory(context));
-            BackupRun.Outcome outcome = BackupRun.run(document, destination, System.currentTimeMillis());
+        BackupRun.Outcome outcome = Backups.runOnce(context, target);
+        if (outcome == null) {
+            Log.d(TAG, "No quotes to back up, skipping");
+        } else {
             switch (outcome.kind) {
                 case WRITTEN:
-                    BackupState.record(context, target, System.currentTimeMillis());
-                    BackupNotifications.clearFailed(context, target);
                     Log.d(TAG, target.id + " backup written: " + outcome.filename);
                     break;
                 case SKIPPED_UNCHANGED:
@@ -58,8 +45,6 @@ public class BackupWorker extends Worker {
                     BackupNotifications.notifyFailed(context, target);
                     break;
             }
-        } else {
-            Log.d(TAG, "No quotes to back up, skipping");
         }
 
         // Always re-arm, and always report success: a failed run must not break the chain (the

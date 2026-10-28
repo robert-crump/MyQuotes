@@ -65,6 +65,19 @@
     <string name="drive_sign_in_failed_toast">Google sign-in failed</string>
     <string name="drive_authorization_failed_toast">Google Drive authorization failed</string>
 
+    <!-- Back up now -->
+    <string name="settings_backup_now">Back up now</string>
+    <string name="backup_now_off">Turn on an auto-backup above first</string>
+    <string name="backup_now_to_format">To %s</string>
+    <string name="backup_now_running">Backing up…</string>
+    <string name="backup_now_local">your local folder</string>
+    <string name="backup_now_drive">Google Drive</string>
+    <string name="backup_now_both">your local folder and Google Drive</string>
+    <string name="backup_now_no_quotes">No quotes to back up</string>
+    <string name="backup_now_written_format">Backed up to %s</string>
+    <string name="backup_now_unchanged_format">Nothing changed since the last backup to %s</string>
+    <string name="backup_now_failed_format">Backup to %1$s failed: %2$s</string>
+
     <!-- Drive auto-backup -->
     <string name="drive_backup_never">Last change backed up to Drive: Never</string>
     <string name="drive_backup_last_format">Last change backed up to Drive: %s</string>
