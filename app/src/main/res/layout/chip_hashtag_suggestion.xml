@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One suggested tag under the Add/Edit hashtag field (HashtagSuggestionRow): an outlined assist
-     chip with a +, unlike the quote's own input chips. A tap adds it. -->
+     chip with a +, unlike the quote's own input chips. A tap adds it. Padded as tightly as those. -->
 <com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     style="@style/Widget.Material3.Chip.Assist"
@@ -8,4 +8,10 @@
     android:layout_height="wrap_content"
     app:chipIcon="@drawable/ic_add_24dp"
     app:chipIconTint="?attr/colorPrimary"
-    app:chipIconVisible="true" />
+    app:chipIconVisible="true"
+    app:chipStartPadding="4dp"
+    app:iconStartPadding="0dp"
+    app:iconEndPadding="0dp"
+    app:textStartPadding="4dp"
+    app:textEndPadding="2dp"
+    app:chipEndPadding="4dp" />
