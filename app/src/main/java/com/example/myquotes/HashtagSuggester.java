@@ -48,10 +48,10 @@ import java.util.function.BiConsumer;
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
-    static final int MIN_WORD_WITH_TAG = 4;
+    static final int MIN_WORD_WITH_TAG = 3;
     static final int MIN_AUTHOR_WITH_TAG = 2;
     static final int MIN_TAG_WITH_TAG = 4;
-    static final int MIN_SHARE_PERCENT = 50;
+    static final int MIN_SHARE_PERCENT = 40;
     static final int MAX_SUGGESTIONS = 3;
     static final int MIN_WORD_LENGTH = 3;
     static final int STEM_LENGTH = 6;

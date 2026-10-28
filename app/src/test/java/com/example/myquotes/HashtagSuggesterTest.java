@@ -62,9 +62,9 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void aWordNeedsFourQuotesWithTheTag() {
-        addTagged(3, "forest", "Nature");
-        addTagged(2, "river", "Nature");
+    public void aWordNeedsThreeQuotesWithTheTag() {
+        addTagged(2, "forest", "Nature");
+        addTagged(3, "river", "Nature");
         addFiller(10);
         assertEquals(Collections.emptyList(), suggest("forest"));
 
@@ -73,9 +73,10 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void aWordNeedsHalfOfItsQuotesWithTheTag() {
-        addTagged(5, "forest", "Nature");
-        addUntagged(5, "forest");
+    public void aWordNeedsFortyPercentOfItsQuotesWithTheTag() {
+        addTagged(4, "forest", "Nature");
+        addTagged(1, "river", "Nature");
+        addUntagged(6, "forest");                            // 4/10
         assertEquals(Collections.singletonList("Nature"), suggest("forest"));
 
         addUntagged(1, "forest");
@@ -83,10 +84,10 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void theAuthorIsAReasonAtTwoQuotesAndHalf() {
+    public void theAuthorIsAReasonAtTwoQuotesAndFortyPercent() {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
-        addEmerson(2, 2);
+        addEmerson(2, 3);
         assertEquals(Collections.singletonList("Nature"), HashtagSuggester.fit(quotes)
                 .suggest("gold coin", "  emerson ", "", Collections.emptyList()));
 
@@ -172,7 +173,7 @@ public class HashtagSuggesterTest {
     @Test
     public void fittingWithoutTheEditedQuoteStopsItsOwnWordsFromVoting() {
         addTagged(5, "forest river mountain", "Nature");
-        addTagged(3, "zebra giraffe", "Nature");
+        addTagged(2, "zebra giraffe", "Nature");
         addFiller(10);
         Quote edited = add("Anon", "zebra giraffe savanna", "Nature");
 
@@ -291,7 +292,7 @@ public class HashtagSuggesterTest {
     }
 
     @Test
-    public void aTagOfTheQuoteIsAReasonAtFourQuotesAndHalf() {
+    public void aTagOfTheQuoteIsAReasonAtFourQuotesAndFortyPercent() {
         addWithTags(3, "Death", "Life");
         addWithTags(2, "Life");
         addWithTags(3, "Death");
@@ -300,8 +301,11 @@ public class HashtagSuggesterTest {
         addWithTags(1, "Death", "Life");
         assertEquals(Collections.singletonList("Life"), suggestWithTags("death"));  // 4/7
 
-        addWithTags(2, "Death");
-        assertEquals(Collections.emptyList(), suggestWithTags("Death"));        // 4/9
+        addWithTags(3, "Death");
+        assertEquals(Collections.singletonList("Life"), suggestWithTags("Death")); // 4/10
+
+        addWithTags(1, "Death");
+        assertEquals(Collections.emptyList(), suggestWithTags("Death"));        // 4/11
     }
 
     @Test
