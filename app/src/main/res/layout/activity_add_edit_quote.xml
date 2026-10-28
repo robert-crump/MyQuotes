@@ -214,7 +214,7 @@
                     android:imeOptions="actionDone"
                     android:inputType="textMultiLine|textCapSentences"
                     android:minLines="6"
-                    android:maxLines="6"
+                    android:maxLines="10"
                     android:scrollbars="vertical"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
