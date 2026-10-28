@@ -93,42 +93,6 @@
 
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Quote Text Input -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:hint="Quote *"
-                app:boxBackgroundColor="@android:color/transparent"
-                style="@style/Widget.Material3.TextInputLayout.FilledBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_text_quote"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:paddingTop="28dp"
-                    android:paddingBottom="12dp"
-                    android:gravity="top|start"
-                    android:imeOptions="actionDone"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:minLines="6"
-                    android:maxLines="10"
-                    android:scrollbars="vertical"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="* Required fields"
-                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                android:textColor="@android:color/darker_gray"
-                android:layout_marginTop="4dp" />
-
             <!-- Hashtags: the tags as input chips, then the text being typed, wrapping onto more
                  lines (AddEditActivity). Space, Enter, comma or a dropdown pick commits a chip. The
                  dropdown opens right under the underline, over the Suggested row. -->
@@ -136,7 +100,7 @@
                 android:id="@+id/hashtag_field"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginBottom="20dp"
                 android:orientation="vertical">
 
                 <TextView
@@ -229,6 +193,42 @@
                 </LinearLayout>
 
             </LinearLayout>
+
+            <!-- Quote Text Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="Quote *"
+                app:boxBackgroundColor="@android:color/transparent"
+                style="@style/Widget.Material3.TextInputLayout.FilledBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/edit_text_quote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="12dp"
+                    android:gravity="top|start"
+                    android:imeOptions="actionDone"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:minLines="6"
+                    android:maxLines="10"
+                    android:scrollbars="vertical"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="* Required fields"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="@android:color/darker_gray"
+                android:layout_marginTop="4dp" />
 
         </LinearLayout>
 
