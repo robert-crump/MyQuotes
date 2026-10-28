@@ -16,30 +16,38 @@ public class HashtagSuggestionTextTest {
     public void explanationListsWordsThenTheAuthorWithTheUnitOnTheFirst() {
         HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Thankful",
                 Arrays.asList(evidence("gratitude", 6, 9), evidence("grateful", 4, 7)), evidence("Rumi", 4, 5),
-                evidence("Masnavi", 3, 4), Arrays.asList(evidence("#Grief", 4, 4), evidence("#Death", 6, 9)));
+                evidence("Masnavi", 3, 4), Arrays.asList(evidence("#Grief", 4, 4), evidence("#Death", 6, 9)),
+                true);
         assertEquals("gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · from Masnavi (3/4)"
-                        + " · with #Grief (4/4), #Death (6/9)",
+                        + " · with #Grief (4/4), #Death (6/9) · contains the tag's name",
                 HashtagSuggestionText.explanation(why));
     }
 
     @Test
     public void explanationWithOnlyTheAuthor() {
         HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Wisdom",
-                Collections.emptyList(), evidence("Seneca", 5, 6), null, Collections.emptyList());
+                Collections.emptyList(), evidence("Seneca", 5, 6), null, Collections.emptyList(), false);
         assertEquals("by Seneca (5/6 quotes)", HashtagSuggestionText.explanation(why));
     }
 
     @Test
     public void explanationWithOnlyTheSource() {
         HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Stoicism",
-                Collections.emptyList(), null, evidence("Meditations", 3, 4), Collections.emptyList());
+                Collections.emptyList(), null, evidence("Meditations", 3, 4), Collections.emptyList(), false);
         assertEquals("from Meditations (3/4 quotes)", HashtagSuggestionText.explanation(why));
+    }
+
+    @Test
+    public void explanationWithOnlyTheName() {
+        HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Nature",
+                Collections.emptyList(), null, null, Collections.emptyList(), true);
+        assertEquals("contains the tag's name", HashtagSuggestionText.explanation(why));
     }
 
     @Test
     public void explanationWithOnlyTags() {
         HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Life",
-                Collections.emptyList(), null, null, Collections.singletonList(evidence("#Death", 6, 9)));
+                Collections.emptyList(), null, null, Collections.singletonList(evidence("#Death", 6, 9)), false);
         assertEquals("with #Death (6/9 quotes)", HashtagSuggestionText.explanation(why));
     }
 
@@ -80,6 +88,13 @@ public class HashtagSuggestionTextTest {
         assertEquals("Suggested: #Gratitude (10/11) #Love (6/8)", HashtagSuggestionText.suggestedLine(Arrays.asList(
                 new HashtagSuggester.Suggestion("Gratitude", evidence("grateful", 10, 11)),
                 new HashtagSuggester.Suggestion("Love", evidence("Rumi", 6, 8)))));
+    }
+
+    @Test
+    public void suggestedLineMarksANameMatch() {
+        assertEquals("Suggested: #Love (6/8) #Nature (name)", HashtagSuggestionText.suggestedLine(Arrays.asList(
+                new HashtagSuggester.Suggestion("Love", evidence("Rumi", 6, 8)),
+                new HashtagSuggester.Suggestion("Nature", HashtagSuggester.Evidence.nameMatch("natur")))));
     }
 
     @Test

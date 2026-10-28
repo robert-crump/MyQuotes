@@ -165,6 +165,55 @@ public class HashtagSuggesterTest {
     }
 
     @Test
+    public void theTagsNameInTheTextIsAReason() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        assertEquals(Collections.singletonList("Nature"), suggest("Natural light."));
+    }
+
+    @Test
+    public void theTagsNameMatchesInEitherLanguage() {
+        addTagged(5, "herz seele", "Liebe");
+        addFiller(10);
+        // German: "lieben" and the tag "Liebe" both stem to "lieb".
+        assertEquals(Collections.singletonList("Liebe"), suggest("Wir lieben uns."));
+    }
+
+    @Test
+    public void aNameMatchStillNeedsTheTagOnFiveQuotes() {
+        addTagged(4, "forest river mountain", "Nature");
+        addFiller(10);
+        assertEquals(Collections.emptyList(), suggest("Nature is calm."));
+    }
+
+    @Test
+    public void aNameMatchRanksBelowEveryCountedReason() {
+        addTagged(5, "forest", "Nature");
+        addUntagged(7, "forest");                            // forest 5/12, weak but counted
+        addTagged(5, "quiet", "Calm");
+        assertEquals(Arrays.asList("Nature", "Calm"), suggest("A calm forest."));
+    }
+
+    @Test
+    public void suggestionsForMarkANameMatch() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        Quote quote = add("Someone New", "nature");
+        List<HashtagSuggester.Suggestion> suggestions = HashtagSuggester.fit(quotes).suggestionsFor(quote);
+        assertEquals(1, suggestions.size());
+        assertTrue(suggestions.get(0).strongest.nameMatch);
+    }
+
+    @Test
+    public void explainSaysWhenTheQuoteContainsTheTagsName() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        assertTrue(model.explain("Nature heals.", "", "", null, "Nature").containsName);
+        assertEquals(false, model.explain("A forest.", "", "", null, "Nature").containsName);
+    }
+
+    @Test
     public void tagsTheQuoteHasAreExcludedIgnoringCase() {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);

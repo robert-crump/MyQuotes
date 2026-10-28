@@ -36,7 +36,9 @@ import java.util.function.BiConsumer;
  *       {@link #MIN_SHARE_PERCENT}% of their quotes; the source likewise, at least
  *       {@link #MIN_SOURCE_WITH_TAG} of its quotes. A tag u of the quote is a reason when at least
  *       {@link #MIN_TAG_WITH_TAG} quotes have both u and t, and that is at least
- *       {@link #MIN_SHARE_PERCENT}% of the quotes with u.</li>
+ *       {@link #MIN_SHARE_PERCENT}% of the quotes with u. A word whose stem is the stem of t's
+ *       name (English or German) is a reason too, regardless of counts, but the weakest: below
+ *       every counted reason.</li>
  *   <li><b>Eligibility</b>: t is on at least {@link #MIN_QUOTES_PER_TAG} quotes and the quote
  *       has at least one reason for it.</li>
  * </ul>
@@ -130,33 +132,47 @@ public final class HashtagSuggester {
         public final String label;
         public final int withTag;
         public final int total;
+        /** The quote contains the tag's name ({@code label} is the stem); no counts. */
+        public final boolean nameMatch;
 
         Evidence(String label, int withTag, int total) {
+            this(label, withTag, total, false);
+        }
+
+        private Evidence(String label, int withTag, int total, boolean nameMatch) {
             this.label = label;
             this.withTag = withTag;
             this.total = total;
+            this.nameMatch = nameMatch;
+        }
+
+        /** The quote contains the tag's name, as the word stem {@code stem}. */
+        static Evidence nameMatch(String stem) {
+            return new Evidence(stem, 0, 0, true);
         }
 
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof Evidence)) return false;
             Evidence other = (Evidence) o;
-            return label.equals(other.label) && withTag == other.withTag && total == other.total;
+            return label.equals(other.label) && withTag == other.withTag && total == other.total
+                    && nameMatch == other.nameMatch;
         }
 
         @Override
         public int hashCode() {
-            return (label.hashCode() * 31 + withTag) * 31 + total;
+            return ((label.hashCode() * 31 + withTag) * 31 + total) * 31 + (nameMatch ? 1 : 0);
         }
 
         @Override
         public String toString() {
-            return label + " " + withTag + "/" + total;
+            return nameMatch ? label + " (name)" : label + " " + withTag + "/" + total;
         }
     }
 
-    /** Higher share first, then higher count; equal strength is 0. */
+    /** Counted evidence before a name match; then higher share first, then higher count; equal strength is 0. */
     static int byStrength(Evidence a, Evidence b) {
+        if (a.nameMatch != b.nameMatch) return a.nameMatch ? 1 : -1;
         int byShare = Long.compare((long) b.withTag * a.total, (long) a.withTag * b.total);
         return byShare != 0 ? byShare : b.withTag - a.withTag;
     }
@@ -177,13 +193,17 @@ public final class HashtagSuggester {
         public final Evidence source;
         /** The quote's tags that are a reason for the tag, labelled {@code #Tag}. */
         public final List<Evidence> tags;
+        /** The quote contains the tag's name. */
+        public final boolean containsName;
 
-        Explanation(String tag, List<Evidence> words, Evidence author, Evidence source, List<Evidence> tags) {
+        Explanation(String tag, List<Evidence> words, Evidence author, Evidence source, List<Evidence> tags,
+                    boolean containsName) {
             this.tag = tag;
             this.words = words;
             this.author = author;
             this.source = source;
             this.tags = tags;
+            this.containsName = containsName;
         }
     }
 
@@ -246,6 +266,8 @@ public final class HashtagSuggester {
         final String spelling;
         int quotes;
         final Map<String, Integer> tokens = new HashMap<>();
+        // The stems of the tag's name, English and German (set for eligible tags).
+        final Set<String> nameStems = new HashSet<>();
 
         TagStats(String spelling) {
             this.spelling = spelling;
@@ -278,7 +300,10 @@ public final class HashtagSuggester {
         for (Map.Entry<String, TagStats> entry : all.entrySet()) {
             model.tagQuotes.put(entry.getKey(), entry.getValue().quotes);
             model.tagSpellings.put(entry.getKey(), entry.getValue().spelling);
-            if (entry.getValue().quotes >= MIN_QUOTES_PER_TAG) model.tags.put(entry.getKey(), entry.getValue());
+            if (entry.getValue().quotes >= MIN_QUOTES_PER_TAG) {
+                model.tags.put(entry.getKey(), entry.getValue());
+                entry.getValue().nameStems.addAll(nameStems(entry.getKey()));
+            }
         }
         for (int i = 0; i < quotes.size(); i++) {
             for (String tag : quotes.get(i).getTags()) {
@@ -335,6 +360,10 @@ public final class HashtagSuggester {
                 Evidence evidence = evidence(stats, token, token, self);
                 if (best == null || byStrength(evidence, best) < 0) best = evidence;
             }
+            if (best == null) {
+                String name = nameIn(stats, tokens);
+                if (name != null) best = Evidence.nameMatch(name);
+            }
             if (best != null) ranked.add(new Suggestion(stats.spelling, best));
         }
         ranked.sort((a, b) -> {
@@ -358,7 +387,8 @@ public final class HashtagSuggester {
         forEachWord(text, ownWords::putIfAbsent);
 
         List<Evidence> words = new ArrayList<>();
-        for (String token : tokens(text, null, null)) {
+        Set<String> wordTokens = tokens(text, null, null);
+        for (String token : wordTokens) {
             if (isReason(stats, token)) {
                 words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token))));
             }
@@ -377,7 +407,8 @@ public final class HashtagSuggester {
             if (isTagReason(stats, token)) tagEvidence.add(evidence(stats, token, tagLabel(token)));
         }
         tagEvidence.sort(STRONGEST_FIRST);
-        return new Explanation(stats.spelling, words, authorEvidence, sourceEvidence, tagEvidence);
+        return new Explanation(stats.spelling, words, authorEvidence, sourceEvidence, tagEvidence,
+                nameIn(stats, wordTokens) != null);
     }
 
     /** What the model learned about {@code tag}; a tag no quote has gets a profile with 0 quotes. */
@@ -411,6 +442,26 @@ public final class HashtagSuggester {
         sources.sort(STRONGEST_FIRST);
         tagEvidence.sort(STRONGEST_FIRST);
         return new TagProfile(stats.spelling, quotes, true, words, authors, sources, tagEvidence);
+    }
+
+    /** The first of {@code tokens} that is a stem of the tag's name; null when there is none. */
+    private static String nameIn(TagStats stats, Set<String> tokens) {
+        for (String token : tokens) {
+            if (stats.nameStems.contains(token)) return token;
+        }
+        return null;
+    }
+
+    /** The English and German stems of a tag's name ({@code key}, lowercase); none when it is too short. */
+    private static Set<String> nameStems(String key) {
+        Set<String> stems = new HashSet<>();
+        if (key.codePointCount(0, key.length()) < MIN_WORD_LENGTH) return stems;
+        for (SnowballStemmer stemmer : new SnowballStemmer[]{new englishStemmer(), new germanStemmer()}) {
+            stemmer.setCurrent(key);
+            stemmer.stem();
+            stems.add(stemmer.getCurrent());
+        }
+        return stems;
     }
 
     /** Whether the tag token is a reason for the tag; a tag is never a reason for itself. */

@@ -13,8 +13,8 @@ final class HashtagSuggestionText {
     /** The top of the "Why these hashtags" dialog. */
     static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
             + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
-            + "suggests hashtags that are often used for the author or the source, and hashtags that "
-            + "often appear together with the quote's hashtags.";
+            + "suggests hashtags that are often used for the author or the source, hashtags that "
+            + "often appear together with the quote's hashtags, and hashtags whose name is in the quote.";
 
     private HashtagSuggestionText() {
     }
@@ -26,8 +26,8 @@ final class HashtagSuggestionText {
     }
 
     /**
-     * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · from Masnavi (3/4) · with #Death (6/9)";
-     * the dialog's line per tag.
+     * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · from Masnavi (3/4) · with #Death (6/9)
+     * · contains the tag's name"; the dialog's line per tag.
      */
     static String explanation(HashtagSuggester.Explanation explanation) {
         List<String> parts = new ArrayList<>();
@@ -50,6 +50,10 @@ final class HashtagSuggestionText {
             }
             String with = "with " + String.join(", ", tags);
             line = line.isEmpty() ? with : line + " · " + with;
+        }
+        if (explanation.containsName) {
+            String name = "contains the tag's name";
+            line = line.isEmpty() ? name : line + " · " + name;
         }
         return line;
     }
@@ -83,14 +87,16 @@ final class HashtagSuggestionText {
     }
 
     /**
-     * The "No hashtag" list's line (#53): "Suggested: #Gratitude (10/11) #Love (6/8)", each tag
-     * with the counts of its strongest reason; null when there are no suggestions.
+     * The "No hashtag" list's line (#53): "Suggested: #Gratitude (10/11) #Love (6/8) #Nature (name)",
+     * each tag with the counts of its strongest reason ("name" when that is the tag's name in the
+     * quote); null when there are no suggestions.
      */
     static String suggestedLine(List<HashtagSuggester.Suggestion> suggestions) {
         if (suggestions.isEmpty()) return null;
         List<String> parts = new ArrayList<>();
         for (HashtagSuggester.Suggestion s : suggestions) {
-            parts.add(Hashtag.display(s.tag) + " (" + s.strongest.withTag + "/" + s.strongest.total + ")");
+            parts.add(Hashtag.display(s.tag) + (s.strongest.nameMatch ? " (name)"
+                    : " (" + s.strongest.withTag + "/" + s.strongest.total + ")"));
         }
         return "Suggested: " + String.join(" ", parts);
     }
