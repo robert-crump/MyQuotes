@@ -1,5 +1,9 @@
 package com.example.myquotes;
 
+import org.tartarus.snowball.SnowballStemmer;
+import org.tartarus.snowball.ext.englishStemmer;
+import org.tartarus.snowball.ext.germanStemmer;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -20,8 +24,9 @@ import java.util.function.BiConsumer;
  * {@link #suggest} looks for reasons to suggest each tag for a new quote (#52).
  * <ul>
  *   <li><b>Tokens</b>: the quote text lowercased and split on non-letters; words shorter than
- *       {@link #MIN_WORD_LENGTH} and English/German stopwords dropped; the rest cut to their first
- *       {@link #STEM_LENGTH} letters as a cheap stem. Plus one {@code author:<name>} token. The
+ *       {@link #MIN_WORD_LENGTH} and English/German stopwords dropped; the rest stemmed with the
+ *       Snowball stemmer of the quote's language (German when it has more German than English
+ *       stopwords, else English). Plus one {@code author:<name>} token. The
  *       source is not used. A quote counts each token once. In {@link #fit}, each of the quote's
  *       tags adds a {@code tag:<key>} token; in {@link #suggest}, each of {@code existingTags}.</li>
  *   <li><b>Reasons</b>: a word of the quote is a reason for tag t when at least
@@ -54,12 +59,10 @@ public final class HashtagSuggester {
     static final int MIN_SHARE_PERCENT = 40;
     static final int MAX_SUGGESTIONS = 3;
     static final int MIN_WORD_LENGTH = 3;
-    static final int STEM_LENGTH = 6;
     static final String AUTHOR_PREFIX = "author:";
     static final String TAG_PREFIX = "tag:";
 
-    private static final Set<String> STOPWORDS = new HashSet<>(Arrays.asList(
-            // English
+    private static final Set<String> ENGLISH_STOPWORDS = new HashSet<>(Arrays.asList(
             "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "had", "her",
             "was", "one", "our", "out", "has", "have", "him", "his", "how", "man", "its", "may",
             "who", "did", "get", "let", "she", "too", "use", "they", "them", "their", "theirs",
@@ -75,8 +78,8 @@ public final class HashtagSuggester {
             "don", "doesn", "didn", "isn", "aren", "wasn", "weren", "hasn", "haven", "hadn",
             "won", "wouldn", "couldn", "shouldn", "cannot", "now", "well", "even",
             "still", "like", "make", "made", "thus", "thee", "thou", "thy", "thine",
-            "unto", "whether", "within", "whatever", "whoever", "whenever", "wherever",
-            // German
+            "unto", "whether", "within", "whatever", "whoever", "whenever", "wherever"));
+    private static final Set<String> GERMAN_STOPWORDS = new HashSet<>(Arrays.asList(
             "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "eines", "einem",
             "einen", "und", "oder", "aber", "doch", "denn", "sondern", "nicht", "kein", "keine",
             "keiner", "keines", "keinem", "keinen", "ich", "du", "sie", "wir", "ihr", "mich",
@@ -98,6 +101,11 @@ public final class HashtagSuggester {
             "vom", "beim", "zu", "an", "in", "es", "er", "ja", "nein", "sei", "wäre", "hätte",
             "würde", "einmal", "gibt", "gar", "eben", "halt", "mal", "wohl", "dies", "jener",
             "jene", "welche", "welcher", "welches", "solche", "solcher", "andere", "anderen"));
+    private static final Set<String> STOPWORDS = new HashSet<>(ENGLISH_STOPWORDS);
+
+    static {
+        STOPWORDS.addAll(GERMAN_STOPWORDS);
+    }
 
     // Quotes per token (document frequency).
     private final Map<String, Integer> tokenCounts = new HashMap<>();
@@ -450,11 +458,25 @@ public final class HashtagSuggester {
 
     /**
      * Each content word of {@code text} (lowercased; stopwords and words under
-     * {@link #MIN_WORD_LENGTH} letters dropped) with its stem, its first {@link #STEM_LENGTH}
-     * letters.
+     * {@link #MIN_WORD_LENGTH} letters dropped) with its stem, from the stemmer of the text's
+     * language ({@link #stemmerFor}).
      */
     private static void forEachWord(String text, BiConsumer<String, String> action) {
         if (text == null) return;
+        List<String> words = words(text);
+        SnowballStemmer stemmer = stemmerFor(words);
+        for (String w : words) {
+            if (w.codePointCount(0, w.length()) >= MIN_WORD_LENGTH && !STOPWORDS.contains(w)) {
+                stemmer.setCurrent(w);
+                stemmer.stem();
+                action.accept(stemmer.getCurrent(), w);
+            }
+        }
+    }
+
+    /** Every word of {@code text}: its runs of letters, lowercased. */
+    private static List<String> words(String text) {
+        List<String> words = new ArrayList<>();
         StringBuilder word = new StringBuilder();
         String lower = text.toLowerCase(Locale.ROOT);
         for (int i = 0; i <= lower.length(); ) {
@@ -462,15 +484,23 @@ public final class HashtagSuggester {
             if (Character.isLetter(cp)) {
                 word.appendCodePoint(cp);
             } else if (word.length() > 0) {
-                String w = word.toString();
-                int length = w.codePointCount(0, w.length());
-                if (length >= MIN_WORD_LENGTH && !STOPWORDS.contains(w)) {
-                    action.accept(length <= STEM_LENGTH ? w : w.substring(0, w.offsetByCodePoints(0, STEM_LENGTH)), w);
-                }
+                words.add(word.toString());
                 word.setLength(0);
             }
             i += Character.charCount(cp);
         }
+        return words;
+    }
+
+    /** German when {@code words} hold more German than English stopwords, else English. */
+    private static SnowballStemmer stemmerFor(List<String> words) {
+        int english = 0;
+        int german = 0;
+        for (String w : words) {
+            if (ENGLISH_STOPWORDS.contains(w)) english++;
+            if (GERMAN_STOPWORDS.contains(w)) german++;
+        }
+        return german > english ? new germanStemmer() : new englishStemmer();
     }
 
     /** Adds a {@code tag:<key>} token for each of {@code tags} (normalized; null is none). */

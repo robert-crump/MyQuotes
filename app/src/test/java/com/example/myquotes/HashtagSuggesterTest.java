@@ -150,7 +150,7 @@ public class HashtagSuggesterTest {
     public void stopwordsAndShortWordsDoNotCount() {
         assertEquals(new LinkedHashSet<>(Collections.singletonList("forest")),
                 HashtagSuggester.tokens("The forest is where we go, and they are ours.", null));
-        assertEquals(new LinkedHashSet<>(Arrays.asList("wald", "bäume")),
+        assertEquals(new LinkedHashSet<>(Arrays.asList("wald", "baum")),
                 HashtagSuggester.tokens("Der Wald und die Bäume, ich bin immer da.", ""));
 
         addTagged(5, "the and forest", "Nature");
@@ -160,14 +160,29 @@ public class HashtagSuggesterTest {
 
     @Test
     public void theStemMergesWordForms() {
-        assertEquals(new LinkedHashSet<>(Collections.singletonList("friend")),
-                HashtagSuggester.tokens("Friendship, friendships and a friend.", null));
-        assertEquals(new LinkedHashSet<>(Arrays.asList("freund", "author:goethe")),
-                HashtagSuggester.tokens("Freundschaft und Freunde", " Goethe "));
+        assertEquals(new LinkedHashSet<>(Collections.singletonList("love")),
+                HashtagSuggester.tokens("Love, loved and loving.", null));
+        assertEquals(new LinkedHashSet<>(Collections.singletonList("happi")),
+                HashtagSuggester.tokens("Happiness is being happy.", null));
+        assertEquals(new LinkedHashSet<>(Arrays.asList("lieb", "author:goethe")),
+                HashtagSuggester.tokens("Die Liebe und lieben", " Goethe "));
 
-        addTagged(5, "true friendship lasting companionship", "Friends");
+        addTagged(5, "true love lasts", "Love");
         addFiller(10);
-        assertEquals(Collections.singletonList("Friends"), suggest("Friendships are companions."));
+        assertEquals(Collections.singletonList("Love"), suggest("She loved him."));
+    }
+
+    @Test
+    public void theLanguageWithMoreStopwordsPicksTheStemmer() {
+        // German: "leben" → "leb", "sterben" → "sterb".
+        assertEquals(new LinkedHashSet<>(Arrays.asList("leb", "sterb")),
+                HashtagSuggester.tokens("Wir leben und wir sterben.", null));
+        // English: "living" → "live", "dying" → "die".
+        assertEquals(new LinkedHashSet<>(Arrays.asList("live", "die")),
+                HashtagSuggester.tokens("We are living and we are dying.", null));
+        // No stopwords at all: English.
+        assertEquals(new LinkedHashSet<>(Collections.singletonList("live")),
+                HashtagSuggester.tokens("Living!", null));
     }
 
     @Test
