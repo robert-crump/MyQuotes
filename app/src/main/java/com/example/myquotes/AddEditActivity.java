@@ -119,7 +119,7 @@ public class AddEditActivity extends AppCompatActivity {
         hashtagField = new HashtagChipField(findViewById(R.id.hashtag_field), this,
                 quoteCollection, MyApplication.getInstance().getHashtags());
 
-        // The quote field is a fixed 6 lines and scrolls internally; keep drags inside it from
+        // The quote field grows from 6 to 10 lines, then scrolls internally; keep drags inside it from
         // being taken over by the surrounding ScrollView while it can still scroll.
         editTextQuote.setOnTouchListener((v, event) -> {
             if (v.canScrollVertically(1) || v.canScrollVertically(-1)) {
