@@ -30,11 +30,13 @@ import java.util.List;
  * typing; a tag the quote already has is ignored, and one that exists elsewhere in the collection
  * keeps its spelling. A chip's × removes it; Backspace in the empty field highlights the last
  * chip, a second Backspace removes it. The dropdown lists existing tags starting with the input,
- * most-used first, at most 6, with counts (the most-used ones for empty input). It opens below
+ * most-used first, at most 3, with counts; empty input (or a lone {@code #}) has none. It opens below
  * the field ({@link DropDownBelowTextView}); while the field has focus the form is scrolled to put
  * it at the top, with blank space added below the form when it is too short to scroll that far.
  */
 final class HashtagChipField {
+    private static final int MAX_SUGGESTIONS = 3;
+
     private final Context context;
     private final ChipGroup group;
     private final AutoCompleteTextView input;
@@ -65,6 +67,7 @@ final class HashtagChipField {
 
         adapter = new FieldSuggestionAdapter(context);
         adapter.setField(QuoteQuery.Field.HASHTAGS);
+        adapter.setLimit(MAX_SUGGESTIONS);
         input.setAdapter(adapter);
         collection.getQuoteList().observe(owner, quotes -> adapter.setQuotes(new ArrayList<>(quotes)));
 
@@ -97,10 +100,7 @@ final class HashtagChipField {
             }
             return true;
         });
-        input.setOnItemClickListener((parent, view, position, id) -> {
-            commitPending();
-            input.post(this::showMostUsed); // after the completion has closed the dropdown
-        });
+        input.setOnItemClickListener((parent, view, position, id) -> commitPending());
         input.setOnFocusChangeListener((v, hasFocus) -> {
             int color = resolveColor(hasFocus ? androidx.appcompat.R.attr.colorPrimary
                     : com.google.android.material.R.attr.colorOnSurfaceVariant);
@@ -108,7 +108,6 @@ final class HashtagChipField {
             underline.setBackgroundColor(color);
             if (hasFocus) {
                 liftField();
-                showMostUsed();
             } else {
                 highlight(null);
                 setFormExtraBottom(0);
@@ -282,15 +281,6 @@ final class HashtagChipField {
             if (p instanceof ScrollView) return (ScrollView) p;
         }
         throw new IllegalStateException("The hashtag field must sit in a ScrollView");
-    }
-
-    private void showMostUsed() {
-        if (!input.hasFocus() || input.length() > 0) return;
-        adapter.getFilter().filter("", count -> {
-            if (count > 0 && input.hasFocus() && input.length() == 0 && input.isAttachedToWindow()) {
-                input.showDropDown();
-            }
-        });
     }
 
     private int resolveColor(int attr) {

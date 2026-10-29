@@ -55,11 +55,12 @@ public class SuggestionProvider {
     /**
      * Existing hashtags starting with {@code input} (case-insensitive, a leading {@code #}
      * ignored) with their quote counts, most-used first, then by name, at most {@code limit}.
-     * Empty input lists the most-used tags.
+     * Empty input, or a lone {@code #}, has none.
      */
     public List<FieldSuggestion> getTagSuggestions(List<Quote> quotes, String input, int limit) {
         String prefix = Hashtag.key(Hashtag.stripHash(input));
         List<FieldSuggestion> result = new ArrayList<>();
+        if (prefix.isEmpty()) return result;
         for (Map.Entry<String, Integer> e : Hashtags.counts(quotes).entrySet()) {
             if (Hashtag.key(e.getKey()).startsWith(prefix)) {
                 result.add(new FieldSuggestion(e.getKey(), e.getValue()));

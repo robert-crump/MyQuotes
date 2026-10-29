@@ -18,8 +18,7 @@ import androidx.appcompat.widget.AppCompatAutoCompleteTextView;
  * wherever there is more room, so with the keyboard up a long list opens above the field and jumps
  * below once it gets short. Before each show this caps the list's height to the space between the
  * anchor and the bottom of the enclosing ScrollView (the top of the keyboard, since the screen pads
- * for it), so it always fits below; a list that fits keeps its natural height. Empty text counts
- * as enough to filter.
+ * for it), so it always fits below; a list that fits keeps its natural height.
  */
 public class DropDownBelowTextView extends AppCompatAutoCompleteTextView {
     private final Rect padding = new Rect();
@@ -35,15 +34,6 @@ public class DropDownBelowTextView extends AppCompatAutoCompleteTextView {
 
     public DropDownBelowTextView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-    }
-
-    /**
-     * Empty text filters too, so the adapter's entries for it (the most-used ones) stay open;
-     * otherwise the dropdown closes whenever the adapter's data changes while the text is empty.
-     */
-    @Override
-    public boolean enoughToFilter() {
-        return true;
     }
 
     @Override

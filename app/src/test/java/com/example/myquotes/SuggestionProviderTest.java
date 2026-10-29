@@ -148,10 +148,10 @@ public class SuggestionProviderTest {
     }
 
     @Test
-    public void tagSuggestionsForEmptyInputAreTheMostUsed() {
+    public void noTagSuggestionsForEmptyInputOrALoneHash() {
         List<Quote> quotes = Arrays.asList(
                 qc("A", "", "Love Life"), qc("B", "", "Life Wisdom"), qc("C", "", "Life Love"));
-        assertEquals(Arrays.asList("Life:3", "Love:2", "Wisdom:1"),
-                values(provider.getTagSuggestions(quotes, "", 6)));
+        assertTrue(provider.getTagSuggestions(quotes, "", 6).isEmpty());
+        assertTrue(provider.getTagSuggestions(quotes, "#", 6).isEmpty());
     }
 }

@@ -18,8 +18,8 @@ import java.util.List;
 /**
  * Suggestions for a text field: existing values of one field (author, source, hashtags) with
  * their quote counts. The search field uses it for its filter and offers nothing while searching
- * all fields or quote text; the Add/Edit hashtag field uses it for tags, also on empty input,
- * leaving out the tags the quote already has.
+ * all fields or quote text; the Add/Edit hashtag field uses it for tags, leaving out the tags
+ * the quote already has. Empty input has no suggestions.
  */
 class FieldSuggestionAdapter extends ArrayAdapter<SuggestionProvider.FieldSuggestion> {
     static final int MAX_SUGGESTIONS = 6;
@@ -29,9 +29,15 @@ class FieldSuggestionAdapter extends ArrayAdapter<SuggestionProvider.FieldSugges
     private volatile List<Quote> quotes = Collections.emptyList();
     private volatile QuoteQuery.Field field;
     private volatile List<String> excludedTags = Collections.emptyList();
+    private volatile int limit = MAX_SUGGESTIONS;
 
     FieldSuggestionAdapter(Context context) {
         super(context, R.layout.item_field_suggestion, new ArrayList<>());
+    }
+
+    /** The most suggestions to offer; {@link #MAX_SUGGESTIONS} unless set. */
+    void setLimit(int limit) {
+        this.limit = limit;
     }
 
     void setQuotes(List<Quote> quotes) {
@@ -73,21 +79,22 @@ class FieldSuggestionAdapter extends ArrayAdapter<SuggestionProvider.FieldSugges
         protected FilterResults performFiltering(CharSequence constraint) {
             QuoteQuery.Field current = field;
             String input = constraint == null ? "" : constraint.toString();
+            int max = limit;
             List<SuggestionProvider.FieldSuggestion> suggestions;
             if (current == QuoteQuery.Field.HASHTAGS) {
                 List<String> excluded = excludedTags;
                 suggestions = new ArrayList<>();
                 for (SuggestionProvider.FieldSuggestion s : provider.getTagSuggestions(
-                        quotes, input, MAX_SUGGESTIONS + excluded.size())) {
+                        quotes, input, max + excluded.size())) {
                     if (!Hashtag.containsIgnoreCase(excluded, s.value)) suggestions.add(s);
                 }
-                if (suggestions.size() > MAX_SUGGESTIONS) {
-                    suggestions = new ArrayList<>(suggestions.subList(0, MAX_SUGGESTIONS));
+                if (suggestions.size() > max) {
+                    suggestions = new ArrayList<>(suggestions.subList(0, max));
                 }
             } else {
                 suggestions = current == null || constraint == null
                         ? Collections.emptyList()
-                        : provider.getFieldSuggestions(quotes, current, input, MAX_SUGGESTIONS);
+                        : provider.getFieldSuggestions(quotes, current, input, max);
             }
             FilterResults results = new FilterResults();
             results.values = suggestions;
