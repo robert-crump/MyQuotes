@@ -106,6 +106,20 @@
         <item quantity="one">%d quote</item>
         <item quantity="other">%d quotes</item>
     </plurals>
+    <!-- Statistics: the toggle under a ranked list cut off after its top 10 -->
+    <string name="stats_show_less">Show less</string>
+    <plurals name="stats_more_authors">
+        <item quantity="one">+ %d more author</item>
+        <item quantity="other">+ %d more authors</item>
+    </plurals>
+    <plurals name="stats_more_sources">
+        <item quantity="one">+ %d more source</item>
+        <item quantity="other">+ %d more sources</item>
+    </plurals>
+    <plurals name="stats_more_hashtags">
+        <item quantity="one">+ %d more hashtag</item>
+        <item quantity="other">+ %d more hashtags</item>
+    </plurals>
     <string name="import_confirm_title">Replace all quotes?</string>
     <!-- %2$s is settings_quote_count for the file, e.g. "12 quotes" -->
     <plurals name="import_confirm_message">

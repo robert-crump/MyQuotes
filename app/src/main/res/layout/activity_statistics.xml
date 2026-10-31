@@ -124,7 +124,7 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Top 10 Autoren CardView -->
+            <!-- Top Authors CardView -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -142,7 +142,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Top 10 Authors"
+                        android:text="Top Authors"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
@@ -154,11 +154,15 @@
                         android:layout_height="wrap_content"
                         android:nestedScrollingEnabled="false" />
 
+                    <include
+                        android:id="@+id/toggle_top_authors"
+                        layout="@layout/view_show_more_toggle" />
+
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Top 10 Quellen CardView -->
+            <!-- Top Sources CardView -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -176,7 +180,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Top 10 Sources"
+                        android:text="Top Sources"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
@@ -188,11 +192,15 @@
                         android:layout_height="wrap_content"
                         android:nestedScrollingEnabled="false" />
 
+                    <include
+                        android:id="@+id/toggle_top_sources"
+                        layout="@layout/view_show_more_toggle" />
+
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Hashtags histogram -->
+            <!-- Top Hashtags CardView -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -210,7 +218,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Hashtags"
+                        android:text="Top Hashtags"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp"
@@ -221,6 +229,10 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:nestedScrollingEnabled="false" />
+
+                    <include
+                        android:id="@+id/toggle_hashtags"
+                        layout="@layout/view_show_more_toggle" />
 
                     <!-- Quotes without any hashtag -->
                     <TextView

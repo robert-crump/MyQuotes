@@ -11,9 +11,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
+/** A ranked list that shows only its first {@link #COLLAPSED_ROWS} items until expanded. */
 public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHolder> {
+    static final int COLLAPSED_ROWS = 10;
+
     private final List<StatItem> items = new ArrayList<>();
     private final QuoteQuery.Field field;
+    private boolean expanded;
 
     public StatItemAdapter(QuoteQuery.Field field) {
         this.field = field;
@@ -24,6 +28,26 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();
+    }
+
+    public boolean isExpanded() {
+        return expanded;
+    }
+
+    public void setExpanded(boolean expanded) {
+        if (this.expanded == expanded) return;
+        this.expanded = expanded;
+        if (overflowCount() == 0) return;
+        if (expanded) {
+            notifyItemRangeInserted(COLLAPSED_ROWS, overflowCount());
+        } else {
+            notifyItemRangeRemoved(COLLAPSED_ROWS, overflowCount());
+        }
+    }
+
+    /** The items beyond the collapsed rows, shown only while expanded. */
+    public int overflowCount() {
+        return Math.max(0, items.size() - COLLAPSED_ROWS);
     }
 
     @NonNull
@@ -42,7 +66,7 @@ public class StatItemAdapter extends RecyclerView.Adapter<StatItemAdapter.ViewHo
 
     @Override
     public int getItemCount() {
-        return items.size();
+        return expanded ? items.size() : Math.min(items.size(), COLLAPSED_ROWS);
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {

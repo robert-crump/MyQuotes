@@ -35,8 +35,8 @@ public class QuoteStatisticsTest {
                 q("A", "S1", "Life", true), q("A", "S1", "Life", false), q("B", "S2", "Work", true)));
         assertEquals(3, s.total);
         assertEquals(2, s.favoriteCount);
-        assertEquals(Arrays.asList("A:2", "B:1"), names(s.topAuthors));
-        assertEquals(Arrays.asList("S1:2", "S2:1"), names(s.topSources));
+        assertEquals(Arrays.asList("A:2", "B:1"), names(s.authors));
+        assertEquals(Arrays.asList("S1:2", "S2:1"), names(s.sources));
         assertEquals(Arrays.asList("Life:2", "Work:1"), names(s.hashtags));
     }
 
@@ -50,21 +50,21 @@ public class QuoteStatisticsTest {
     }
 
     @Test
-    public void topListsLimitedToTen_hashtagsNot() {
+    public void listsNotLimited() {
         List<Quote> quotes = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
             quotes.add(q("author" + i, "src" + i, "tag" + i, false));
         }
         QuoteStatistics s = QuoteStatistics.of(quotes);
-        assertEquals(10, s.topAuthors.size());
-        assertEquals(10, s.topSources.size());
+        assertEquals(12, s.authors.size());
+        assertEquals(12, s.sources.size());
         assertEquals(12, s.hashtags.size());
     }
 
     @Test
     public void emptySourceExcluded() {
         QuoteStatistics s = QuoteStatistics.of(Arrays.asList(q("A", "", "", false), q("B", "S", "", false)));
-        assertEquals(Collections.singletonList("S:1"), names(s.topSources));
+        assertEquals(Collections.singletonList("S:1"), names(s.sources));
     }
 
     @Test
@@ -78,7 +78,7 @@ public class QuoteStatisticsTest {
     public void tiesOrderedByNameAscending() {
         QuoteStatistics s = QuoteStatistics.of(Arrays.asList(
                 q("Zed", "", "", false), q("Amy", "", "", false), q("Bob", "", "", false), q("Bob", "", "", false)));
-        assertEquals(Arrays.asList("Bob:2", "Amy:1", "Zed:1"), names(s.topAuthors));
+        assertEquals(Arrays.asList("Bob:2", "Amy:1", "Zed:1"), names(s.authors));
     }
 
     @Test
@@ -87,7 +87,7 @@ public class QuoteStatisticsTest {
         assertEquals(0, s.total);
         assertEquals(0, s.favoriteCount);
         assertEquals(0, s.withoutHashtagsCount);
-        assertTrue(s.topAuthors.isEmpty() && s.topSources.isEmpty() && s.hashtags.isEmpty());
+        assertTrue(s.authors.isEmpty() && s.sources.isEmpty() && s.hashtags.isEmpty());
     }
 
     private static final ZoneId ZONE = ZoneOffset.UTC;

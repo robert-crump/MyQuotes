@@ -13,7 +13,6 @@ import java.util.Map;
 
 /** Immutable aggregate over a quote list. Pure: no Android dependencies. */
 public final class QuoteStatistics {
-    static final int TOP_LIMIT = 10;
     static final int MONTHS = 12;
 
     /** Quotes added in one calendar month. */
@@ -29,8 +28,9 @@ public final class QuoteStatistics {
 
     public final int total;
     public final int favoriteCount;
-    public final List<StatItem> topAuthors;
-    public final List<StatItem> topSources;
+    /** Every author and source, most quotes first; ties by name. */
+    public final List<StatItem> authors;
+    public final List<StatItem> sources;
     /** Every hashtag; a quote counts once for each of its tags. */
     public final List<StatItem> hashtags;
     public final int withoutHashtagsCount;
@@ -39,14 +39,14 @@ public final class QuoteStatistics {
     /** Quotes with {@code addedAt == 0} (added before the field existed). */
     public final int unknownAddedCount;
 
-    private QuoteStatistics(int total, int favoriteCount, List<StatItem> topAuthors,
-                            List<StatItem> topSources, List<StatItem> hashtags,
+    private QuoteStatistics(int total, int favoriteCount, List<StatItem> authors,
+                            List<StatItem> sources, List<StatItem> hashtags,
                             int withoutHashtagsCount, List<MonthCount> addedPerMonth,
                             int unknownAddedCount) {
         this.total = total;
         this.favoriteCount = favoriteCount;
-        this.topAuthors = topAuthors;
-        this.topSources = topSources;
+        this.authors = authors;
+        this.sources = sources;
         this.hashtags = hashtags;
         this.withoutHashtagsCount = withoutHashtagsCount;
         this.addedPerMonth = addedPerMonth;
@@ -88,18 +88,16 @@ public final class QuoteStatistics {
             months.add(new MonthCount(first.plusMonths(i), perMonth[i]));
         }
         return new QuoteStatistics(quotes.size(), favorites,
-                rank(authors, TOP_LIMIT), rank(sources, TOP_LIMIT),
-                rank(hashtags, Integer.MAX_VALUE), noHashtags,
+                rank(authors), rank(sources), rank(hashtags), noHashtags,
                 Collections.unmodifiableList(months), unknownAdded);
     }
 
-    private static List<StatItem> rank(Map<String, Integer> counts, int limit) {
+    private static List<StatItem> rank(Map<String, Integer> counts) {
         List<StatItem> items = new ArrayList<>();
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
             items.add(new StatItem(e.getKey(), e.getValue()));
         }
         items.sort(Comparator.<StatItem>comparingInt(i -> -i.count).thenComparing(i -> i.name));
-        List<StatItem> top = new ArrayList<>(items.subList(0, Math.min(limit, items.size())));
-        return Collections.unmodifiableList(top);
+        return Collections.unmodifiableList(items);
     }
 }
