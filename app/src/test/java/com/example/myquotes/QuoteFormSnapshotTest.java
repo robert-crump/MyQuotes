@@ -48,4 +48,16 @@ public class QuoteFormSnapshotTest {
         assertNotEquals(base, new QuoteFormSnapshot("a", "t", "", Arrays.asList("A")));
         assertNotEquals(base, new QuoteFormSnapshot("a", "t", "", Arrays.asList("A", "B", "C")));
     }
+
+    @Test
+    public void comparesRejectedTagsLeavingOutTheFormsTags() {
+        QuoteFormSnapshot base = new QuoteFormSnapshot("a", "t", "", Arrays.asList("A"));
+        assertNotEquals(base, new QuoteFormSnapshot("a", "t", "", Arrays.asList("A"), Arrays.asList("B")));
+        assertEquals(base, new QuoteFormSnapshot("a", "t", "", Arrays.asList("A"), Arrays.asList("a")));
+        Quote quote = new Quote(1, "a", "t", "");
+        quote.setTags(Arrays.asList("A"));
+        quote.setRejectedTags(Arrays.asList("B"));
+        assertEquals(QuoteFormSnapshot.of(quote),
+                new QuoteFormSnapshot("a", "t", "", Arrays.asList("A"), Arrays.asList("#B")));
+    }
 }

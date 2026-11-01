@@ -138,4 +138,16 @@ public class QuoteCodecTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    public void rejectedTagsRoundtripAndAreOptional() throws Exception {
+        Quote quote = makeQuote(1);
+        quote.setRejectedTags(Arrays.asList("Love", "Hope"));
+        String json = QuoteCodec.encode(Arrays.asList(quote, makeQuote(2)));
+
+        JSONArray quotes = new JSONObject(json).getJSONArray("quotes");
+        assertFalse(quotes.getJSONObject(1).has("rejectedTags"));
+        List<Quote> out = QuoteCodec.decode(json);
+        assertEquals(Arrays.asList("Hope", "Love"), out.get(0).getRejectedTags());
+        assertTrue(out.get(1).getRejectedTags().isEmpty());
+    }
 }

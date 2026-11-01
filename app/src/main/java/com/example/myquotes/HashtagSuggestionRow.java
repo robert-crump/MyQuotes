@@ -19,6 +19,7 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -30,8 +31,11 @@ import java.util.concurrent.Executors;
  * The model is fitted off the main thread whenever the Quote Collection emits (so on opening),
  * leaving out the quote being edited; the row refreshes 300 ms after the text, author or source
  * last changed, and at once when the quote's tags change. Hidden when nothing qualifies.
- * The info button next to the label, or a long-press on a chip, explains all current
- * suggestions in one dialog (#51, #52): how suggesting works, then each tag's reasons with counts.
+ * The info button next to the label explains all current suggestions in one dialog (#51, #52):
+ * how suggesting works, then each tag's reasons with counts, then the tags not suggested for this
+ * quote. A long-press on a chip explains that one suggestion and offers "Don't suggest for this
+ * quote" (#55): the tag joins the form's rejected tags at once ({@link #getRejected}; saved with
+ * the quote) and the next-best tag can take its place.
  */
 final class HashtagSuggestionRow {
     private static final long DEBOUNCE_MILLIS = 300;
@@ -49,6 +53,7 @@ final class HashtagSuggestionRow {
     private int editedQuoteId;
     private HashtagSuggester model;
     private List<String> shown = Collections.emptyList();
+    private final ArrayList<String> rejected = new ArrayList<>();
 
     /** {@code editedQuoteId} is left out of the model; -1 when adding. */
     HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, int editedQuoteId,
@@ -89,6 +94,18 @@ final class HashtagSuggestionRow {
         fit(collection.getQuoteList().getValue());
     }
 
+    /** The form's rejected tags (#55): the loaded quote's, or the saved state's. */
+    void setRejected(Collection<String> tags) {
+        rejected.clear();
+        rejected.addAll(Hashtag.normalizeAll(tags));
+        refresh();
+    }
+
+    /** The form's rejected tags, including any the quote has since been given by hand. */
+    ArrayList<String> getRejected() {
+        return new ArrayList<>(rejected);
+    }
+
     private void fit(List<Quote> quotes) {
         if (fitter.isShutdown() || quotes == null) return;
         int leftOut = editedQuoteId;
@@ -116,7 +133,7 @@ final class HashtagSuggestionRow {
         main.removeCallbacks(refresh);
         List<String> suggestions = model == null ? Collections.emptyList()
                 : model.suggest(text.getText().toString(), author.getText().toString(),
-                        source.getText().toString(), field.getTags());
+                        source.getText().toString(), field.getTags(), rejected);
         shown = suggestions;
         group.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(group.getContext());
@@ -126,7 +143,7 @@ final class HashtagSuggestionRow {
             chip.setContentDescription("Add " + Hashtag.display(tag));
             chip.setOnClickListener(v -> field.addTag(tag));
             chip.setOnLongClickListener(v -> {
-                showExplanation();
+                showSuggestion(tag);
                 return true;
             });
             group.addView(chip);
@@ -134,14 +151,35 @@ final class HashtagSuggestionRow {
         row.setVisibility(suggestions.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** One dialog explaining every shown suggestion: the intro, then "#Love" and "heart (6/8 quotes), ...". */
+    private HashtagSuggester.Explanation explain(String tag) {
+        return model.explain(text.getText().toString(), author.getText().toString(),
+                source.getText().toString(), field.getTags(), tag);
+    }
+
+    /** One suggestion's reasons, with "Don't suggest for this quote" (#55). */
+    private void showSuggestion(String tag) {
+        if (model == null) return;
+        HashtagSuggester.Explanation explanation = explain(tag);
+        new MaterialAlertDialogBuilder(row.getContext())
+                .setTitle(Hashtag.display(tag))
+                .setMessage(explanation == null ? null : HashtagSuggestionText.explanation(explanation))
+                .setPositiveButton("Don't suggest for this quote", (dialog, which) -> {
+                    if (!Hashtag.containsIgnoreCase(rejected, tag)) rejected.add(tag);
+                    refresh();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * One dialog explaining every shown suggestion: the intro, then "#Love" and "heart (6/8 quotes),
+     * ...", then "Not suggested for this quote: #Hope" when the form has rejected tags.
+     */
     private void showExplanation() {
         if (model == null || shown.isEmpty()) return;
         SpannableStringBuilder message = new SpannableStringBuilder(HashtagSuggestionText.INTRO);
         for (String tag : shown) {
-            HashtagSuggester.Explanation explanation =
-                    model.explain(text.getText().toString(), author.getText().toString(),
-                            source.getText().toString(), field.getTags(), tag);
+            HashtagSuggester.Explanation explanation = explain(tag);
             if (explanation == null) continue;
             message.append("\n\n");
             int start = message.length();
@@ -150,6 +188,8 @@ final class HashtagSuggestionRow {
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             message.append("\n").append(HashtagSuggestionText.explanation(explanation));
         }
+        String notSuggested = HashtagSuggestionText.notSuggestedLine(rejected, field.getTags());
+        if (notSuggested != null) message.append("\n\n").append(notSuggested);
         new MaterialAlertDialogBuilder(row.getContext())
                 .setTitle("Why these hashtags")
                 .setMessage(message)

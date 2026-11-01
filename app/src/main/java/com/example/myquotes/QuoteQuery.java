@@ -20,7 +20,10 @@ import java.util.Set;
  * Owns matching, the minimum-length rule and result snippets, and is the single protocol for
  * opening SearchActivity (or handing SearchFragment) a query. Text matches by contains (on each
  * hashtag, ignoring a leading {@code #}). The hashtag filter (#51, ADR-005) is one whole tag,
- * compared ignoring case, or "no hashtag"; it combines with the text and needs no minimum length.
+ * compared ignoring case, "no hashtag", or "has suggestions" (#55); it combines with the text and
+ * needs no minimum length. "Has suggestions" depends on the suggestion model, which this class
+ * doesn't know: it lets every quote through, and {@link SuggestionRanking} keeps the ones with
+ * suggestions.
  */
 public final class QuoteQuery {
     public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, HASHTAGS }
@@ -33,18 +36,26 @@ public final class QuoteQuery {
     static final String EXTRA_TEXT = "search_query";
     static final String EXTRA_FIELDS = "search_fields";
     static final String EXTRA_TAG = "search_tag";
+    static final String EXTRA_SUGGESTED = "search_suggested";
 
     private final String text;
     private final EnumSet<Field> fields;
     // The hashtag filter: null for none, "" for "no hashtag" (a tag is never empty), else a tag.
     @Nullable
     private final String tag;
+    // The "has suggestions" filter; tag is then null.
+    private final boolean suggested;
 
-    private QuoteQuery(String text, Set<Field> fields, @Nullable String tag) {
+    private QuoteQuery(String text, Set<Field> fields, @Nullable String tag, boolean suggested) {
         this.text = text == null ? "" : text.trim();
         this.fields = EnumSet.noneOf(Field.class);
         this.fields.addAll(fields);
-        this.tag = tag;
+        this.tag = suggested ? null : tag;
+        this.suggested = suggested;
+    }
+
+    private QuoteQuery(String text, Set<Field> fields, @Nullable String tag) {
+        this(text, fields, tag, false);
     }
 
     private QuoteQuery(String text, Set<Field> fields) {
@@ -71,6 +82,11 @@ public final class QuoteQuery {
         return all("").withUntagged();
     }
 
+    /** The quotes with hashtag suggestions (#55): no text, "has suggestions" filter. */
+    public static QuoteQuery suggested() {
+        return all("").withSuggested();
+    }
+
     public String getText() {
         return text;
     }
@@ -94,8 +110,18 @@ public final class QuoteQuery {
         return tag != null && tag.isEmpty();
     }
 
+    /** Whether the filter is "has suggestions" (#55). */
+    public boolean isSuggested() {
+        return suggested;
+    }
+
+    /** Whether the results are ranked by their suggestions: "no hashtag" or "has suggestions". */
+    public boolean isRankedBySuggestions() {
+        return suggested || isUntagged();
+    }
+
     public boolean hasTagFilter() {
-        return tag != null;
+        return tag != null || suggested;
     }
 
     /** Same text and fields, filtered to {@code newTag}. */
@@ -109,13 +135,18 @@ public final class QuoteQuery {
         return new QuoteQuery(text, fields, "");
     }
 
+    /** Same text and fields, filtered to quotes with hashtag suggestions. */
+    public QuoteQuery withSuggested() {
+        return new QuoteQuery(text, fields, null, true);
+    }
+
     public QuoteQuery withoutTagFilter() {
         return new QuoteQuery(text, fields, null);
     }
 
     /** New text; fields and hashtag filter stay. */
     public QuoteQuery withText(String newText) {
-        return new QuoteQuery(newText, fields, tag);
+        return new QuoteQuery(newText, fields, tag, suggested);
     }
 
     /**
@@ -123,7 +154,8 @@ public final class QuoteQuery {
      * (the search filter).
      */
     public QuoteQuery scopedTo(@Nullable Field field) {
-        return new QuoteQuery(text, field == null ? EnumSet.allOf(Field.class) : EnumSet.of(field), tag);
+        return new QuoteQuery(text, field == null ? EnumSet.allOf(Field.class) : EnumSet.of(field), tag,
+                suggested);
     }
 
     /** The one field this query is scoped to, or null when it covers several (e.g. all). */
@@ -134,7 +166,7 @@ public final class QuoteQuery {
 
     /** Whether anything narrows the results: text of at least {@link #MIN_LENGTH} or the filter. */
     public boolean isActive() {
-        return isTextActive() || tag != null;
+        return isTextActive() || hasTagFilter();
     }
 
     private boolean isTextActive() {
@@ -231,7 +263,10 @@ public final class QuoteQuery {
     @Nullable
     public static QuoteQuery fromIntent(Intent intent) {
         String text = intent.getStringExtra(EXTRA_TEXT);
-        if ((text == null || text.isEmpty()) && intent.getStringExtra(EXTRA_TAG) == null) return null;
+        if ((text == null || text.isEmpty()) && intent.getStringExtra(EXTRA_TAG) == null
+                && !intent.getBooleanExtra(EXTRA_SUGGESTED, false)) {
+            return null;
+        }
         return fromBundle(intent.getExtras());
     }
 
@@ -244,6 +279,7 @@ public final class QuoteQuery {
         for (Field f : fields) names.add(f.name());
         bundle.putStringArrayList(EXTRA_FIELDS, names);
         if (tag != null) bundle.putString(EXTRA_TAG, tag);
+        if (suggested) bundle.putBoolean(EXTRA_SUGGESTED, true);
         return bundle;
     }
 
@@ -255,7 +291,8 @@ public final class QuoteQuery {
         if (text == null) return null;
         ArrayList<String> names = bundle.getStringArrayList(EXTRA_FIELDS);
         String tag = bundle.getString(EXTRA_TAG);
-        if (names == null) return new QuoteQuery(text, EnumSet.allOf(Field.class), tag);
+        boolean suggested = bundle.getBoolean(EXTRA_SUGGESTED, false);
+        if (names == null) return new QuoteQuery(text, EnumSet.allOf(Field.class), tag, suggested);
         Set<Field> fields = EnumSet.noneOf(Field.class);
         for (String name : names) {
             try {
@@ -264,7 +301,7 @@ public final class QuoteQuery {
                 // unknown field name: skip
             }
         }
-        return new QuoteQuery(text, fields, tag);
+        return new QuoteQuery(text, fields, tag, suggested);
     }
 
     @Override
@@ -272,11 +309,12 @@ public final class QuoteQuery {
         if (this == o) return true;
         if (!(o instanceof QuoteQuery)) return false;
         QuoteQuery other = (QuoteQuery) o;
-        return text.equals(other.text) && fields.equals(other.fields) && Objects.equals(tag, other.tag);
+        return text.equals(other.text) && fields.equals(other.fields) && Objects.equals(tag, other.tag)
+                && suggested == other.suggested;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(text, fields, tag);
+        return Objects.hash(text, fields, tag, suggested);
     }
 }

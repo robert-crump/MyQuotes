@@ -65,6 +65,10 @@ public final class QuoteCodec {
             jsonQuote.put("quoteText", quote.getQuoteText());
             jsonQuote.put("source", quote.getSource());
             jsonQuote.put("tags", new JSONArray(quote.getTags()));
+            // Optional (#55): written only when there are any; read as none when missing.
+            if (!quote.getRejectedTags().isEmpty()) {
+                jsonQuote.put("rejectedTags", new JSONArray(quote.getRejectedTags()));
+            }
             jsonQuote.put("isFavorite", quote.isFavorite());
             jsonQuote.put("favoritedAt", quote.getFavoritedAt());
             jsonQuote.put("lastShown", quote.getLastShown());
@@ -85,6 +89,17 @@ public final class QuoteCodec {
         } catch (JSONException e) {
             return false;
         }
+    }
+
+    private static List<String> parseRejectedTags(JSONObject jsonQuote) {
+        List<String> tags = new ArrayList<>();
+        JSONArray array = jsonQuote.optJSONArray("rejectedTags");
+        if (array == null) return tags;
+        for (int i = 0; i < array.length(); i++) {
+            String tag = array.optString(i, "");
+            if (!tag.isEmpty()) tags.add(tag);
+        }
+        return tags;
     }
 
     // "tags" when present; otherwise the legacy "category" as a single tag.
@@ -124,6 +139,7 @@ public final class QuoteCodec {
 
                 Quote quote = new Quote(id, author, quoteText, source);
                 quote.setTags(parseTags(jsonQuote));
+                quote.setRejectedTags(parseRejectedTags(jsonQuote));
                 quote.setFavorite(isFavorite);
                 quote.setFavoritedAt(favoritedAt);
                 quote.setLastShown(lastShown);

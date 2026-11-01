@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
-public class UntaggedRankingTest {
+public class SuggestionRankingTest {
     private final List<Quote> quotes = new ArrayList<>();
 
     private Quote add(String author, String text, long addedAt, String... tags) {
@@ -30,13 +30,13 @@ public class UntaggedRankingTest {
         return new HashtagSuggester.Suggestion(tag, new HashtagSuggester.Evidence("word", withTag, total));
     }
 
-    private static UntaggedRanking.Entry entry(Quote quote, HashtagSuggester.Suggestion... suggestions) {
-        return new UntaggedRanking.Entry(quote, Arrays.asList(suggestions));
+    private static SuggestionRanking.Entry entry(Quote quote, HashtagSuggester.Suggestion... suggestions) {
+        return new SuggestionRanking.Entry(quote, Arrays.asList(suggestions));
     }
 
     private List<Quote> ranked(List<Quote> candidates) {
         List<Quote> order = new ArrayList<>();
-        for (UntaggedRanking.Entry e : UntaggedRanking.rank(candidates, HashtagSuggester.fit(quotes))) {
+        for (SuggestionRanking.Entry e : SuggestionRanking.rank(candidates, HashtagSuggester.fit(quotes))) {
             order.add(e.quote);
         }
         return order;
@@ -61,11 +61,11 @@ public class UntaggedRankingTest {
         Quote one = new Quote(1, "A", "x", "");
         Quote two = new Quote(2, "B", "y", "");
         Quote three = new Quote(3, "C", "z", "");
-        List<UntaggedRanking.Entry> entries = new ArrayList<>(Arrays.asList(
+        List<SuggestionRanking.Entry> entries = new ArrayList<>(Arrays.asList(
                 entry(one, suggestion("Love", 5, 5)),
                 entry(two, suggestion("Love", 5, 5), suggestion("Life", 4, 8)),
                 entry(three, suggestion("Love", 5, 5))));
-        entries.sort(UntaggedRanking.ORDER);
+        entries.sort(SuggestionRanking.ORDER);
         // two has a 2nd suggestion; one and three tie, so the newer id first.
         assertEquals(Arrays.asList(two, three, one),
                 Arrays.asList(entries.get(0).quote, entries.get(1).quote, entries.get(2).quote));
@@ -81,10 +81,10 @@ public class UntaggedRankingTest {
         QuoteQuery rumi = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "Rumi").withUntagged();
 
         // All three are heart 5/7: newest first, then the higher id.
-        assertEquals(second, UntaggedRanking.next(quotes, rumi, model, Collections.emptySet()));
-        assertEquals(other, UntaggedRanking.next(quotes, QuoteQuery.untagged(), model, Collections.emptySet()));
-        assertEquals(best, UntaggedRanking.next(quotes, rumi, model, Collections.singleton(second.getId())));
-        assertNull(UntaggedRanking.next(quotes, rumi, model, new HashSet<>(Arrays.asList(best.getId(), second.getId()))));
+        assertEquals(second, SuggestionRanking.next(quotes, rumi, model, Collections.emptySet()));
+        assertEquals(other, SuggestionRanking.next(quotes, QuoteQuery.untagged(), model, Collections.emptySet()));
+        assertEquals(best, SuggestionRanking.next(quotes, rumi, model, Collections.singleton(second.getId())));
+        assertNull(SuggestionRanking.next(quotes, rumi, model, new HashSet<>(Arrays.asList(best.getId(), second.getId()))));
     }
 
     @Test
@@ -92,7 +92,36 @@ public class UntaggedRankingTest {
         addTagged(5, "heart rose", "Love");
         Quote a = add("A", "one", 1);
         add("B", "two", 2);
-        assertEquals(2, UntaggedRanking.remaining(quotes, QuoteQuery.untagged(), Collections.emptySet()));
-        assertEquals(1, UntaggedRanking.remaining(quotes, QuoteQuery.untagged(), Collections.singleton(a.getId())));
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        assertEquals(2, SuggestionRanking.remaining(quotes, QuoteQuery.untagged(), model, Collections.emptySet()));
+        assertEquals(1, SuggestionRanking.remaining(quotes, QuoteQuery.untagged(), model, Collections.singleton(a.getId())));
+    }
+
+    @Test
+    public void theSuggestedListHasTaggedAndUntaggedQuotesWithSuggestionsOnly() {
+        addTagged(5, "heart rose", "Love");
+        Quote tagged = add("A", "heart gold", 2, "Money");
+        Quote untagged = add("B", "heart silver", 1);
+        add("C", "office", 3); // no suggestion
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        List<Quote> order = new ArrayList<>();
+        for (SuggestionRanking.Entry e : SuggestionRanking.results(quotes, QuoteQuery.suggested(), model,
+                Collections.emptySet())) {
+            order.add(e.quote);
+        }
+        // Both are heart 5/7: newest first.
+        assertEquals(Arrays.asList(tagged, untagged), order);
+        assertEquals(2, SuggestionRanking.countWithSuggestions(SuggestionRanking.suggestionsById(quotes, model)));
+        assertEquals(untagged, SuggestionRanking.next(quotes, QuoteQuery.suggested(), model,
+                Collections.singleton(tagged.getId())));
+    }
+
+    @Test
+    public void aQuoteWhoseSuggestionsAreAllRejectedLeavesTheSuggestedList() {
+        addTagged(5, "heart rose", "Love");
+        Quote quote = add("A", "heart gold", 1, "Money");
+        quote.setRejectedTags(Collections.singletonList("Love"));
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        assertEquals(0, SuggestionRanking.remaining(quotes, QuoteQuery.suggested(), model, Collections.emptySet()));
     }
 }

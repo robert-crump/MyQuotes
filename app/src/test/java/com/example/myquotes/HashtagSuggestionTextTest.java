@@ -101,4 +101,12 @@ public class HashtagSuggestionTextTest {
     public void suggestedLineIsNullWithoutSuggestions() {
         assertEquals(null, HashtagSuggestionText.suggestedLine(Collections.emptyList()));
     }
+
+    @Test
+    public void notSuggestedLineListsTheRejectedTagsTheQuoteDoesNotHave() {
+        assertEquals("Not suggested for this quote: #Hope, #Love", HashtagSuggestionText.notSuggestedLine(
+                Arrays.asList("Hope", "Love", "Zen"), Arrays.asList("zen")));
+        assertEquals(null, HashtagSuggestionText.notSuggestedLine(
+                Collections.singletonList("Zen"), Arrays.asList("Zen")));
+    }
 }

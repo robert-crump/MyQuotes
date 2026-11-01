@@ -10,10 +10,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * A tagging run (#53): the editor opened from the "No hashtag" list, going from one untagged
- * quote to the next. Holds the list's query, whether the user has said to continue (asked once per
- * run), and the quotes skipped in this run (memory only; saved with the editor's state). The order
- * is {@link UntaggedRanking}'s.
+ * A tagging run (#53, #55): the editor opened from the ranked "No hashtag" or "Has suggestions"
+ * list, going from one quote to the next. Holds the list's query, whether the user has said to
+ * continue (asked once per run), and the quotes left out for the rest of the run: skipped, and in
+ * a "Has suggestions" run also saved (memory only; saved with the editor's state). The order is
+ * {@link SuggestionRanking}'s.
  */
 final class TaggingRun {
     private static final String KEY_QUERY = "run_query";
@@ -30,6 +31,14 @@ final class TaggingRun {
 
     QuoteQuery getQuery() {
         return query;
+    }
+
+    /**
+     * A run through the "Has suggestions" list: every save is done with the quote. Else a run
+     * through the "No hashtag" list, where a quote is done once it has hashtags.
+     */
+    boolean isSuggestionsRun() {
+        return query.isSuggested();
     }
 
     /** Whether the user has said to continue, so saves go straight on without asking. */
@@ -49,12 +58,27 @@ final class TaggingRun {
     /** The next quote, best ranked first; null when the run has none left. */
     @Nullable
     Quote next(List<Quote> quotes, HashtagSuggester model) {
-        return UntaggedRanking.next(quotes, query, model, skipped);
+        return SuggestionRanking.next(quotes, query, model, skipped);
     }
 
-    /** How many quotes the run still has, the one being edited included while it is untagged. */
-    int remaining(List<Quote> quotes) {
-        return UntaggedRanking.remaining(quotes, query, skipped);
+    /** How many quotes the run still has, the one being edited included while it is still in the list. */
+    int remaining(List<Quote> quotes, HashtagSuggester model) {
+        return SuggestionRanking.remaining(quotes, query, model, skipped);
+    }
+
+    /** "Continue with next untagged quote?" or "Continue with the next quote?". */
+    String continuePrompt() {
+        return isSuggestionsRun() ? "Continue with the next quote?" : "Continue with next untagged quote?";
+    }
+
+    /** The toast when the run has nothing left. */
+    String noMoreMessage() {
+        return isSuggestionsRun() ? "No more suggestions" : "No more untagged quotes";
+    }
+
+    /** The Skip action's title. */
+    String skipTitle() {
+        return isSuggestionsRun() ? "Skip to next quote" : "Skip to next untagged quote";
     }
 
     Bundle toBundle() {

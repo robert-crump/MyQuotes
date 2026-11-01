@@ -26,6 +26,10 @@ public class HashtagSuggesterTest {
         for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tag);
     }
 
+    private void addTagged(int count, String text, String tag, String other) {
+        for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tag, other);
+    }
+
     private void addUntagged(int count, String text) {
         for (int i = 0; i < count; i++) add("Untagged " + quotes.size(), text);
     }
@@ -521,9 +525,33 @@ public class HashtagSuggesterTest {
                 HashtagSuggester.fit(quotes).suggestionsFor(quote));
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void suggestionsForRejectATaggedQuote() {
-        Quote quote = add("Someone", "forest", "Nature");
-        HashtagSuggester.fit(quotes).suggestionsFor(quote);
+    @Test
+    public void suggestionsForATaggedQuoteMatchTheEditor() {
+        addTagged(5, "forest walk", "Nature");
+        addTagged(4, "grief loss", "Death");
+        addTagged(4, "grief loss", "Death", "Nature");
+        addUntagged(1, "forest gold");
+        Quote quote = add("Someone New", "forest grief", "Death");
+        addFiller(10);
+        List<Quote> others = new ArrayList<>(quotes);
+        others.remove(quote);
+        List<String> editor = HashtagSuggester.fit(others)
+                .suggest(quote.getQuoteText(), quote.getAuthor(), "", quote.getTags());
+        List<String> listed = new ArrayList<>();
+        for (HashtagSuggester.Suggestion s : HashtagSuggester.fit(quotes).suggestionsFor(quote)) listed.add(s.tag);
+        assertEquals(Collections.singletonList("Nature"), editor);
+        assertEquals(editor, listed);
+    }
+
+    @Test
+    public void rejectedTagsAreNeverSuggested() {
+        addTagged(5, "forest river mountain", "Nature");
+        addFiller(10);
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        assertEquals(Collections.emptyList(), model.suggest("forest river", "X", "",
+                Collections.emptyList(), Collections.singletonList("nature")));
+        Quote quote = add("Someone New", "forest river");
+        quote.setRejectedTags(Collections.singletonList("Nature"));
+        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes).suggestionsFor(quote));
     }
 }

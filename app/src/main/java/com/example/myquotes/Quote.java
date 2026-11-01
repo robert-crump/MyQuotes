@@ -21,6 +21,7 @@ public class Quote {
     private String quoteText;
     private String source;
     private List<String> tags = Collections.emptyList();
+    private List<String> rejectedTags = Collections.emptyList();
 
     private boolean isFavorite = false;
     private long favoritedAt = 0L;
@@ -54,6 +55,15 @@ public class Quote {
     public List<String> getTags() { return tags; }
     public void setTags(Collection<String> tags) {
         this.tags = Collections.unmodifiableList(Hashtag.normalizeAll(tags));
+    }
+
+    /**
+     * The tags the user said not to suggest for this quote (#55). Never null; normalized like
+     * {@link #getTags()}. {@link QuoteCollection} keeps it free of the quote's own tags.
+     */
+    public List<String> getRejectedTags() { return rejectedTags; }
+    public void setRejectedTags(Collection<String> rejectedTags) {
+        this.rejectedTags = Collections.unmodifiableList(Hashtag.normalizeAll(rejectedTags));
     }
 
     public boolean isFavorite() { return isFavorite; }

@@ -50,9 +50,12 @@ import java.util.function.BiConsumer;
  * a tag. Stems are shown as a real word: the quote's own word in {@code explain}, otherwise the
  * collection's most frequent word with that stem.
  * <p>
- * The "No hashtag" list (#53) ranks untagged quotes by {@link #suggestionsFor}: the same
- * suggestions, each with its strongest reason, for a quote that is part of the fitted collection,
- * counted as if it were left out (as the editor fits without the quote being edited).
+ * The ranked "No hashtag" and "Has suggestions" lists (#53, #55) use {@link #suggestionsFor}: the
+ * same suggestions, each with its strongest reason, for a quote that is part of the fitted
+ * collection, counted as if it were left out (as the editor fits without the quote being edited).
+ * <p>
+ * Rejected tags (#55): the tags the user said not to suggest for a quote are left out like its
+ * own tags; they don't change any count.
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
@@ -320,29 +323,42 @@ public final class HashtagSuggester {
      * {@code existingTags}, which are reasons for other tags.
      */
     public List<String> suggest(String text, String author, String source, Collection<String> existingTags) {
+        return suggest(text, author, source, existingTags, null);
+    }
+
+    /** {@link #suggest(String, String, String, Collection)}, never one of {@code rejectedTags} either. */
+    public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
+                                Collection<String> rejectedTags) {
         Set<String> tokens = tokens(text, author, source);
         addTagTokens(tokens, existingTags);
-        Set<String> excluded = new HashSet<>();
-        if (existingTags != null) {
-            for (String tag : existingTags) excluded.add(Hashtag.key(Hashtag.normalize(tag)));
-        }
-
         List<String> tags = new ArrayList<>();
-        for (Suggestion suggestion : suggestions(tokens, excluded, 0)) tags.add(suggestion.tag);
+        for (Suggestion suggestion : suggestions(tokens, excluded(existingTags, rejectedTags), 0)) {
+            tags.add(suggestion.tag);
+        }
         return tags;
     }
 
     /**
-     * What {@link #suggest} gives {@code quote}, an untagged quote of the fitted collection, if it
-     * were fitted without it: up to {@link #MAX_SUGGESTIONS}, best first, each with its strongest
-     * reason. Leaving an untagged quote out only lowers the counts of its own tokens by one.
+     * What {@link #suggest} gives {@code quote}, a quote of the fitted collection, with its tags and
+     * rejected tags, if it were fitted without it: up to {@link #MAX_SUGGESTIONS}, best first, each
+     * with its strongest reason. Leaving the quote out lowers the counts of its own tokens (its
+     * tags' tokens included) by one; it changes nothing else a suggestion depends on, since only
+     * its own tags, which are never suggested for it, count it among their quotes.
      */
     public List<Suggestion> suggestionsFor(Quote quote) {
-        if (!quote.getTags().isEmpty()) {
-            throw new IllegalArgumentException("Quote #" + quote.getId() + " has hashtags");
+        Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
+        addTagTokens(tokens, quote.getTags());
+        return suggestions(tokens, excluded(quote.getTags(), quote.getRejectedTags()), 1);
+    }
+
+    /** The keys of {@code existingTags} and {@code rejectedTags} (null is none). */
+    private static Set<String> excluded(Collection<String> existingTags, Collection<String> rejectedTags) {
+        Set<String> excluded = new HashSet<>();
+        for (Collection<String> tags : Arrays.asList(existingTags, rejectedTags)) {
+            if (tags == null) continue;
+            for (String tag : tags) excluded.add(Hashtag.key(Hashtag.normalize(tag)));
         }
-        return suggestions(tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource()),
-                Collections.emptySet(), 1);
+        return excluded;
     }
 
     /**

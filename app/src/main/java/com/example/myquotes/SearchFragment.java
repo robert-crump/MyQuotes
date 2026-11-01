@@ -30,6 +30,7 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,15 +41,16 @@ import java.util.concurrent.Executors;
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
  * SearchActivity. Holds one {@link QuoteQuery}; a tapped result opens in a {@link QuoteDialogFragment}.
  * The filter icon in the search field picks what the text searches: all fields or one; for
- * author, source and hashtags the field suggests existing values. The hashtag filter (a tag or
- * "No hashtag", #51) shows as a chip under the field and combines with the text: a tapped
- * hashtag arrives as {@link QuoteQuery#forTag} with an empty field; the filter dialog's
- * "Hashtag" button picks one, the chip's x removes it.
+ * author, source and hashtags the field suggests existing values. The hashtag filter (a tag,
+ * "No hashtag" or "Has suggestions", #51, #55) shows as a chip under the field and combines with
+ * the text: a tapped hashtag arrives as {@link QuoteQuery#forTag} with an empty field; the filter
+ * dialog's "Hashtag" button picks one, the chip's x removes it.
  * <p>
- * With the "No hashtag" filter (#53) the results are ranked by {@link UntaggedRanking}, each with
- * a "Suggested:" line, from a model fitted off the main thread on the current collection; the
- * results wait for it. Editing a quote from there starts a tagging run in the editor
- * ({@link AddEditActivity#taggingRunIntent}).
+ * With the "No hashtag" or "Has suggestions" filter (#53, #55) the results are ranked by
+ * {@link SuggestionRanking}, each with a "Suggested:" line. The model is fitted off the main
+ * thread whenever the collection emits, with the count of quotes that have suggestions for the
+ * filter dialog; ranked results wait for it. Editing a quote from a ranked list starts a tagging
+ * run in the editor ({@link AddEditActivity#taggingRunIntent}).
  */
 public class SearchFragment extends Fragment
         implements SearchResultsAdapter.OnQuoteClickListener, QuoteDialogFragment.Host {
@@ -72,10 +74,12 @@ public class SearchFragment extends Fragment
     private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes = new ArrayList<>();
-    // The "No hashtag" ranking's model: fitted on fittedFor, or being fitted on fitting.
+    // Each quote's suggestions for the ranked lists, from a model fitted on fittedFor (with
+    // suggestedCount, the quotes with suggestions), or being fitted on fitting.
     private final Handler main = new Handler(Looper.getMainLooper());
     private ExecutorService fitter;
-    private HashtagSuggester untaggedModel;
+    private Map<Integer, List<HashtagSuggester.Suggestion>> suggestionsById = Collections.emptyMap();
+    private int suggestedCount;
     private List<Quote> fittedFor;
     private List<Quote> fitting;
 
@@ -138,6 +142,7 @@ public class SearchFragment extends Fragment
         quoteCollection.getQuoteList().observe(getViewLifecycleOwner(), quotes -> {
             allQuotes = quotes != null ? quotes : new ArrayList<>();
             suggestionAdapter.setQuotes(allQuotes);
+            fitModel();
             rerunSearch();
         });
     }
@@ -241,7 +246,10 @@ public class SearchFragment extends Fragment
                 .show();
     }
 
-    /** Picks the hashtag filter: "No hashtag" or one tag, each with its quote count. */
+    /**
+     * Picks the hashtag filter: "No hashtag", "Has suggestions" (its count once the model is
+     * fitted) or one tag, each with its quote count.
+     */
     private void showHashtagFilterDialog() {
         Map<String, Integer> counts = Hashtags.counts(allQuotes);
         int untagged = 0;
@@ -249,18 +257,21 @@ public class SearchFragment extends Fragment
             if (quote.getTags().isEmpty()) untagged++;
         }
         List<String> tags = new ArrayList<>(counts.keySet());
-        String[] labels = new String[tags.size() + 1];
+        String[] labels = new String[tags.size() + 2];
         labels[0] = "No hashtag (" + untagged + ")";
-        int checked = query.isUntagged() ? 0 : -1;
+        labels[1] = "Has suggestions" + (fittedFor == allQuotes ? " (" + suggestedCount + ")" : "");
+        int checked = query.isUntagged() ? 0 : query.isSuggested() ? 1 : -1;
         for (int i = 0; i < tags.size(); i++) {
-            labels[i + 1] = Hashtag.display(tags.get(i)) + " (" + counts.get(tags.get(i)) + ")";
-            if (tags.get(i).equalsIgnoreCase(query.getTag())) checked = i + 1;
+            labels[i + 2] = Hashtag.display(tags.get(i)) + " (" + counts.get(tags.get(i)) + ")";
+            if (tags.get(i).equalsIgnoreCase(query.getTag())) checked = i + 2;
         }
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("Filter by hashtag")
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     dialog.dismiss();
-                    query = which == 0 ? query.withUntagged() : query.withTag(tags.get(which - 1));
+                    query = which == 0 ? query.withUntagged()
+                            : which == 1 ? query.withSuggested()
+                            : query.withTag(tags.get(which - 2));
                     renderFilter();
                     rerunSearch();
                 })
@@ -296,7 +307,8 @@ public class SearchFragment extends Fragment
 
         String tag = query.getTag();
         hashtagFilterChip.setVisibility(query.hasTagFilter() ? View.VISIBLE : View.GONE);
-        hashtagFilterChip.setText(tag != null ? Hashtag.display(tag) : "No hashtag");
+        hashtagFilterChip.setText(tag != null ? Hashtag.display(tag)
+                : query.isSuggested() ? "Has suggestions" : "No hashtag");
         hashtagFilterChip.setCloseIconContentDescription("Remove hashtag filter");
     }
 
@@ -305,15 +317,17 @@ public class SearchFragment extends Fragment
         query = query.withText(searchEditText.getText().toString());
         List<Quote> results = query.filter(allQuotes);
         Map<Integer, List<HashtagSuggester.Suggestion>> suggestions = null;
-        if (query.isUntagged()) {
+        if (query.isRankedBySuggestions()) {
             if (fittedFor != allQuotes) {
-                fitUntaggedModel(); // reruns the search when the model is ready
+                fitModel(); // reruns the search when the model is ready
                 return;
             }
-            List<UntaggedRanking.Entry> ranked = UntaggedRanking.rank(results, untaggedModel);
+            Map<Integer, List<HashtagSuggester.Suggestion>> byId = suggestionsById;
+            List<SuggestionRanking.Entry> ranked = SuggestionRanking.results(allQuotes, query,
+                    quote -> byId.getOrDefault(quote.getId(), Collections.emptyList()), Collections.emptySet());
             results = new ArrayList<>();
             suggestions = new HashMap<>();
-            for (UntaggedRanking.Entry entry : ranked) {
+            for (SuggestionRanking.Entry entry : ranked) {
                 results.add(entry.quote);
                 suggestions.put(entry.quote.getId(), entry.suggestions);
             }
@@ -322,16 +336,22 @@ public class SearchFragment extends Fragment
         updateResultCount(results.size());
     }
 
-    /** Fits the "No hashtag" ranking's model on the current collection, off the main thread. */
-    private void fitUntaggedModel() {
+    /**
+     * Fits the suggestion model on the current collection and counts the quotes with suggestions,
+     * off the main thread; reruns the search when done.
+     */
+    private void fitModel() {
         List<Quote> quotes = allQuotes;
-        if (fitting == quotes || fitter.isShutdown()) return;
+        if (fitting == quotes || fittedFor == quotes || fitter.isShutdown()) return;
         fitting = quotes;
         fitter.execute(() -> {
-            HashtagSuggester fitted = HashtagSuggester.fit(quotes);
+            Map<Integer, List<HashtagSuggester.Suggestion>> byId =
+                    SuggestionRanking.suggestionsById(quotes, HashtagSuggester.fit(quotes));
+            int count = SuggestionRanking.countWithSuggestions(byId);
             main.post(() -> {
                 if (fitter.isShutdown() || quotes != allQuotes) return;
-                untaggedModel = fitted;
+                suggestionsById = byId;
+                suggestedCount = count;
                 fittedFor = quotes;
                 rerunSearch();
             });
@@ -361,12 +381,12 @@ public class SearchFragment extends Fragment
     }
 
     /**
-     * From the quote dialog. In the "No hashtag" list this starts a tagging run, which returns to
-     * the list, so the dialog closes.
+     * From the quote dialog. In a ranked list ("No hashtag", "Has suggestions") this starts a
+     * tagging run, which returns to the list, so the dialog closes.
      */
     @Override
     public void editQuote(Quote quote) {
-        if (!query.isUntagged()) {
+        if (!query.isRankedBySuggestions()) {
             startActivity(AddEditActivity.editIntent(requireContext(), quote.getId()));
             return;
         }

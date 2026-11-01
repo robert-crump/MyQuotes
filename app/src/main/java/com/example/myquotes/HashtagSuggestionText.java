@@ -101,6 +101,18 @@ final class HashtagSuggestionText {
         return "Suggested: " + String.join(" ", parts);
     }
 
+    /**
+     * The end of the "Why these hashtags" dialog (#55): "Not suggested for this quote: #Hope, #Love",
+     * the rejected tags the quote doesn't have ({@code tags}); null when there are none.
+     */
+    static String notSuggestedLine(List<String> rejected, List<String> tags) {
+        List<String> parts = new ArrayList<>();
+        for (String tag : rejected) {
+            if (!Hashtag.containsIgnoreCase(tags, tag)) parts.add(Hashtag.display(tag));
+        }
+        return parts.isEmpty() ? null : "Not suggested for this quote: " + String.join(", ", parts);
+    }
+
     /** "gratitude (6/9), grateful (4/7)". */
     private static String list(List<HashtagSuggester.Evidence> evidence) {
         List<String> parts = new ArrayList<>();

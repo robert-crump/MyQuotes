@@ -29,10 +29,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The Hashtag set as a wrapping flow of tags with their quote counts, then a "No hashtag" entry
- * that opens the untagged quotes. A tap opens the tag's {@link HashtagSheet} (its quotes, rename,
+ * that opens the untagged quotes and a "Has suggestions" entry that opens the quotes with hashtag
+ * suggestions (#55; counted off the main thread whenever the collection changes). A tap opens the tag's {@link HashtagSheet} (its quotes, rename,
  * delete, how it is suggested); long-press starts multi-selection with a contextual bar: rename
  * (exactly one; merging into an existing tag asks first) and delete (removes the tags from their
  * quotes, never the quotes). There is no Add action: a tag exists while a quote has it. The
@@ -57,6 +60,8 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
     // Selection saved across recreation, applied once the first Hashtag set arrives.
     private ArrayList<String> pendingSelection;
     private boolean sortByCount;
+    // One thread: the latest count arrives last.
+    private final ExecutorService counter = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +97,11 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
             }
 
             @Override
+            public void onSuggestedClick() {
+                startActivity(QuoteQuery.suggested().toIntent(HashtagsActivity.this));
+            }
+
+            @Override
             public void onSelectionChanged(Set<String> selected) {
                 renderSelectionMode(selected);
             }
@@ -103,6 +113,7 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
             pendingSelection = savedInstanceState.getStringArrayList(STATE_SELECTED);
         }
         sortByCount = uiPrefs().getBoolean(KEY_SORT_BY_COUNT, false);
+        MyApplication.getInstance().getQuoteCollection().getQuoteList().observe(this, this::countSuggested);
         hashtags.getHashtags().observe(this, tags -> {
             submitSorted();
             binding.hashtagsEmpty.setVisibility(tags.isEmpty() ? View.VISIBLE : View.GONE);
@@ -111,6 +122,24 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
                 pendingSelection = null;
             }
         });
+    }
+
+    /** Counts the quotes with suggestions off the main thread, for the "Has suggestions" entry. */
+    private void countSuggested(List<Quote> quotes) {
+        if (quotes == null || counter.isShutdown()) return;
+        counter.execute(() -> {
+            int count = SuggestionRanking.countWithSuggestions(
+                    SuggestionRanking.suggestionsById(quotes, HashtagSuggester.fit(quotes)));
+            runOnUiThread(() -> {
+                if (!isDestroyed()) adapter.setSuggestedCount(count);
+            });
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        counter.shutdownNow();
+        super.onDestroy();
     }
 
     private void submitSorted() {

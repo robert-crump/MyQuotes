@@ -56,6 +56,7 @@ public class QuoteCollection {
         int maxId = current.stream().mapToInt(Quote::getId).max().orElse(0);
         quote.setId(maxId + 1);
         quote.setTags(canonicalTags(quote.getTags(), current, null));
+        quote.setRejectedTags(withoutTags(quote.getRejectedTags(), quote.getTags()));
         quote.setAddedAt(System.currentTimeMillis());
         List<Quote> updated = new ArrayList<>(current);
         updated.add(quote);
@@ -84,8 +85,17 @@ public class QuoteCollection {
         Log.w(TAG, "Quote with ID " + updatedQuote.getId() + " not found");
     }
 
-    // Replaces the editable fields, keeping favorite, view state and addedAt.
+    // Replaces the editable fields, keeping favorite, view state, addedAt and the rejected tags
+    // (minus any the quote now has).
     public void edit(int id, String author, String text, String source, Collection<String> tags) {
+        Quote stored = findById(id);
+        edit(id, author, text, source, tags, stored != null ? stored.getRejectedTags() : null);
+    }
+
+    // As above, with new rejected tags (#55); a tag the quote has is never rejected, so adding a
+    // rejected tag by hand drops the rejection.
+    public void edit(int id, String author, String text, String source, Collection<String> tags,
+                     Collection<String> rejectedTags) {
         Quote stored = findById(id);
         if (stored == null) {
             Log.w(TAG, "Quote with ID " + id + " not found");
@@ -93,6 +103,7 @@ public class QuoteCollection {
         }
         Quote edited = new Quote(id, author, text, source);
         edited.setTags(canonicalTags(Hashtag.normalizeAll(tags), getCurrentList(), id));
+        edited.setRejectedTags(withoutTags(Hashtag.normalizeAll(rejectedTags), edited.getTags()));
         edited.setFavorite(stored.isFavorite());
         edited.setFavoritedAt(stored.getFavoritedAt());
         edited.setTimesShown(stored.getTimesShown());
@@ -103,22 +114,37 @@ public class QuoteCollection {
 
     // Renames tag `oldTag` (compared ignoring case) on every quote, or removes it when `newTag`
     // is null or empty. Renaming to a tag that already exists merges: a quote holding both ends
-    // up with it once. One emission and one save regardless of how many quotes match. Returns
-    // the match count.
+    // up with it once. Rejected tags (#55) follow along: renamed, or removed with the tag, and
+    // dropped where the quote now has the tag. One emission and one save regardless of how many
+    // quotes match. Returns the count of quotes that had the tag.
     public int replaceTag(String oldTag, String newTag) {
         List<Quote> updated = getCurrentList();
         String replacement = newTag == null ? "" : Hashtag.normalize(newTag);
         int count = 0;
+        boolean changed = false;
         for (Quote quote : updated) {
             List<String> tags = new ArrayList<>(quote.getTags());
             int index = Hashtag.indexOf(tags, oldTag);
-            if (index < 0) continue;
-            tags.remove(index);
-            if (!replacement.isEmpty()) tags.add(replacement);
-            quote.setTags(tags);
-            count++;
+            if (index >= 0) {
+                tags.remove(index);
+                if (!replacement.isEmpty()) tags.add(replacement);
+                quote.setTags(tags);
+                count++;
+                changed = true;
+            }
+            List<String> rejected = new ArrayList<>(quote.getRejectedTags());
+            int rejectedIndex = Hashtag.indexOf(rejected, oldTag);
+            if (rejectedIndex >= 0) {
+                rejected.remove(rejectedIndex);
+                if (!replacement.isEmpty()) rejected.add(replacement);
+            }
+            List<String> kept = withoutTags(Hashtag.normalizeAll(rejected), quote.getTags());
+            if (!kept.equals(quote.getRejectedTags())) {
+                quote.setRejectedTags(kept);
+                changed = true;
+            }
         }
-        if (count > 0) {
+        if (changed) {
             liveQuoteList.setValue(updated);
             save(updated);
             Log.d(TAG, "Replaced tag on " + count + " quotes");
@@ -238,6 +264,15 @@ public class QuoteCollection {
         }
         List<String> result = new ArrayList<>();
         for (String tag : tags) result.add(spelling.getOrDefault(Hashtag.key(tag), tag));
+        return result;
+    }
+
+    // `rejected` without the tags in `tags` (compared ignoring case).
+    private static List<String> withoutTags(List<String> rejected, List<String> tags) {
+        List<String> result = new ArrayList<>();
+        for (String tag : rejected) {
+            if (!Hashtag.containsIgnoreCase(tags, tag)) result.add(tag);
+        }
         return result;
     }
 

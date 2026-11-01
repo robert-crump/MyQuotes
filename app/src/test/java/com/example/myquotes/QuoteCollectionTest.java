@@ -227,4 +227,52 @@ public class QuoteCollectionTest {
         assertEquals(0, c.replaceTag("Missing", "X"));
         assertEquals(0, store.saveCount);
     }
+
+    private static Quote rejecting(int id, List<String> tags, String... rejected) {
+        Quote q = quote(id, "a");
+        q.setTags(tags);
+        q.setRejectedTags(Arrays.asList(rejected));
+        return q;
+    }
+
+    @Test
+    public void editKeepsOrReplacesRejectedTagsAndDropsTheOnesTheQuoteHas() {
+        QuoteCollection c = collectionOf(new InMemoryQuoteStore(Arrays.asList(
+                rejecting(1, Arrays.asList("Zen"), "Love", "Hope"))));
+        c.edit(1, "a", "t", "s", Arrays.asList("Zen", "love"));
+        assertEquals(Arrays.asList("Hope"), c.findById(1).getRejectedTags());
+
+        c.edit(1, "a", "t", "s", Arrays.asList("Zen"), Arrays.asList("Hope", "Grief"));
+        assertEquals(Arrays.asList("Grief", "Hope"), c.findById(1).getRejectedTags());
+    }
+
+    @Test
+    public void addDropsRejectedTagsTheQuoteHas() {
+        QuoteCollection c = collectionOf(new InMemoryQuoteStore(Arrays.asList(quote(1, "a"))));
+        Quote added = rejecting(0, Arrays.asList("Love"), "love", "Hope");
+        c.add(added);
+        assertEquals(Arrays.asList("Hope"), c.findById(added.getId()).getRejectedTags());
+    }
+
+    @Test
+    public void replaceTagRenamesAndDeletesRejectedTagsToo() {
+        InMemoryQuoteStore store = new InMemoryQuoteStore(Arrays.asList(
+                rejecting(1, Arrays.asList("Zen"), "Luv"),
+                rejecting(2, Arrays.asList("Love"), "Luv"),
+                rejecting(3, Arrays.asList("Luv"), "Hope")));
+        QuoteCollection c = collectionOf(store);
+        store.saveCount = 0;
+
+        assertEquals(1, c.replaceTag("luv", "Love"));
+        assertEquals(Arrays.asList("Love"), c.findById(1).getRejectedTags());
+        // Quote 2 has #Love, so it can't reject it.
+        assertTrue(c.findById(2).getRejectedTags().isEmpty());
+        assertEquals(Arrays.asList("Hope"), c.findById(3).getRejectedTags());
+        assertEquals(1, store.saveCount);
+
+        // A tag only some quote rejects still counts as a change.
+        assertEquals(0, c.replaceTag("Hope", null));
+        assertTrue(c.findById(3).getRejectedTags().isEmpty());
+        assertEquals(2, store.saveCount);
+    }
 }

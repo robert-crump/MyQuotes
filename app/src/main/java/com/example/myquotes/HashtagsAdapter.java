@@ -20,20 +20,23 @@ import java.util.Set;
 /**
  * The tags on the Hashtags screen ({@code #Tag} over {@code Nx}) with long-press selection: a
  * long-press selects a tag and starts selection mode, taps then toggle tags, and deselecting the
- * last one ends it. Outside selection mode a tap opens the tag. After the tags comes a
- * "No hashtag" entry with the untagged quote count (when there are any); it opens those quotes
- * and is never selected.
+ * last one ends it. Outside selection mode a tap opens the tag. After the tags come a
+ * "No hashtag" entry with the untagged quote count and a "Has suggestions" entry with the count
+ * of quotes with suggestions (#55), each when there are any; they open those quotes and are never
+ * selected.
  */
 public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.HashtagViewHolder> {
     private final List<String> hashtags = new ArrayList<>();
     private Map<String, Integer> counts = Collections.emptyMap();
     private int untagged;
+    private int suggested;
     private final Set<String> selected = new LinkedHashSet<>();
     private final Listener listener;
 
     public interface Listener {
         void onHashtagClick(String tag);
         void onUntaggedClick();
+        void onSuggestedClick();
         void onSelectionChanged(Set<String> selected);
     }
 
@@ -43,7 +46,7 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
 
     /**
      * Replaces the tags and the untagged count; selected tags that no longer exist (renamed,
-     * deleted) are dropped.
+     * deleted) are dropped. The "Has suggestions" count stays ({@link #setSuggestedCount}).
      */
     @SuppressWarnings("NotifyDataSetChanged")
     public void submit(List<String> newHashtags, Map<String, Integer> newCounts, int untaggedCount) {
@@ -54,6 +57,24 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         boolean selectionChanged = selected.retainAll(newHashtags);
         notifyDataSetChanged();
         if (selectionChanged) listener.onSelectionChanged(getSelected());
+    }
+
+    /** The count of quotes with suggestions, computed off the main thread; 0 hides the entry. */
+    @SuppressWarnings("NotifyDataSetChanged")
+    public void setSuggestedCount(int count) {
+        if (count == suggested) return;
+        suggested = count;
+        notifyDataSetChanged();
+    }
+
+    /** Whether {@code position} is the "No hashtag" entry. */
+    private boolean isUntaggedAt(int position) {
+        return position == hashtags.size() && untagged > 0;
+    }
+
+    /** Whether {@code position} is the "Has suggestions" entry. */
+    private boolean isSuggestedAt(int position) {
+        return position == hashtags.size() + (untagged > 0 ? 1 : 0) && suggested > 0;
     }
 
     public Set<String> getSelected() {
@@ -90,8 +111,10 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         view.setOnClickListener(v -> {
             int position = holder.getBindingAdapterPosition();
             if (position == RecyclerView.NO_POSITION) return;
-            if (position == hashtags.size()) {
+            if (isUntaggedAt(position)) {
                 if (selected.isEmpty()) listener.onUntaggedClick();
+            } else if (isSuggestedAt(position)) {
+                if (selected.isEmpty()) listener.onSuggestedClick();
             } else if (selected.isEmpty()) {
                 listener.onHashtagClick(hashtags.get(position));
             } else {
@@ -100,7 +123,7 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
         });
         view.setOnLongClickListener(v -> {
             int position = holder.getBindingAdapterPosition();
-            if (position == RecyclerView.NO_POSITION || position == hashtags.size()) return false;
+            if (position == RecyclerView.NO_POSITION || position >= hashtags.size()) return false;
             toggle(position);
             return true;
         });
@@ -109,8 +132,12 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
 
     @Override
     public void onBindViewHolder(@NonNull HashtagViewHolder holder, int position) {
-        if (position == hashtags.size()) {
-            holder.bindUntagged(untagged);
+        if (isUntaggedAt(position)) {
+            holder.bindExtra("No hashtag", untagged);
+            return;
+        }
+        if (isSuggestedAt(position)) {
+            holder.bindExtra("Has suggestions", suggested);
             return;
         }
         String tag = hashtags.get(position);
@@ -120,7 +147,7 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
 
     @Override
     public int getItemCount() {
-        return hashtags.size() + (untagged > 0 ? 1 : 0);
+        return hashtags.size() + (untagged > 0 ? 1 : 0) + (suggested > 0 ? 1 : 0);
     }
 
     static class HashtagViewHolder extends RecyclerView.ViewHolder {
@@ -143,13 +170,16 @@ public class HashtagsAdapter extends RecyclerView.Adapter<HashtagsAdapter.Hashta
                     + (isSelected ? ", selected" : ""));
         }
 
-        /** "No hashtag" over the count, set apart from the tags: not bold, never selected. */
-        void bindUntagged(int quoteCount) {
+        /**
+         * "No hashtag" or "Has suggestions" over the count, set apart from the tags: italic, never
+         * selected.
+         */
+        void bindExtra(String label, int quoteCount) {
             name.setTypeface(null, Typeface.ITALIC);
-            name.setText("No hashtag");
+            name.setText(label);
             count.setText(quoteCount + "x");
             itemView.setSelected(false);
-            itemView.setContentDescription("No hashtag, "
+            itemView.setContentDescription(label + ", "
                     + (quoteCount == 1 ? "1 quote" : quoteCount + " quotes"));
         }
     }

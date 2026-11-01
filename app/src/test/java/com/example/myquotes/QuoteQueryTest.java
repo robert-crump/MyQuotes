@@ -88,6 +88,24 @@ public class QuoteQueryTest {
     }
 
     @Test
+    public void suggestedFilterLetsEveryQuoteThroughForTheRanking() {
+        Quote bare = quote("Nothing at all", "Seneca", "", "");
+        QuoteQuery suggested = QuoteQuery.suggested();
+        assertTrue(suggested.isSuggested());
+        assertTrue(suggested.isRankedBySuggestions());
+        assertTrue(suggested.hasTagFilter());
+        assertTrue(suggested.isActive());
+        assertFalse(suggested.isUntagged());
+        assertEquals(null, suggested.getTag());
+        assertEquals(2, suggested.filter(Arrays.asList(q, bare)).size());
+        assertTrue(suggested.withText("x").scopedTo(QuoteQuery.Field.AUTHOR).isSuggested());
+        assertFalse(suggested.withTag("Stoic").isSuggested());
+        assertFalse(suggested.withUntagged().isSuggested());
+        assertFalse(suggested.withoutTagFilter().isActive());
+        assertNotEquals(QuoteQuery.untagged(), suggested);
+    }
+
+    @Test
     public void removingTheTagFilterKeepsTextAndFields() {
         QuoteQuery filtered = QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen").withTag("Stoic");
         assertNotEquals(QuoteQuery.forField(QuoteQuery.Field.AUTHOR, "sen"), filtered);
