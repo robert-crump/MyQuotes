@@ -35,6 +35,8 @@ public class SuggestionAdapter extends BaseAdapter {
             items.add(DIVIDER);
             items.addAll(suggestions.otherSources);
         } else {
+            // At most one list is non-empty: the author's own sources or the others.
+            items.addAll(suggestions.authorSources);
             items.addAll(suggestions.otherSources);
         }
         return new SuggestionAdapter(context, items);
