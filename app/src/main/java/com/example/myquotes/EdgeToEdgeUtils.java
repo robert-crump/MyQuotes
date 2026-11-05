@@ -57,8 +57,13 @@ final class EdgeToEdgeUtils {
      * For a screen whose root ends in a BottomNavigationView: the root pads only left/right,
      * and the bottom nav pads itself for the navigation bar, so its background reaches the
      * bottom edge. Left/right are consumed here so the bottom nav doesn't pad them twice.
+     *
+     * While the keyboard is open the bottom nav is hidden and the root pads by the keyboard's
+     * height instead, so the content ends right above the keyboard with no nav bar in between.
+     * The IME inset is consumed so the bottom nav (which pads by the legacy system window
+     * inset, IME included) never lifts itself above the keyboard.
      */
-    static void applyAboveBottomNav(Activity activity, View statusBarScrim) {
+    static void applyAboveBottomNav(Activity activity, View statusBarScrim, View bottomNav) {
         applyStatusBarScrim(activity, statusBarScrim);
 
         View content = rootContent(activity);
@@ -66,10 +71,16 @@ final class EdgeToEdgeUtils {
         final int contentBottom = content.getPaddingBottom();
         ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, contentTop, systemBars.right, contentBottom);
+            boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+            int bottom = imeVisible
+                    ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                    : contentBottom;
+            v.setPadding(systemBars.left, contentTop, systemBars.right, bottom);
+            bottomNav.setVisibility(imeVisible ? View.GONE : View.VISIBLE);
             return new WindowInsetsCompat.Builder(insets)
                     .setInsets(WindowInsetsCompat.Type.systemBars(),
                             Insets.of(0, systemBars.top, 0, systemBars.bottom))
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
                     .build();
         });
     }

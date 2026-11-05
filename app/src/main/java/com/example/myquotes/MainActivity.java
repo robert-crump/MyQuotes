@@ -55,8 +55,8 @@ public class MainActivity extends AppCompatActivity
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        // The bottom nav pads itself for the navigation bar.
-        EdgeToEdgeUtils.applyAboveBottomNav(this, binding.statusBarScrim);
+        // The bottom nav pads itself for the navigation bar and hides while the keyboard is open.
+        EdgeToEdgeUtils.applyAboveBottomNav(this, binding.statusBarScrim, binding.bottomNav);
         setSupportActionBar(binding.toolbar);
 
         QuoteNotifications.requestPostNotificationsPermission(this);
