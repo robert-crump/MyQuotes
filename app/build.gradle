@@ -36,6 +36,12 @@ android {
     testOptions {
         unitTests {
             returnDefaultValues true
+            // The hashtag suggestion eval (#59) prints its report to stdout.
+            all {
+                testLogging {
+                    showStandardStreams = true
+                }
+            }
         }
     }
     buildFeatures {
