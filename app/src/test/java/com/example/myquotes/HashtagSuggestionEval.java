@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -158,6 +160,157 @@ final class HashtagSuggestionEval {
             return HashtagSuggester.fit(others).suggest(quote.getQuoteText(), quote.getAuthor(),
                     quote.getSource(), Collections.emptyList(), quote.getRejectedTags());
         };
+    }
+
+    /**
+     * Suggestions from one leave-one-out pass (#61): the current model ({@link #baseline}) and the
+     * similar-quotes reason with each parameter set. The model is fitted once per quote and shared by
+     * every parameter set, so a sweep costs about as much as {@link #leaveOneOut}.
+     */
+    static final class Sweep {
+        private final Map<Quote, List<String>> baseline = new IdentityHashMap<>();
+        private final Map<HashtagSuggester.Knn, Map<Quote, List<String>>> byKnn = new LinkedHashMap<>();
+
+        Function<Quote, List<String>> baseline() {
+            return baseline::get;
+        }
+
+        Function<Quote, List<String>> with(HashtagSuggester.Knn knn) {
+            return byKnn.get(knn)::get;
+        }
+    }
+
+    /**
+     * {@link #leaveOneOut} with quote vectors: the quote is left out of the fit, and its own vector
+     * is the query. The baseline is the same fit without a query vector, i.e. the current model.
+     */
+    static Sweep sweep(List<Quote> quotes, Map<Integer, float[]> vectors, List<HashtagSuggester.Knn> configs) {
+        Sweep sweep = new Sweep();
+        for (HashtagSuggester.Knn knn : configs) sweep.byKnn.put(knn, new IdentityHashMap<>());
+        for (Quote quote : quotes) {
+            HashtagSuggester fitted = HashtagSuggester.fit(without(quotes, quote), vectors);
+            float[] vector = quote.getId() == null ? null : vectors.get(quote.getId());
+            sweep.baseline.put(quote, suggestAsNew(fitted, quote, null));
+            for (HashtagSuggester.Knn knn : configs) {
+                sweep.byKnn.get(knn).put(quote, suggestAsNew(fitted.withKnn(knn), quote, vector));
+            }
+        }
+        return sweep;
+    }
+
+    static List<Quote> without(List<Quote> quotes, Quote quote) {
+        List<Quote> others = new ArrayList<>(quotes.size());
+        for (Quote other : quotes) {
+            if (other != quote) others.add(other);
+        }
+        return others;
+    }
+
+    /** The editor on a new quote: no chips, the quote's rejected tags left out. */
+    private static List<String> suggestAsNew(HashtagSuggester model, Quote quote, float[] vector) {
+        return model.suggest(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList(),
+                quote.getRejectedTags(), null, vector);
+    }
+
+    /**
+     * The #61 success bar against the baseline: recall@3 (eligible) up at least 5 points or coverage
+     * of untagged quotes up at least 10 points, with precision@3 down at most 5 points.
+     */
+    static boolean passes(Result baseline, Result candidate) {
+        double precision = candidate.precision() - baseline.precision();
+        double recall = candidate.recallEligible() - baseline.recallEligible();
+        double coverage = candidate.coverageUntagged() - baseline.coverageUntagged();
+        return precision >= -0.05 - 1e-9 && (recall >= 0.05 - 1e-9 || coverage >= 0.10 - 1e-9);
+    }
+
+    /** One line per labelled result: the metrics, their change from {@code baseline}, and the bar. */
+    static String formatComparison(Result baseline, Map<String, Result> results) {
+        StringBuilder out = new StringBuilder();
+        out.append(String.format(Locale.ROOT, "%-34s %7s %7s %7s %7s %7s %7s %7s %7s  %s%n", "", "P@3",
+                "R@3", "covTag", "covUnt", "dP", "dR", "dCovTag", "dCovUnt", "bar"));
+        out.append(comparisonLine("baseline (current model)", baseline, baseline, false));
+        for (Map.Entry<String, Result> entry : results.entrySet()) {
+            out.append(comparisonLine(entry.getKey(), baseline, entry.getValue(), true));
+        }
+        return out.toString();
+    }
+
+    private static String comparisonLine(String label, Result baseline, Result result, boolean withBar) {
+        return String.format(Locale.ROOT, "%-34s %7s %7s %7s %7s %7s %7s %7s %7s  %s%n", label,
+                percent(result.precision()), percent(result.recallEligible()), percent(result.coverageTagged()),
+                percent(result.coverageUntagged()),
+                points(result.precision() - baseline.precision()),
+                points(result.recallEligible() - baseline.recallEligible()),
+                points(result.coverageTagged() - baseline.coverageTagged()),
+                points(result.coverageUntagged() - baseline.coverageUntagged()),
+                withBar ? (passes(baseline, result) ? "PASS" : "-") : "");
+    }
+
+    /** Per tag (most frequent first): suggestions, hits, precision and recall before and after; changed tags only. */
+    static String formatTagDeltas(Result baseline, Result candidate) {
+        StringBuilder out = new StringBuilder();
+        out.append(String.format(Locale.ROOT, "%-28s %6s %11s %9s %15s %15s%n", "Tag", "quotes", "suggested",
+                "hits", "precision", "recall"));
+        List<TagResult> tags = new ArrayList<>(candidate.perTag.values());
+        for (Map.Entry<String, TagResult> entry : baseline.perTag.entrySet()) {
+            if (!candidate.perTag.containsKey(entry.getKey())) tags.add(entry.getValue());
+        }
+        tags.sort((a, b) -> a.quotes != b.quotes ? b.quotes - a.quotes : a.tag.compareToIgnoreCase(b.tag));
+        TagResult none = new TagResult("");
+        for (TagResult tag : tags) {
+            String key = Hashtag.key(tag.tag);
+            TagResult before = baseline.perTag.getOrDefault(key, none);
+            TagResult after = candidate.perTag.getOrDefault(key, none);
+            if (before.suggested == after.suggested && before.hits == after.hits) continue;
+            out.append(String.format(Locale.ROOT, "%-28s %6d %5d->%-5d %4d->%-4d %7s->%-7s %7s->%-7s%n",
+                    Hashtag.display(tag.tag), Math.max(before.quotes, after.quotes), before.suggested,
+                    after.suggested, before.hits, after.hits, percent(before.precision()),
+                    percent(after.precision()), percent(before.recall()), percent(after.recall())));
+        }
+        return out.toString();
+    }
+
+    /** A tag in the candidate's top 3 for a quote but not in the baseline's, and not on the quote. */
+    static final class Addition {
+        final Quote quote;
+        final String tag;
+
+        Addition(Quote quote, String tag) {
+            this.quote = quote;
+            this.tag = tag;
+        }
+    }
+
+    /**
+     * Every {@link Addition}: the suggestions the candidate adds that the eval counts as wrong. Some
+     * may be right and only missing from the quote, which is what the manual spot-check is for.
+     */
+    static List<Addition> additions(List<Quote> quotes, Function<Quote, List<String>> baseline,
+                                    Function<Quote, List<String>> candidate) {
+        List<Addition> additions = new ArrayList<>();
+        for (Quote quote : quotes) {
+            Set<String> before = keys(top(baseline.apply(quote)));
+            Set<String> own = keys(quote.getTags());
+            for (String tag : top(candidate.apply(quote))) {
+                String key = Hashtag.key(tag);
+                if (!before.contains(key) && !own.contains(key)) additions.add(new Addition(quote, tag));
+            }
+        }
+        return additions;
+    }
+
+    private static List<String> top(List<String> suggestions) {
+        return suggestions.subList(0, Math.min(HashtagSuggester.MAX_SUGGESTIONS, suggestions.size()));
+    }
+
+    private static Set<String> keys(List<String> tags) {
+        Set<String> keys = new HashSet<>();
+        for (String tag : tags) keys.add(Hashtag.key(tag));
+        return keys;
+    }
+
+    private static String points(double delta) {
+        return Double.isNaN(delta) ? "-" : String.format(Locale.ROOT, "%+.1f", delta * 100);
     }
 
     /** A plain-text report: overall numbers, then one line per tag (most frequent first). */
