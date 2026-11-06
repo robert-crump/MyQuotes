@@ -7,10 +7,16 @@ import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 
 import androidx.lifecycle.LifecycleOwner;
 
@@ -21,8 +27,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,7 +45,8 @@ import java.util.concurrent.Executors;
  * how suggesting works, then each tag's reasons with counts, then the tags not suggested for this
  * quote. A long-press on a chip explains that one suggestion and offers "Don't suggest for this
  * quote" (#55): the tag joins the form's rejected tags at once ({@link #getRejected}; saved with
- * the quote) and the next-best tag can take its place.
+ * the quote) and the next-best tag can take its place. In both dialogs a "similar to ..." part
+ * is a link that shows and hides the neighbour quotes with the tag (#63).
  * With {@link QuoteEmbeddings} (#62) the model has the similar-quotes reason: it refits when
  * vectors are added, and the typed text is embedded on its own thread on each refresh; until its
  * vector arrives the previous text's vector is used.
@@ -213,15 +223,17 @@ final class HashtagSuggestionRow {
     private void showSuggestion(String tag) {
         if (model == null) return;
         HashtagSuggester.Explanation explanation = explain(tag);
-        new MaterialAlertDialogBuilder(row.getContext())
+        WhyMessage message = new WhyMessage(null, explanation == null ? Collections.emptyList()
+                : Collections.singletonList(explanation), false, null);
+        message.attach(new MaterialAlertDialogBuilder(row.getContext())
                 .setTitle(Hashtag.display(tag))
-                .setMessage(explanation == null ? null : HashtagSuggestionText.explanation(explanation))
+                .setMessage(explanation == null ? null : message.build())
                 .setPositiveButton("Don't suggest for this quote", (dialog, which) -> {
                     if (!Hashtag.containsIgnoreCase(rejected, tag)) rejected.add(tag);
                     refresh();
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .show());
     }
 
     /**
@@ -230,23 +242,109 @@ final class HashtagSuggestionRow {
      */
     private void showExplanation() {
         if (model == null || shown.isEmpty()) return;
-        SpannableStringBuilder message = new SpannableStringBuilder(HashtagSuggestionText.INTRO);
+        List<HashtagSuggester.Explanation> explanations = new ArrayList<>();
         for (String tag : shown) {
             HashtagSuggester.Explanation explanation = explain(tag);
-            if (explanation == null) continue;
-            message.append("\n\n");
-            int start = message.length();
-            message.append(Hashtag.display(tag));
-            message.setSpan(new StyleSpan(Typeface.BOLD), start, message.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            message.append("\n").append(HashtagSuggestionText.explanation(explanation));
+            if (explanation != null) explanations.add(explanation);
         }
-        String notSuggested = HashtagSuggestionText.notSuggestedLine(rejected, field.getTags());
-        if (notSuggested != null) message.append("\n\n").append(notSuggested);
-        new MaterialAlertDialogBuilder(row.getContext())
+        WhyMessage message = new WhyMessage(HashtagSuggestionText.INTRO, explanations, true,
+                HashtagSuggestionText.notSuggestedLine(rejected, field.getTags()));
+        message.attach(new MaterialAlertDialogBuilder(row.getContext())
                 .setTitle("Why these hashtags")
-                .setMessage(message)
+                .setMessage(message.build())
                 .setPositiveButton("OK", null)
-                .show();
+                .show());
+    }
+
+    /**
+     * A dialog message of explanation lines whose "similar to N of the K closest tagged quotes" part
+     * is a link (#63): a tap shows the neighbour quotes with the tag under the line (a snippet each,
+     * most similar first), another tap hides them. Neighbours are looked up in the Quote Collection
+     * when the dialog opens; a deleted one is skipped.
+     */
+    private final class WhyMessage {
+        private final String intro;
+        private final List<HashtagSuggester.Explanation> explanations;
+        private final boolean headings;
+        private final String footer;
+        private final Map<Integer, String> texts = new HashMap<>();
+        // The tags whose neighbour quotes are shown.
+        private final Set<String> expanded = new HashSet<>();
+        private TextView view;
+
+        /** {@code intro} and {@code footer} may be null; {@code headings} puts the tag above each line. */
+        WhyMessage(String intro, List<HashtagSuggester.Explanation> explanations, boolean headings,
+                   String footer) {
+            this.intro = intro;
+            this.explanations = explanations;
+            this.headings = headings;
+            this.footer = footer;
+            List<Quote> quotes = collection.getQuoteList().getValue();
+            if (quotes != null) {
+                for (Quote quote : quotes) {
+                    if (quote.getId() != null) texts.put(quote.getId(), quote.getQuoteText());
+                }
+            }
+        }
+
+        /** Makes the shown dialog's links tappable. */
+        void attach(AlertDialog dialog) {
+            view = dialog.findViewById(android.R.id.message);
+            if (view != null) view.setMovementMethod(LinkMovementMethod.getInstance());
+        }
+
+        CharSequence build() {
+            SpannableStringBuilder message = new SpannableStringBuilder();
+            if (intro != null) message.append(intro);
+            for (HashtagSuggester.Explanation explanation : explanations) {
+                if (message.length() > 0) message.append("\n\n");
+                if (headings) {
+                    int start = message.length();
+                    message.append(Hashtag.display(explanation.tag));
+                    message.setSpan(new StyleSpan(Typeface.BOLD), start, message.length(),
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    message.append("\n");
+                }
+                int lineStart = message.length();
+                String line = HashtagSuggestionText.explanation(explanation);
+                message.append(line);
+                if (explanation.similar == null) continue;
+                String similar = HashtagSuggestionText.similar(explanation.similar);
+                int at = line.indexOf(similar);
+                if (at < 0) continue;
+                message.setSpan(new Toggle(explanation), lineStart + at, lineStart + at + similar.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                if (expanded.contains(explanation.tag)) {
+                    for (String neighbour : neighbours(explanation)) message.append("\n").append(neighbour);
+                }
+            }
+            if (footer != null) message.append("\n\n").append(footer);
+            return message;
+        }
+
+        private List<String> neighbours(HashtagSuggester.Explanation explanation) {
+            return HashtagSuggestionText.neighbourLines(explanation.similarQuoteIds, texts);
+        }
+
+        private final class Toggle extends ClickableSpan {
+            private final HashtagSuggester.Explanation explanation;
+
+            Toggle(HashtagSuggester.Explanation explanation) {
+                this.explanation = explanation;
+            }
+
+            @Override
+            public void onClick(@NonNull View widget) {
+                String tag = explanation.tag;
+                boolean show = expanded.add(tag);
+                if (!show) expanded.remove(tag);
+                if (view == null) return;
+                view.setText(build());
+                int count = neighbours(explanation).size();
+                view.announceForAccessibility(show
+                        ? "Showing " + HashtagSuggestionText.quotes(count) + " with " + Hashtag.display(tag)
+                        : "Hid the quotes with " + Hashtag.display(tag));
+            }
+        }
     }
 }

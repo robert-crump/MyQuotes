@@ -2,6 +2,7 @@ package com.example.myquotes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Words for the why behind hashtag suggestions (#51, #52), from {@link HashtagSuggester}'s
@@ -14,8 +15,15 @@ final class HashtagSuggestionText {
     static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
             + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
             + "suggests hashtags that are often used for the author or the source, hashtags that "
-            + "often appear together with the quote's hashtags, hashtags of the quotes closest in "
-            + "meaning, and hashtags whose name is in the quote.";
+            + "often appear together with the quote's hashtags, hashtags of similar quotes (the "
+            + "quotes closest in meaning, found by an on-device language model), and hashtags whose "
+            + "name is in the quote. Tap \"similar to …\" to see those quotes.";
+
+    /** The hashtag sheet's note that the similar-quotes reason exists (#63); it has no per-tag counts. */
+    static final String ALSO_SIMILAR = "Also suggested by similar quotes.";
+
+    /** Characters of a neighbour quote shown in the Why dialog (#63), before the ellipsis. */
+    static final int NEIGHBOUR_CHARS = 60;
 
     private HashtagSuggestionText() {
     }
@@ -66,7 +74,7 @@ final class HashtagSuggestionText {
 
     /**
      * The sheet's Suggestions section, one paragraph each: why the tag can't be suggested yet, or
-     * its Words line and (when they qualify) its Author, Source and With lines.
+     * its Words line, (when they qualify) its Author, Source and With lines, and {@link #ALSO_SIMILAR}.
      */
     static List<String> suggestions(HashtagSuggester.TagProfile profile) {
         List<String> lines = new ArrayList<>();
@@ -89,20 +97,23 @@ final class HashtagSuggestionText {
         if (!profile.tags.isEmpty()) {
             lines.add("With: " + list(profile.tags) + ".");
         }
+        lines.add(ALSO_SIMILAR);
         return lines;
     }
 
     /**
      * The "No hashtag" list's line (#53): "Suggested: #Gratitude (10/11) #Love (6/8) #Nature (name)",
      * each tag with the counts of its strongest reason ("name" when that is the tag's name in the
-     * quote); null when there are no suggestions.
+     * quote, "#Grief (4/10, based on similar quotes)" when it is similar quotes, so it doesn't read as
+     * a word count, #63); null when there are no suggestions.
      */
     static String suggestedLine(List<HashtagSuggester.Suggestion> suggestions) {
         if (suggestions.isEmpty()) return null;
         List<String> parts = new ArrayList<>();
         for (HashtagSuggester.Suggestion s : suggestions) {
             parts.add(Hashtag.display(s.tag) + (s.strongest.nameMatch ? " (name)"
-                    : " (" + s.strongest.withTag + "/" + s.strongest.total + ")"));
+                    : " (" + s.strongest.withTag + "/" + s.strongest.total
+                            + (s.strongest.similar ? ", based on similar quotes" : "") + ")"));
         }
         return "Suggested: " + String.join(" ", parts);
     }
@@ -131,6 +142,36 @@ final class HashtagSuggestionText {
     static String similar(HashtagSuggester.Evidence similar) {
         return "similar to " + similar.withTag + " of the " + similar.total + " closest tagged "
                 + (similar.total == 1 ? "quote" : "quotes");
+    }
+
+    /**
+     * The Why dialog's lines under an expanded "similar to ..." (#63): one per neighbour with the tag,
+     * most similar first, its text on one line and cut to {@link #NEIGHBOUR_CHARS} characters with
+     * "…". Ids without a text in {@code textsById} (deleted meanwhile) are skipped.
+     */
+    static List<String> neighbourLines(List<Integer> ids, Map<Integer, String> textsById) {
+        List<String> lines = new ArrayList<>();
+        for (Integer id : ids) {
+            String text = textsById.get(id);
+            if (text == null) continue;
+            lines.add("• " + snippet(text));
+        }
+        return lines;
+    }
+
+    /**
+     * The text with runs of whitespace as one space, cut to at most {@link #NEIGHBOUR_CHARS} with
+     * "…": at the last word break when that keeps at least half, else mid-word.
+     */
+    static String snippet(String text) {
+        String flat = text.trim().replaceAll("\\s+", " ");
+        if (flat.codePointCount(0, flat.length()) <= NEIGHBOUR_CHARS) return flat;
+        int end = flat.offsetByCodePoints(0, NEIGHBOUR_CHARS);
+        if (flat.charAt(end) != ' ') {
+            int space = flat.lastIndexOf(' ', end);
+            if (space >= end / 2) end = space;
+        }
+        return flat.substring(0, end).trim() + "…";
     }
 
     /** "gratitude (6/9), grateful (4/7)". */

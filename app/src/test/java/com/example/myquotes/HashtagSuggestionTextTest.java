@@ -1,11 +1,14 @@
 package com.example.myquotes;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class HashtagSuggestionTextTest {
     private static HashtagSuggester.Evidence evidence(String label, int withTag, int total) {
@@ -87,7 +90,8 @@ public class HashtagSuggestionTextTest {
                         "Words: gratitude (6/9), grateful (4/7).",
                         "Author: Rumi (4/5), Seneca (3/4).",
                         "Source: Masnavi (3/4).",
-                        "With: #Grief (4/4), #Death (6/9)."),
+                        "With: #Grief (4/4), #Death (6/9).",
+                        "Also suggested by similar quotes."),
                 HashtagSuggestionText.suggestions(profile));
     }
 
@@ -95,8 +99,9 @@ public class HashtagSuggestionTextTest {
     public void noWordAndNoAuthor() {
         HashtagSuggester.TagProfile profile = new HashtagSuggester.TagProfile("Life", 8, true,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-        assertEquals(Collections.singletonList(
-                        "Words: No word is strong enough yet to serve as a predictor for this hashtag."),
+        assertEquals(Arrays.asList(
+                        "Words: No word is strong enough yet to serve as a predictor for this hashtag.",
+                        "Also suggested by similar quotes."),
                 HashtagSuggestionText.suggestions(profile));
     }
 
@@ -134,5 +139,41 @@ public class HashtagSuggestionTextTest {
                 Collections.emptyList(), false);
         assertEquals("#Stoicism: virtue (4/6 quotes) \u00b7 by Seneca (3/4)",
                 HashtagSuggestionText.suggestedForLine(why));
+    }
+
+    @Test
+    public void suggestedLineExplainsSimilarQuotesCounts() {
+        assertEquals("Suggested: #Grief (4/10, based on similar quotes) #Love (6/8)",
+                HashtagSuggestionText.suggestedLine(Arrays.asList(
+                        new HashtagSuggester.Suggestion("Grief", HashtagSuggester.Evidence.similar(4, 10)),
+                        new HashtagSuggester.Suggestion("Love", evidence("Rumi", 6, 8)))));
+    }
+
+    @Test
+    public void introMentionsSimilarQuotesAndTheTap() {
+        assertTrue(HashtagSuggestionText.INTRO.contains("hashtags of similar quotes"));
+        assertTrue(HashtagSuggestionText.INTRO.endsWith("Tap \"similar to \u2026\" to see those quotes."));
+    }
+
+    @Test
+    public void neighbourLinesAreSnippetsMostSimilarFirstSkippingDeletedQuotes() {
+        Map<Integer, String> texts = new HashMap<>();
+        texts.put(3, "Grief is love\n  with nowhere to go.");
+        texts.put(7, "What we have once enjoyed we can never lose; all that we love deeply becomes a part of us.");
+        assertEquals(Arrays.asList(
+                        "\u2022 What we have once enjoyed we can never lose; all that we\u2026",
+                        "\u2022 Grief is love with nowhere to go."),
+                HashtagSuggestionText.neighbourLines(Arrays.asList(7, 9, 3), texts));
+    }
+
+    @Test
+    public void snippetKeepsShortTextsAndCutsLongOnesAtSixtyCharacters() {
+        String sixty = "123456789 123456789 123456789 123456789 123456789 123456789 ";
+        assertEquals(sixty.trim(), HashtagSuggestionText.snippet(sixty));
+        assertEquals("123456789 123456789 123456789 123456789 123456789 123456789\u2026",
+                HashtagSuggestionText.snippet(sixty + "more"));
+        // A surrogate pair counts as one character and is never split.
+        String face = new String(Character.toChars(0x1F600));
+        assertEquals(face.repeat(60) + "\u2026", HashtagSuggestionText.snippet(face.repeat(61)));
     }
 }
