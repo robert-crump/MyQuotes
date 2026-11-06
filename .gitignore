@@ -51,3 +51,6 @@ Thumbs.db
 
 # CSV files — personal quote collection, do not upload
 *.csv
+
+# personal backup for the local hashtag-suggestion eval (#58), do not upload
+app/src/test/resources/private/
