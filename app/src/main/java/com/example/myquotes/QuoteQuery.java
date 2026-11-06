@@ -20,10 +20,10 @@ import java.util.Set;
  * Owns matching, the minimum-length rule and result snippets, and is the single protocol for
  * opening SearchActivity (or handing SearchFragment) a query. Text matches by contains (on each
  * hashtag, ignoring a leading {@code #}). The hashtag filter (#51, ADR-005) is one whole tag,
- * compared ignoring case, "no hashtag", or "has suggestions" (#55); it combines with the text and
- * needs no minimum length. "Has suggestions" depends on the suggestion model, which this class
- * doesn't know: it lets every quote through, and {@link SuggestionRanking} keeps the ones with
- * suggestions.
+ * compared ignoring case, "no hashtag", "has suggestions" (#55), or "suggested for" one tag (#56);
+ * it combines with the text and needs no minimum length. The two suggestion filters depend on the
+ * suggestion model, which this class doesn't know: they let every quote through, and
+ * {@link SuggestionRanking} keeps the ones with suggestions (with the tag among them).
  */
 public final class QuoteQuery {
     public enum Field { QUOTE_TEXT, AUTHOR, SOURCE, HASHTAGS }
@@ -43,14 +43,14 @@ public final class QuoteQuery {
     // The hashtag filter: null for none, "" for "no hashtag" (a tag is never empty), else a tag.
     @Nullable
     private final String tag;
-    // The "has suggestions" filter; tag is then null.
+    // A suggestion filter: "has suggestions" when tag is null, else "suggested for" tag (#56).
     private final boolean suggested;
 
     private QuoteQuery(String text, Set<Field> fields, @Nullable String tag, boolean suggested) {
         this.text = text == null ? "" : text.trim();
         this.fields = EnumSet.noneOf(Field.class);
         this.fields.addAll(fields);
-        this.tag = suggested ? null : tag;
+        this.tag = suggested && tag != null && tag.isEmpty() ? null : tag;
         this.suggested = suggested;
     }
 
@@ -87,6 +87,11 @@ public final class QuoteQuery {
         return all("").withSuggested();
     }
 
+    /** The quotes {@code tag} is suggested for (#56): no text, "suggested for" filter. */
+    public static QuoteQuery suggestedFor(String tag) {
+        return all("").withSuggestedFor(tag);
+    }
+
     public String getText() {
         return text;
     }
@@ -99,23 +104,32 @@ public final class QuoteQuery {
         return fields.contains(field);
     }
 
-    /** The filter tag, or null when the filter is off or "no hashtag". */
+    /** The filter tag, or null when the filter is off, "no hashtag" or a suggestion filter. */
     @Nullable
     public String getTag() {
-        return tag == null || tag.isEmpty() ? null : tag;
+        return suggested || tag == null || tag.isEmpty() ? null : tag;
     }
 
     /** Whether the filter is "no hashtag". */
     public boolean isUntagged() {
-        return tag != null && tag.isEmpty();
+        return !suggested && tag != null && tag.isEmpty();
     }
 
     /** Whether the filter is "has suggestions" (#55). */
     public boolean isSuggested() {
-        return suggested;
+        return suggested && tag == null;
     }
 
-    /** Whether the results are ranked by their suggestions: "no hashtag" or "has suggestions". */
+    /** The tag of the "suggested for" filter (#56); null for any other filter. */
+    @Nullable
+    public String getSuggestedTag() {
+        return suggested ? tag : null;
+    }
+
+    /**
+     * Whether the results are ranked by their suggestions: "no hashtag", "has suggestions" or
+     * "suggested for".
+     */
     public boolean isRankedBySuggestions() {
         return suggested || isUntagged();
     }
@@ -138,6 +152,12 @@ public final class QuoteQuery {
     /** Same text and fields, filtered to quotes with hashtag suggestions. */
     public QuoteQuery withSuggested() {
         return new QuoteQuery(text, fields, null, true);
+    }
+
+    /** Same text and fields, filtered to quotes {@code newTag} is suggested for. */
+    public QuoteQuery withSuggestedFor(String newTag) {
+        String normalized = Hashtag.normalize(newTag);
+        return new QuoteQuery(text, fields, normalized.isEmpty() ? null : normalized, true);
     }
 
     public QuoteQuery withoutTagFilter() {
@@ -175,7 +195,7 @@ public final class QuoteQuery {
 
     public boolean matches(Quote quote) {
         if (!isActive()) return false;
-        if (tag != null && !passesTagFilter(quote.getTags())) return false;
+        if (tag != null && !suggested && !passesTagFilter(quote.getTags())) return false;
         if (!isTextActive()) return true;
         return (fields.contains(Field.QUOTE_TEXT) && matchesValue(quote.getQuoteText()))
                 || (fields.contains(Field.AUTHOR) && matchesValue(quote.getAuthor()))

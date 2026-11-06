@@ -1,6 +1,7 @@
 package com.example.myquotes;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -553,5 +554,67 @@ public class HashtagSuggesterTest {
         Quote quote = add("Someone New", "forest river");
         quote.setRejectedTags(Collections.singletonList("Nature"));
         assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes).suggestionsFor(quote));
+    }
+
+    // Three tags at 5/5 and #Stoicism at 5/7 (left out) for "tree sea sky virtue".
+    private Quote addFourTagQuote() {
+        addTagged(5, "forest", "Tree");
+        addTagged(5, "ocean", "Sea");
+        addTagged(5, "cloud", "Sky");
+        addTagged(5, "virtue", "Stoicism");
+        addUntagged(2, "virtue gold");
+        Quote quote = add("Someone New", "forest ocean cloud virtue");
+        addFiller(10);
+        return quote;
+    }
+
+    @Test
+    public void suggestionForFindsATagBeyondTheTopThree() {
+        Quote quote = addFourTagQuote();
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        List<String> top = new ArrayList<>();
+        for (HashtagSuggester.Suggestion s : model.suggestionsFor(quote)) top.add(s.tag);
+        assertEquals(Arrays.asList("Sea", "Sky", "Tree"), top);
+        // "virtue" is on 8 quotes with this one, 7 without it, as the editor counts.
+        assertEquals(new HashtagSuggester.Suggestion("Stoicism", new HashtagSuggester.Evidence("virtu", 5, 7)),
+                model.suggestionFor(quote, "stoicism"));
+    }
+
+    @Test
+    public void suggestionForIsNullForOwnRejectedUnknownAndUnreasonedTags() {
+        Quote quote = addFourTagQuote();
+        Quote other = add("Someone Else", "money matters");
+        assertNull(HashtagSuggester.fit(quotes).suggestionFor(other, "Stoicism"));
+        assertNull(HashtagSuggester.fit(quotes).suggestionFor(quote, "Nothing"));
+        quote.setRejectedTags(Collections.singletonList("stoicism"));
+        assertNull(HashtagSuggester.fit(quotes).suggestionFor(quote, "Stoicism"));
+        quote.setRejectedTags(Collections.emptyList());
+        quote.setTags(Collections.singletonList("Stoicism"));
+        assertNull(HashtagSuggester.fit(quotes).suggestionFor(quote, "Stoicism"));
+    }
+
+    @Test
+    public void aPinnedTagComesFirstWhenEligibleStillAtMostThree() {
+        Quote quote = addFourTagQuote();
+        List<Quote> others = new ArrayList<>(quotes);
+        others.remove(quote);
+        HashtagSuggester model = HashtagSuggester.fit(others);
+        String text = quote.getQuoteText();
+        assertEquals(Arrays.asList("Sea", "Sky", "Tree"),
+                model.suggest(text, "X", "", Collections.emptyList(), Collections.emptyList(), null));
+        assertEquals(Arrays.asList("Stoicism", "Sea", "Sky"),
+                model.suggest(text, "X", "", Collections.emptyList(), Collections.emptyList(), "stoicism"));
+        assertEquals(Arrays.asList("Sea", "Sky", "Tree"),
+                model.suggest(text, "X", "", Collections.emptyList(), Collections.emptyList(), "Nothing"));
+        assertEquals(Arrays.asList("Sea", "Sky", "Tree"),
+                model.suggest(text, "X", "", Collections.emptyList(), Collections.singletonList("Stoicism"),
+                        "Stoicism"));
+    }
+
+    @Test
+    public void explainForCountsTheQuoteAsIfItWereLeftOut() {
+        Quote quote = addFourTagQuote();
+        HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes).explainFor(quote, "Stoicism");
+        assertEquals(Collections.singletonList(new HashtagSuggester.Evidence("virtue", 5, 7)), why.words);
     }
 }

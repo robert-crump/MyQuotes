@@ -29,6 +29,13 @@
             android:layout_marginTop="8dp"
             android:drawableStart="@drawable/ic_search" />
 
+        <!-- "Suggested for N quotes" (#56): shown once counted, hidden at 0 -->
+        <TextView
+            android:id="@+id/sheet_suggested_quotes"
+            style="@style/Widget.MyQuotes.SheetAction"
+            android:drawableStart="@drawable/ic_tag_24dp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/sheet_rename"
             style="@style/Widget.MyQuotes.SheetAction"

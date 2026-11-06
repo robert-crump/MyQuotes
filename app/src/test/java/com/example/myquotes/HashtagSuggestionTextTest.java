@@ -109,4 +109,13 @@ public class HashtagSuggestionTextTest {
         assertEquals(null, HashtagSuggestionText.notSuggestedLine(
                 Collections.singletonList("Zen"), Arrays.asList("Zen")));
     }
+
+    @Test
+    public void suggestedForLineNamesTheTagThenItsExplanation() {
+        HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Stoicism",
+                Collections.singletonList(evidence("virtue", 4, 6)), evidence("Seneca", 3, 4), null,
+                Collections.emptyList(), false);
+        assertEquals("#Stoicism: virtue (4/6 quotes) \u00b7 by Seneca (3/4)",
+                HashtagSuggestionText.suggestedForLine(why));
+    }
 }

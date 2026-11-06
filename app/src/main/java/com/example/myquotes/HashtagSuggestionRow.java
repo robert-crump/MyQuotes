@@ -54,6 +54,8 @@ final class HashtagSuggestionRow {
     private HashtagSuggester model;
     private List<String> shown = Collections.emptyList();
     private final ArrayList<String> rejected = new ArrayList<>();
+    // The tag shown first whenever eligible (#56: a "Suggested for" run); null for none.
+    private String pinned;
 
     /** {@code editedQuoteId} is left out of the model; -1 when adding. */
     HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, int editedQuoteId,
@@ -92,6 +94,12 @@ final class HashtagSuggestionRow {
         model = null;
         refresh();
         fit(collection.getQuoteList().getValue());
+    }
+
+    /** Shows {@code tag} first whenever it is eligible (#56), still at most 3 chips; null for none. */
+    void setPinned(String tag) {
+        pinned = tag;
+        refresh();
     }
 
     /** The form's rejected tags (#55): the loaded quote's, or the saved state's. */
@@ -133,7 +141,7 @@ final class HashtagSuggestionRow {
         main.removeCallbacks(refresh);
         List<String> suggestions = model == null ? Collections.emptyList()
                 : model.suggest(text.getText().toString(), author.getText().toString(),
-                        source.getText().toString(), field.getTags(), rejected);
+                        source.getText().toString(), field.getTags(), rejected, pinned);
         shown = suggestions;
         group.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(group.getContext());

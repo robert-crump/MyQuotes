@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import java.util.concurrent.Executors;
 
 /**
@@ -75,13 +76,18 @@ public class SearchFragment extends Fragment
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes = new ArrayList<>();
     // Each quote's suggestions for the ranked lists, from a model fitted on fittedFor (with
-    // suggestedCount, the quotes with suggestions), or being fitted on fitting.
+    // suggestedCount, the quotes with suggestions), or being fitted on fitting. For a "suggested
+    // for" query (#56) also that tag's suggestion and explanation line per quote (fittedTag).
     private final Handler main = new Handler(Looper.getMainLooper());
     private ExecutorService fitter;
     private Map<Integer, List<HashtagSuggester.Suggestion>> suggestionsById = Collections.emptyMap();
     private int suggestedCount;
     private List<Quote> fittedFor;
     private List<Quote> fitting;
+    private Map<Integer, HashtagSuggester.Suggestion> tagSuggestions = Collections.emptyMap();
+    private Map<Integer, String> tagLines = Collections.emptyMap();
+    private String fittedTag;
+    private String fittingTag;
 
     private QuoteQuery query = QuoteQuery.all("");
 
@@ -307,7 +313,9 @@ public class SearchFragment extends Fragment
 
         String tag = query.getTag();
         hashtagFilterChip.setVisibility(query.hasTagFilter() ? View.VISIBLE : View.GONE);
+        String suggestedTag = query.getSuggestedTag();
         hashtagFilterChip.setText(tag != null ? Hashtag.display(tag)
+                : suggestedTag != null ? "Suggested: " + Hashtag.display(suggestedTag)
                 : query.isSuggested() ? "Has suggestions" : "No hashtag");
         hashtagFilterChip.setCloseIconContentDescription("Remove hashtag filter");
     }
@@ -316,23 +324,35 @@ public class SearchFragment extends Fragment
         if (searchEditText == null) return;
         query = query.withText(searchEditText.getText().toString());
         List<Quote> results = query.filter(allQuotes);
-        Map<Integer, List<HashtagSuggester.Suggestion>> suggestions = null;
+        Map<Integer, String> lines = null;
         if (query.isRankedBySuggestions()) {
-            if (fittedFor != allQuotes) {
+            String tag = query.getSuggestedTag();
+            if (!isFitted(allQuotes, tag)) {
                 fitModel(); // reruns the search when the model is ready
                 return;
             }
-            Map<Integer, List<HashtagSuggester.Suggestion>> byId = suggestionsById;
-            List<SuggestionRanking.Entry> ranked = SuggestionRanking.results(allQuotes, query,
-                    quote -> byId.getOrDefault(quote.getId(), Collections.emptyList()), Collections.emptySet());
+            Function<Quote, List<HashtagSuggester.Suggestion>> suggestions;
+            if (tag != null) {
+                Map<Integer, HashtagSuggester.Suggestion> byTag = tagSuggestions;
+                suggestions = quote -> {
+                    HashtagSuggester.Suggestion suggestion = byTag.get(quote.getId());
+                    return suggestion == null ? Collections.emptyList() : Collections.singletonList(suggestion);
+                };
+            } else {
+                Map<Integer, List<HashtagSuggester.Suggestion>> byId = suggestionsById;
+                suggestions = quote -> byId.getOrDefault(quote.getId(), Collections.emptyList());
+            }
+            List<SuggestionRanking.Entry> ranked = SuggestionRanking.results(allQuotes, query, suggestions,
+                    Collections.emptySet());
             results = new ArrayList<>();
-            suggestions = new HashMap<>();
+            lines = new HashMap<>();
             for (SuggestionRanking.Entry entry : ranked) {
                 results.add(entry.quote);
-                suggestions.put(entry.quote.getId(), entry.suggestions);
+                lines.put(entry.quote.getId(), tag != null ? tagLines.get(entry.quote.getId())
+                        : HashtagSuggestionText.suggestedLine(entry.suggestions));
             }
         }
-        adapter.updateResults(results, query, suggestions);
+        adapter.updateResults(results, query, lines);
         updateResultCount(results.size());
     }
 
@@ -342,20 +362,42 @@ public class SearchFragment extends Fragment
      */
     private void fitModel() {
         List<Quote> quotes = allQuotes;
-        if (fitting == quotes || fittedFor == quotes || fitter.isShutdown()) return;
+        String tag = query.getSuggestedTag();
+        if (fitter.isShutdown() || isFitted(quotes, tag)) return;
+        if (fitting == quotes && (tag == null || tag.equalsIgnoreCase(fittingTag))) return;
         fitting = quotes;
+        fittingTag = tag;
         fitter.execute(() -> {
-            Map<Integer, List<HashtagSuggester.Suggestion>> byId =
-                    SuggestionRanking.suggestionsById(quotes, HashtagSuggester.fit(quotes));
+            HashtagSuggester model = HashtagSuggester.fit(quotes);
+            Map<Integer, List<HashtagSuggester.Suggestion>> byId = SuggestionRanking.suggestionsById(quotes, model);
             int count = SuggestionRanking.countWithSuggestions(byId);
+            Map<Integer, HashtagSuggester.Suggestion> byTag = new HashMap<>();
+            Map<Integer, String> linesByTag = new HashMap<>();
+            if (tag != null) {
+                for (Quote quote : quotes) {
+                    HashtagSuggester.Suggestion suggestion = model.suggestionFor(quote, tag);
+                    if (suggestion == null) continue;
+                    byTag.put(quote.getId(), suggestion);
+                    linesByTag.put(quote.getId(),
+                            HashtagSuggestionText.suggestedForLine(model.explainFor(quote, tag)));
+                }
+            }
             main.post(() -> {
                 if (fitter.isShutdown() || quotes != allQuotes) return;
                 suggestionsById = byId;
                 suggestedCount = count;
                 fittedFor = quotes;
+                tagSuggestions = byTag;
+                tagLines = linesByTag;
+                fittedTag = tag;
                 rerunSearch();
             });
         });
+    }
+
+    /** Whether the model is fitted on {@code quotes}, with {@code tag}'s list unless it is null. */
+    private boolean isFitted(List<Quote> quotes, String tag) {
+        return fittedFor == quotes && (tag == null || tag.equalsIgnoreCase(fittedTag));
     }
 
     private void updateResultCount(int count) {
@@ -381,7 +423,7 @@ public class SearchFragment extends Fragment
     }
 
     /**
-     * From the quote dialog. In a ranked list ("No hashtag", "Has suggestions") this starts a
+     * From the quote dialog. In a ranked list ("No hashtag", "Has suggestions", "Suggested for") this starts a
      * tagging run, which returns to the list, so the dialog closes.
      */
     @Override

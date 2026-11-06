@@ -124,4 +124,29 @@ public class SuggestionRankingTest {
         HashtagSuggester model = HashtagSuggester.fit(quotes);
         assertEquals(0, SuggestionRanking.remaining(quotes, QuoteQuery.suggested(), model, Collections.emptySet()));
     }
+
+    @Test
+    public void theSuggestedForListHasOnlyTheTagRankedByItsStrength() {
+        addTagged(5, "virtue walk", "Stoicism");
+        addTagged(3, "calm", "Stoicism");
+        add("Z", "virtue", 0, "Stoicism"); // has the tag: never in the list
+        Quote strong = add("A", "virtue silver", 0);
+        Quote older = add("C", "calm copper", 1);
+        Quote newer = add("B", "calm iron", 2);
+        add("D", "office", 3); // no suggestion
+        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        QuoteQuery query = QuoteQuery.suggestedFor("stoicism");
+        List<Quote> order = new ArrayList<>();
+        for (SuggestionRanking.Entry e : SuggestionRanking.results(quotes, query, model, Collections.emptySet())) {
+            order.add(e.quote);
+            assertEquals(1, e.suggestions.size());
+            assertEquals("Stoicism", e.suggestions.get(0).tag);
+        }
+        // virtue 6/6 beats calm 3/4; the two calm quotes tie, newest first.
+        assertEquals(Arrays.asList(strong, newer, older), order);
+        assertEquals(3, SuggestionRanking.countSuggestedFor(quotes, model, "Stoicism"));
+
+        older.setRejectedTags(Collections.singletonList("Stoicism"));
+        assertEquals(2, SuggestionRanking.remaining(quotes, query, HashtagSuggester.fit(quotes), Collections.emptySet()));
+    }
 }

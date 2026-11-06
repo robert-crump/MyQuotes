@@ -102,6 +102,14 @@ final class HashtagSuggestionText {
     }
 
     /**
+     * One tag's "Suggested for" list line (#56): "#Stoicism: virtue (4/6 quotes) · by Seneca (3/4)",
+     * the tag's {@link #explanation}.
+     */
+    static String suggestedForLine(HashtagSuggester.Explanation explanation) {
+        return Hashtag.display(explanation.tag) + ": " + explanation(explanation);
+    }
+
+    /**
      * The end of the "Why these hashtags" dialog (#55): "Not suggested for this quote: #Hope, #Love",
      * the rejected tags the quote doesn't have ({@code tags}); null when there are none.
      */

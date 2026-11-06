@@ -14,7 +14,8 @@ import java.util.Set;
  * list, going from one quote to the next. Holds the list's query, whether the user has said to
  * continue (asked once per run), and the quotes left out for the rest of the run: skipped, and in
  * a "Has suggestions" run also saved (memory only; saved with the editor's state). The order is
- * {@link SuggestionRanking}'s.
+ * {@link SuggestionRanking}'s. A run through one tag's "Suggested for" list (#56) is done with a
+ * quote once the tag is decided on: added or rejected.
  */
 final class TaggingRun {
     private static final String KEY_QUERY = "run_query";
@@ -39,6 +40,18 @@ final class TaggingRun {
      */
     boolean isSuggestionsRun() {
         return query.isSuggested();
+    }
+
+    /** The tag of a run through its "Suggested for" list (#56); else null. */
+    @Nullable
+    String getSuggestedTag() {
+        return query.getSuggestedTag();
+    }
+
+    /** In a "Suggested for" run: whether a quote saved with {@code tags} and {@code rejected} is decided on the tag. */
+    boolean isDecided(List<String> tags, List<String> rejected) {
+        String tag = getSuggestedTag();
+        return tag != null && (Hashtag.containsIgnoreCase(tags, tag) || Hashtag.containsIgnoreCase(rejected, tag));
     }
 
     /** Whether the user has said to continue, so saves go straight on without asking. */
@@ -68,17 +81,21 @@ final class TaggingRun {
 
     /** "Continue with next untagged quote?" or "Continue with the next quote?". */
     String continuePrompt() {
+        String tag = getSuggestedTag();
+        if (tag != null) return "Continue with the next quote for " + Hashtag.display(tag) + "?";
         return isSuggestionsRun() ? "Continue with the next quote?" : "Continue with next untagged quote?";
     }
 
     /** The toast when the run has nothing left. */
     String noMoreMessage() {
+        String tag = getSuggestedTag();
+        if (tag != null) return "No more suggestions for " + Hashtag.display(tag);
         return isSuggestionsRun() ? "No more suggestions" : "No more untagged quotes";
     }
 
     /** The Skip action's title. */
     String skipTitle() {
-        return isSuggestionsRun() ? "Skip to next quote" : "Skip to next untagged quote";
+        return isSuggestionsRun() || getSuggestedTag() != null ? "Skip to next quote" : "Skip to next untagged quote";
     }
 
     Bundle toBundle() {

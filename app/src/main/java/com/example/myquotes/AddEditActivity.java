@@ -34,7 +34,9 @@ import java.util.function.BiConsumer;
  * place (best suggestions first, re-ranked with the refitted model). Skip moves on without saving,
  * and so does Delete after deleting; a save that leaves the quote untagged skips it. Back ends the
  * run. From the "Has suggestions" list (#55) every save is done with the quote: it is left out for
- * the rest of the run, and the first save asks "Continue with the next quote?".
+ * the rest of the run, and the first save asks "Continue with the next quote?". From one tag's
+ * "Suggested for" list (#56) a save that adds or rejects the tag is done with the quote; one that
+ * does neither counts as Skip once continued. The Suggested row pins that tag first.
  * <p>
  * The form also holds the quote's rejected suggestions (#55, kept by {@link HashtagSuggestionRow}),
  * saved with the quote and compared by the discard check.
@@ -99,6 +101,7 @@ public class AddEditActivity extends AppCompatActivity {
         handleIntent(savedInstanceState);
         hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
                 quoteCollection, quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
+        if (run != null) hashtagSuggestions.setPinned(run.getSuggestedTag());
         if (savedInstanceState != null) {
             List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
             if (tags != null) hashtagField.setTags(tags);
@@ -370,6 +373,12 @@ public class AddEditActivity extends AppCompatActivity {
         if (isEditMode) {
             quoteCollection.edit(quoteId, quote.getAuthor(), quote.getQuoteText(),
                     quote.getSource(), quote.getTags(), quote.getRejectedTags());
+            if (run != null && run.getSuggestedTag() != null) {
+                boolean decided = run.isDecided(quote.getTags(), quote.getRejectedTags());
+                if (decided) run.skip(quoteId); // done with it for this run
+                continueRun(decided);
+                return;
+            }
             if (run != null && run.isSuggestionsRun()) {
                 run.skip(quoteId); // done with it for this run, whatever the save changed
                 continueRun(true);

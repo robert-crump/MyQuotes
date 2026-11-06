@@ -56,6 +56,11 @@ import java.util.function.BiConsumer;
  * <p>
  * Rejected tags (#55): the tags the user said not to suggest for a quote are left out like its
  * own tags; they don't change any count.
+ * <p>
+ * One tag (#56): {@link #suggestionFor} gives that tag for a quote of the fitted collection, counted
+ * like {@link #suggestionsFor} but whether or not it is in the top {@link #MAX_SUGGESTIONS}
+ * ("Suggested for N quotes"); {@link #explainFor} explains it with the same counts; and
+ * {@code suggest(..., pinned)} puts it first in the editor's row during that tag's tagging run.
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
@@ -329,10 +334,20 @@ public final class HashtagSuggester {
     /** {@link #suggest(String, String, String, Collection)}, never one of {@code rejectedTags} either. */
     public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
                                 Collection<String> rejectedTags) {
+        return suggest(text, author, source, existingTags, rejectedTags, null);
+    }
+
+    /**
+     * {@link #suggest(String, String, String, Collection, Collection)} with {@code pinned} first
+     * whenever it is eligible, even when stronger tags would push it out (#56: the tagging run
+     * for one tag); still at most {@link #MAX_SUGGESTIONS}. Null pins nothing.
+     */
+    public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
+                                Collection<String> rejectedTags, String pinned) {
         Set<String> tokens = tokens(text, author, source);
         addTagTokens(tokens, existingTags);
         List<String> tags = new ArrayList<>();
-        for (Suggestion suggestion : suggestions(tokens, excluded(existingTags, rejectedTags), 0)) {
+        for (Suggestion suggestion : suggestions(tokens, excluded(existingTags, rejectedTags), 0, pinned)) {
             tags.add(suggestion.tag);
         }
         return tags;
@@ -348,7 +363,22 @@ public final class HashtagSuggester {
     public List<Suggestion> suggestionsFor(Quote quote) {
         Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
         addTagTokens(tokens, quote.getTags());
-        return suggestions(tokens, excluded(quote.getTags(), quote.getRejectedTags()), 1);
+        return suggestions(tokens, excluded(quote.getTags(), quote.getRejectedTags()), 1, null);
+    }
+
+    /**
+     * {@code tag} for {@code quote}, a quote of the fitted collection, counted as in
+     * {@link #suggestionsFor} but whether or not stronger tags would push it out of the top
+     * {@link #MAX_SUGGESTIONS} (#56): with its strongest reason, or null when it isn't eligible
+     * (on too few quotes, no reason, one of the quote's tags or rejected tags).
+     */
+    public Suggestion suggestionFor(Quote quote, String tag) {
+        String key = Hashtag.key(Hashtag.normalize(tag));
+        TagStats stats = tags.get(key);
+        if (stats == null || excluded(quote.getTags(), quote.getRejectedTags()).contains(key)) return null;
+        Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
+        addTagTokens(tokens, quote.getTags());
+        return suggestion(stats, tokens, 1);
     }
 
     /** The keys of {@code existingTags} and {@code rejectedTags} (null is none). */
@@ -365,28 +395,42 @@ public final class HashtagSuggester {
      * The best tags for {@code tokens}, none of {@code excluded}, with {@code self} quotes left out
      * of each token's count.
      */
-    private List<Suggestion> suggestions(Set<String> tokens, Set<String> excluded, int self) {
+    private List<Suggestion> suggestions(Set<String> tokens, Set<String> excluded, int self, String pinned) {
         List<Suggestion> ranked = new ArrayList<>();
         for (Map.Entry<String, TagStats> entry : tags.entrySet()) {
             if (excluded.contains(entry.getKey())) continue;
-            TagStats stats = entry.getValue();
-            Evidence best = null;
-            for (String token : tokens) {
-                if (!isReason(stats, token, self)) continue;
-                Evidence evidence = evidence(stats, token, token, self);
-                if (best == null || byStrength(evidence, best) < 0) best = evidence;
-            }
-            if (best == null) {
-                String name = nameIn(stats, tokens);
-                if (name != null) best = Evidence.nameMatch(name);
-            }
-            if (best != null) ranked.add(new Suggestion(stats.spelling, best));
+            Suggestion suggestion = suggestion(entry.getValue(), tokens, self);
+            if (suggestion != null) ranked.add(suggestion);
         }
         ranked.sort((a, b) -> {
             int byStrength = byStrength(a.strongest, b.strongest);
             return byStrength != 0 ? byStrength : Hashtag.ORDER.compare(a.tag, b.tag);
         });
+        if (pinned != null) {
+            String pinnedKey = Hashtag.key(Hashtag.normalize(pinned));
+            for (int i = 1; i < ranked.size(); i++) {
+                if (Hashtag.key(ranked.get(i).tag).equals(pinnedKey)) {
+                    ranked.add(0, ranked.remove(i));
+                    break;
+                }
+            }
+        }
         return new ArrayList<>(ranked.subList(0, Math.min(MAX_SUGGESTIONS, ranked.size())));
+    }
+
+    /** The tag for {@code tokens} with its strongest reason, or null when it has none. */
+    private Suggestion suggestion(TagStats stats, Set<String> tokens, int self) {
+        Evidence best = null;
+        for (String token : tokens) {
+            if (!isReason(stats, token, self)) continue;
+            Evidence evidence = evidence(stats, token, token, self);
+            if (best == null || byStrength(evidence, best) < 0) best = evidence;
+        }
+        if (best == null) {
+            String name = nameIn(stats, tokens);
+            if (name != null) best = Evidence.nameMatch(name);
+        }
+        return best == null ? null : new Suggestion(stats.spelling, best);
     }
 
     /**
@@ -397,6 +441,19 @@ public final class HashtagSuggester {
      */
     public Explanation explain(String text, String author, String source, Collection<String> quoteTags,
                                String tag) {
+        return explain(text, author, source, quoteTags, tag, 0);
+    }
+
+    /**
+     * {@link #explain} for {@code quote}, a quote of the fitted collection, counted as if it were
+     * left out (like {@link #suggestionFor}): the "Suggested for" list's line (#56).
+     */
+    public Explanation explainFor(Quote quote, String tag) {
+        return explain(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), quote.getTags(), tag, 1);
+    }
+
+    private Explanation explain(String text, String author, String source, Collection<String> quoteTags,
+                                String tag, int self) {
         TagStats stats = tags.get(Hashtag.key(Hashtag.normalize(tag)));
         if (stats == null) return null;
         Map<String, String> ownWords = new HashMap<>();
@@ -405,22 +462,22 @@ public final class HashtagSuggester {
         List<Evidence> words = new ArrayList<>();
         Set<String> wordTokens = tokens(text, null, null);
         for (String token : wordTokens) {
-            if (isReason(stats, token)) {
-                words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token))));
+            if (isReason(stats, token, self)) {
+                words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token)), self));
             }
         }
         words.sort(STRONGEST_FIRST);
         String authorToken = authorToken(author);
         Evidence authorEvidence = null;
-        if (isReason(stats, authorToken)) authorEvidence = evidence(stats, authorToken, author.trim());
+        if (isReason(stats, authorToken, self)) authorEvidence = evidence(stats, authorToken, author.trim(), self);
         String sourceToken = sourceToken(source);
         Evidence sourceEvidence = null;
-        if (isReason(stats, sourceToken)) sourceEvidence = evidence(stats, sourceToken, source.trim());
+        if (isReason(stats, sourceToken, self)) sourceEvidence = evidence(stats, sourceToken, source.trim(), self);
         Set<String> tagTokens = new LinkedHashSet<>();
         addTagTokens(tagTokens, quoteTags);
         List<Evidence> tagEvidence = new ArrayList<>();
         for (String token : tagTokens) {
-            if (isTagReason(stats, token)) tagEvidence.add(evidence(stats, token, tagLabel(token)));
+            if (isTagReason(stats, token, self)) tagEvidence.add(evidence(stats, token, tagLabel(token), self));
         }
         tagEvidence.sort(STRONGEST_FIRST);
         return new Explanation(stats.spelling, words, authorEvidence, sourceEvidence, tagEvidence,
@@ -482,7 +539,11 @@ public final class HashtagSuggester {
 
     /** Whether the tag token is a reason for the tag; a tag is never a reason for itself. */
     private boolean isTagReason(TagStats stats, String token) {
-        return !token.equals(TAG_PREFIX + Hashtag.key(stats.spelling)) && isReason(stats, token);
+        return isTagReason(stats, token, 0);
+    }
+
+    private boolean isTagReason(TagStats stats, String token, int self) {
+        return !token.equals(TAG_PREFIX + Hashtag.key(stats.spelling)) && isReason(stats, token, self);
     }
 
     /** "#Death" for {@code tag:death}, in the collection's spelling. */

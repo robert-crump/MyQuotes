@@ -1,6 +1,7 @@
 package com.example.myquotes;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +17,10 @@ import java.util.function.Function;
  * the ones the editor would show. Ranked by the strength of the top suggestion (higher share, then
  * higher count), ties by the 2nd, then the 3rd; quotes without suggestions last (the "Has
  * suggestions" list drops them); then newest first ({@link Quote#NEWEST_FIRST}).
+ * <p>
+ * The "Suggested for" list of one tag (#56) gives each quote only that tag, from
+ * {@link HashtagSuggester#suggestionFor} (whether or not it is among the quote's top 3), so it is
+ * ranked by that tag's strongest reason, and drops the quotes it isn't suggested for.
  */
 final class SuggestionRanking {
 
@@ -59,11 +64,33 @@ final class SuggestionRanking {
 
     /**
      * {@code query}'s results ({@link QuoteQuery#filter}) ranked, without those in {@code skipped};
-     * for "has suggestions" only the quotes with suggestions. {@code model} is fitted on
+     * for "has suggestions" and "suggested for" only the quotes with suggestions. {@code model} is fitted on
      * {@code quotes}.
      */
     static List<Entry> results(List<Quote> quotes, QuoteQuery query, HashtagSuggester model, Set<Integer> skipped) {
-        return results(quotes, query, model::suggestionsFor, skipped);
+        return results(quotes, query, suggestionsOf(query, model), skipped);
+    }
+
+    /**
+     * Each quote's suggestions in {@code query}'s list: for "suggested for" only that tag (or
+     * none), else {@link HashtagSuggester#suggestionsFor}. {@code model} is fitted on the collection.
+     */
+    static Function<Quote, List<HashtagSuggester.Suggestion>> suggestionsOf(QuoteQuery query, HashtagSuggester model) {
+        String tag = query.getSuggestedTag();
+        if (tag == null) return model::suggestionsFor;
+        return quote -> {
+            HashtagSuggester.Suggestion suggestion = model.suggestionFor(quote, tag);
+            return suggestion == null ? Collections.emptyList() : Collections.singletonList(suggestion);
+        };
+    }
+
+    /** How many of {@code quotes} {@code tag} is suggested for (#56); {@code model} is fitted on them. */
+    static int countSuggestedFor(List<Quote> quotes, HashtagSuggester model, String tag) {
+        int count = 0;
+        for (Quote quote : quotes) {
+            if (model.suggestionFor(quote, tag) != null) count++;
+        }
+        return count;
     }
 
     /** {@link #results(List, QuoteQuery, HashtagSuggester, Set)} with the suggestions given per quote. */
@@ -72,7 +99,9 @@ final class SuggestionRanking {
         List<Quote> candidates = query.filter(quotes);
         candidates.removeIf(quote -> skipped.contains(quote.getId()));
         List<Entry> ranked = rank(candidates, suggestions);
-        if (query.isSuggested()) ranked.removeIf(entry -> entry.suggestions.isEmpty());
+        if (query.isSuggested() || query.getSuggestedTag() != null) {
+            ranked.removeIf(entry -> entry.suggestions.isEmpty());
+        }
         return ranked;
     }
 

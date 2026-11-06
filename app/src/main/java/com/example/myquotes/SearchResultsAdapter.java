@@ -15,8 +15,8 @@ import java.util.Map;
 public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdapter.ViewHolder> {
     private List<Quote> quotes = new ArrayList<>();
     private QuoteQuery query = QuoteQuery.all("");
-    // Per quote id, its hashtag suggestions (the "No hashtag" list, #53); null elsewhere.
-    private Map<Integer, List<HashtagSuggester.Suggestion>> suggestions;
+    // Per quote id, its suggestions line (the ranked lists, #53, #55, #56); null elsewhere.
+    private Map<Integer, String> suggestionLines;
     private OnQuoteClickListener clickListener;
 
     public interface OnQuoteClickListener {
@@ -29,10 +29,10 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
     }
 
     public void updateResults(List<Quote> newQuotes, QuoteQuery query,
-                              Map<Integer, List<HashtagSuggester.Suggestion>> suggestions) {
+                              Map<Integer, String> suggestionLines) {
         this.quotes = newQuotes;
         this.query = query;
-        this.suggestions = suggestions;
+        this.suggestionLines = suggestionLines;
         notifyDataSetChanged();
     }
 
@@ -87,9 +87,7 @@ public class SearchResultsAdapter extends RecyclerView.Adapter<SearchResultsAdap
             String snippet = query.snippet(quote);
             quoteSnippetTextView.setText(snippet);
 
-            List<HashtagSuggester.Suggestion> quoteSuggestions =
-                    suggestions == null ? null : suggestions.get(quote.getId());
-            String line = quoteSuggestions == null ? null : HashtagSuggestionText.suggestedLine(quoteSuggestions);
+            String line = suggestionLines == null ? null : suggestionLines.get(quote.getId());
             suggestionsTextView.setText(line);
             suggestionsTextView.setVisibility(line == null ? View.GONE : View.VISIBLE);
         }

@@ -219,4 +219,24 @@ public class QuoteQueryTest {
         assertEquals(repeat("a", 100), QuoteQuery.all("needle").snippet(repeat("a", 100)));
         assertEquals(repeat("a", 100) + "...", QuoteQuery.all("needle").snippet(repeat("a", 150)));
     }
+
+    @Test
+    public void suggestedForFilterLetsEveryQuoteThroughForTheRanking() {
+        Quote bare = quote("Nothing at all", "Seneca", "", "");
+        QuoteQuery query = QuoteQuery.suggestedFor("#Stoic");
+        assertEquals("Stoic", query.getSuggestedTag());
+        assertEquals(null, query.getTag());
+        assertFalse(query.isSuggested());
+        assertFalse(query.isUntagged());
+        assertTrue(query.isRankedBySuggestions());
+        assertTrue(query.hasTagFilter());
+        assertEquals(2, query.filter(Arrays.asList(q, bare)).size());
+        assertEquals("Stoic", query.withText("x").scopedTo(QuoteQuery.Field.AUTHOR).getSuggestedTag());
+        assertEquals(null, query.withTag("Stoic").getSuggestedTag());
+        assertEquals(null, query.withSuggested().getSuggestedTag());
+        assertFalse(query.withoutTagFilter().isActive());
+        assertNotEquals(QuoteQuery.suggested(), query);
+        assertNotEquals(QuoteQuery.forTag("Stoic"), query);
+        assertEquals(null, QuoteQuery.suggested().getSuggestedTag());
+    }
 }
