@@ -55,7 +55,7 @@
                 android:layout_marginTop="4dp"
                 android:text="Quote snippet"
                 android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                android:textColor="@color/dark_text"
+                android:textColor="?android:attr/textColorPrimary"
                 android:maxLines="3"
                 android:ellipsize="end"
                 android:lineSpacingExtra="2dp" />
