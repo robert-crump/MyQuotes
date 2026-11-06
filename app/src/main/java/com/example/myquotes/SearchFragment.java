@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.concurrent.Executors;
@@ -84,6 +85,9 @@ public class SearchFragment extends Fragment
     private int suggestedCount;
     private List<Quote> fittedFor;
     private List<Quote> fitting;
+    // QuoteEmbeddings' change count the model was fitted (or is being fitted) with (#62).
+    private Integer fittedVectors;
+    private Integer fittingVectors;
     private Map<Integer, HashtagSuggester.Suggestion> tagSuggestions = Collections.emptyMap();
     private Map<Integer, String> tagLines = Collections.emptyMap();
     private String fittedTag;
@@ -151,6 +155,9 @@ public class SearchFragment extends Fragment
             fitModel();
             rerunSearch();
         });
+        // Similar-quotes vectors arrived: refit so the ranked lists re-rank (#62).
+        MyApplication.getInstance().getQuoteEmbeddings().getChanges()
+                .observe(getViewLifecycleOwner(), changes -> fitModel());
     }
 
     @Override
@@ -362,13 +369,20 @@ public class SearchFragment extends Fragment
      */
     private void fitModel() {
         List<Quote> quotes = allQuotes;
+        if (quotes == null) return;
         String tag = query.getSuggestedTag();
-        if (fitter.isShutdown() || isFitted(quotes, tag)) return;
-        if (fitting == quotes && (tag == null || tag.equalsIgnoreCase(fittingTag))) return;
+        QuoteEmbeddings embeddings = MyApplication.getInstance().getQuoteEmbeddings();
+        Integer vectorsVersion = embeddings.getChanges().getValue();
+        // Lists show the last fit (older vectors) until the new one is ready.
+        if (fitter.isShutdown() || isFitted(quotes, tag) && Objects.equals(fittedVectors, vectorsVersion)) return;
+        if (fitting == quotes && Objects.equals(fittingVectors, vectorsVersion)
+                && (tag == null || tag.equalsIgnoreCase(fittingTag))) return;
         fitting = quotes;
         fittingTag = tag;
+        fittingVectors = vectorsVersion;
+        Map<Integer, float[]> vectors = embeddings.vectorsFor(quotes);
         fitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes);
+            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
             Map<Integer, List<HashtagSuggester.Suggestion>> byId = SuggestionRanking.suggestionsById(quotes, model);
             int count = SuggestionRanking.countWithSuggestions(byId);
             Map<Integer, HashtagSuggester.Suggestion> byTag = new HashMap<>();
@@ -387,6 +401,7 @@ public class SearchFragment extends Fragment
                 suggestionsById = byId;
                 suggestedCount = count;
                 fittedFor = quotes;
+                fittedVectors = vectorsVersion;
                 tagSuggestions = byTag;
                 tagLines = linesByTag;
                 fittedTag = tag;

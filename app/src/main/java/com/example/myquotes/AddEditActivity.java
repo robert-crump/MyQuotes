@@ -23,6 +23,7 @@ import androidx.appcompat.widget.Toolbar;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
@@ -100,7 +101,7 @@ public class AddEditActivity extends AppCompatActivity {
                 : getIntent().getBundleExtra(EXTRA_TAGGING_RUN));
         handleIntent(savedInstanceState);
         hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
-                quoteCollection, quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
+                quoteCollection, MyApplication.getInstance().getQuoteEmbeddings(), quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
         if (run != null) hashtagSuggestions.setPinned(run.getSuggestedTag());
         if (savedInstanceState != null) {
             List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
@@ -404,8 +405,9 @@ public class AddEditActivity extends AppCompatActivity {
         setTitle("Edit quote");
         if (run == null) return;
         List<Quote> quotes = quoteCollection.getCurrentList();
+        Map<Integer, float[]> vectors = MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes);
         runFitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes);
+            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
             int left = run.remaining(quotes, model);
             main.post(() -> {
                 if (!isDestroyed()) setTitleLeft(left);
@@ -480,8 +482,9 @@ public class AddEditActivity extends AppCompatActivity {
      */
     private void withNextQuote(BiConsumer<Quote, Integer> action) {
         List<Quote> quotes = quoteCollection.getCurrentList();
+        Map<Integer, float[]> vectors = MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes);
         runFitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes);
+            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
             Quote next = run.next(quotes, model);
             int left = run.remaining(quotes, model);
             main.post(() -> {

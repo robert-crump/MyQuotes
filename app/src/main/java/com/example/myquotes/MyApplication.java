@@ -2,20 +2,27 @@ package com.example.myquotes;
 
 import android.app.Application;
 import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.example.myquotes.backup.LocalBackup;
 import com.example.myquotes.drive.DriveBackup;
+import com.example.myquotes.embedding.AssetEmbedder;
+import com.example.myquotes.embedding.TextEmbeddingModel;
 import com.example.myquotes.notifications.QuoteNotifications;
 
+import java.io.File;
 import java.util.Random;
+import java.util.concurrent.Executors;
 
 public class MyApplication extends Application {
     private static MyApplication instance;
     private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
     private Hashtags hashtags;
+    private QuoteEmbeddings quoteEmbeddings;
     private Random shuffleRandom = new Random();
 
     private static final String PREFS_NAME = "AppSettings";
@@ -31,6 +38,15 @@ public class MyApplication extends Application {
         quoteCollection = new QuoteCollection(quoteStore);
         quoteCollection.loadFromStore();
         hashtags = new Hashtags(quoteCollection);
+        Handler main = new Handler(Looper.getMainLooper());
+        // The similar-quotes model chosen in ADR-006.
+        quoteEmbeddings = new QuoteEmbeddings(quoteCollection,
+                new AssetEmbedder(getAssets(), TextEmbeddingModel.PARAPHRASE_MULTILINGUAL_MINILM_L12),
+                new QuoteEmbeddingsFile(new File(getFilesDir(), "quote-embeddings.bin")),
+                Executors.newSingleThreadExecutor(r -> new Thread(() -> {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    r.run();
+                }, "QuoteEmbeddings")), main::post);
         removeLegacyCategoryList();
         QuoteNotifications.initialize(this);
         LocalBackup.initialize(this);
@@ -51,6 +67,10 @@ public class MyApplication extends Application {
 
     public Hashtags getHashtags() {
         return hashtags;
+    }
+
+    public QuoteEmbeddings getQuoteEmbeddings() {
+        return quoteEmbeddings;
     }
 
     // Before #49 the user could keep category names without quotes; tags exist only in use.

@@ -1,6 +1,7 @@
 package com.example.myquotes.embedding;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,14 +18,28 @@ import ai.onnxruntime.OrtSession;
  */
 public final class OnnxEmbedder implements Embedder, AutoCloseable {
 
+    /** Where the model's bytes come from: a file (tests), or a memory-mapped APK asset (the app, #62). */
+    public interface ModelSource {
+        OrtSession open(OrtEnvironment env, OrtSession.SessionOptions options) throws OrtException;
+    }
+
     private final TextEmbeddingModel model;
-    private final File modelFile;
+    private final ModelSource source;
     private final UnigramTokenizer tokenizer;
     private OrtSession session;
 
     public OnnxEmbedder(TextEmbeddingModel model, File modelFile, UnigramTokenizer tokenizer) {
+        this(model, (env, options) -> env.createSession(modelFile.getAbsolutePath(), options), tokenizer);
+    }
+
+    /** {@code modelBytes} is a direct buffer, e.g. the uncompressed asset mapped from the APK. */
+    public OnnxEmbedder(TextEmbeddingModel model, ByteBuffer modelBytes, UnigramTokenizer tokenizer) {
+        this(model, (env, options) -> env.createSession(modelBytes, options), tokenizer);
+    }
+
+    public OnnxEmbedder(TextEmbeddingModel model, ModelSource source, UnigramTokenizer tokenizer) {
         this.model = model;
-        this.modelFile = modelFile;
+        this.source = source;
         this.tokenizer = tokenizer;
     }
 
@@ -91,7 +106,7 @@ public final class OnnxEmbedder implements Embedder, AutoCloseable {
 
     private synchronized OrtSession session() throws OrtException {
         if (session == null) {
-            session = OrtEnvironment.getEnvironment().createSession(modelFile.getAbsolutePath(), new OrtSession.SessionOptions());
+            session = source.open(OrtEnvironment.getEnvironment(), new OrtSession.SessionOptions());
         }
         return session;
     }

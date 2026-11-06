@@ -113,7 +113,11 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
             pendingSelection = savedInstanceState.getStringArrayList(STATE_SELECTED);
         }
         sortByCount = uiPrefs().getBoolean(KEY_SORT_BY_COUNT, false);
-        MyApplication.getInstance().getQuoteCollection().getQuoteList().observe(this, this::countSuggested);
+        QuoteCollection collection = MyApplication.getInstance().getQuoteCollection();
+        collection.getQuoteList().observe(this, this::countSuggested);
+        // Re-count as similar-quotes vectors arrive (#62).
+        MyApplication.getInstance().getQuoteEmbeddings().getChanges()
+                .observe(this, changes -> countSuggested(collection.getQuoteList().getValue()));
         hashtags.getHashtags().observe(this, tags -> {
             submitSorted();
             binding.hashtagsEmpty.setVisibility(tags.isEmpty() ? View.VISIBLE : View.GONE);
@@ -127,9 +131,10 @@ public class HashtagsActivity extends AppCompatActivity implements HashtagSheet.
     /** Counts the quotes with suggestions off the main thread, for the "Has suggestions" entry. */
     private void countSuggested(List<Quote> quotes) {
         if (quotes == null || counter.isShutdown()) return;
+        Map<Integer, float[]> vectors = MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes);
         counter.execute(() -> {
             int count = SuggestionRanking.countWithSuggestions(
-                    SuggestionRanking.suggestionsById(quotes, HashtagSuggester.fit(quotes)));
+                    SuggestionRanking.suggestionsById(quotes, HashtagSuggester.fit(quotes, vectors)));
             runOnUiThread(() -> {
                 if (!isDestroyed()) adapter.setSuggestedCount(count);
             });

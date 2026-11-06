@@ -52,6 +52,23 @@ public class HashtagSuggestionTextTest {
     }
 
     @Test
+    public void explanationWithSimilarQuotesBeforeTheName() {
+        HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Grief",
+                Collections.singletonList(evidence("loss", 4, 6)), null, null, Collections.emptyList(), true,
+                HashtagSuggester.Evidence.similar(4, 10), Arrays.asList(7, 3, 9, 1));
+        assertEquals("loss (4/6 quotes) · similar to 4 of the 10 closest tagged quotes · contains the tag's name",
+                HashtagSuggestionText.explanation(why));
+    }
+
+    @Test
+    public void explanationWithOnlySimilarQuotes() {
+        HashtagSuggester.Explanation why = new HashtagSuggester.Explanation("Grief",
+                Collections.emptyList(), null, null, Collections.emptyList(), false,
+                HashtagSuggester.Evidence.similar(3, 7), Arrays.asList(2, 5, 8));
+        assertEquals("similar to 3 of the 7 closest tagged quotes", HashtagSuggestionText.explanation(why));
+    }
+
+    @Test
     public void aSmallTagSaysWhatItNeeds() {
         HashtagSuggester.TagProfile profile = new HashtagSuggester.TagProfile("AI", 3, false,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());

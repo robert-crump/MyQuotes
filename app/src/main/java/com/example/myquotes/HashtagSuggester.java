@@ -413,14 +413,19 @@ public final class HashtagSuggester {
         this.knn = knn;
     }
 
-    /** Learns from {@code quotes}. For Edit, pass the collection without the quote being edited. */
-    public static HashtagSuggester fit(List<Quote> quotes) {
+    /**
+     * {@link #fit(List, Map)} without vectors (no similar-quotes reason). Tests and the eval only:
+     * the app always passes {@link QuoteEmbeddings}' vectors (#62).
+     */
+    static HashtagSuggester fit(List<Quote> quotes) {
         return fit(quotes, Collections.emptyMap());
     }
 
     /**
-     * {@link #fit(List)} plus the similar-quotes reason: {@code vectors} maps quote ids to normalized
-     * vectors (read only, not copied). Quotes without one are never neighbours.
+     * Learns from {@code quotes}, with the similar-quotes reason: {@code vectors} maps quote ids to
+     * normalized vectors (read only, not copied). Quotes without one are never neighbours; with no
+     * vectors at all the model is the same as before #61. For Edit, pass the collection without the
+     * quote being edited.
      */
     public static HashtagSuggester fit(List<Quote> quotes, Map<Integer, float[]> vectors) {
         return fit(quotes, vectors, Knn.DEFAULT);

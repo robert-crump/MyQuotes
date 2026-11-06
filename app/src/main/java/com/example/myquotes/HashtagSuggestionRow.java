@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,6 +37,9 @@ import java.util.concurrent.Executors;
  * quote. A long-press on a chip explains that one suggestion and offers "Don't suggest for this
  * quote" (#55): the tag joins the form's rejected tags at once ({@link #getRejected}; saved with
  * the quote) and the next-best tag can take its place.
+ * With {@link QuoteEmbeddings} (#62) the model has the similar-quotes reason: it refits when
+ * vectors are added, and the typed text is embedded on its own thread on each refresh; until its
+ * vector arrives the previous text's vector is used.
  */
 final class HashtagSuggestionRow {
     private static final long DEBOUNCE_MILLIS = 300;
@@ -48,8 +52,15 @@ final class HashtagSuggestionRow {
     private final HashtagChipField field;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService fitter = Executors.newSingleThreadExecutor();
+    private final ExecutorService embedder = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::refresh;
     private final QuoteCollection collection;
+    private final QuoteEmbeddings embeddings;
+    // The vector of vectorText, the quote text last embedded; null for none.
+    private float[] textVector;
+    private String vectorText;
+    // The text whose vector is being computed; newer requests make older ones moot.
+    private volatile String embedding;
     private int editedQuoteId;
     private HashtagSuggester model;
     private List<String> shown = Collections.emptyList();
@@ -58,8 +69,9 @@ final class HashtagSuggestionRow {
     private String pinned;
 
     /** {@code editedQuoteId} is left out of the model; -1 when adding. */
-    HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, int editedQuoteId,
-                         EditText author, EditText text, EditText source, HashtagChipField field) {
+    HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, QuoteEmbeddings embeddings,
+                         int editedQuoteId, EditText author, EditText text, EditText source,
+                         HashtagChipField field) {
         row = root.findViewById(R.id.hashtag_suggestions);
         group = root.findViewById(R.id.chip_group_suggestions);
         this.author = author;
@@ -67,6 +79,7 @@ final class HashtagSuggestionRow {
         this.source = source;
         this.field = field;
         this.collection = collection;
+        this.embeddings = embeddings;
         this.editedQuoteId = editedQuoteId;
 
         TextWatcher debounced = new TextWatcher() {
@@ -86,6 +99,7 @@ final class HashtagSuggestionRow {
         root.findViewById(R.id.button_suggestions_info).setOnClickListener(v -> showExplanation());
 
         collection.getQuoteList().observe(owner, this::fit);
+        embeddings.getChanges().observe(owner, changes -> fit(collection.getQuoteList().getValue()));
     }
 
     /** The editor now shows another quote (the tagging run, #53): refits without it. */
@@ -121,8 +135,9 @@ final class HashtagSuggestionRow {
         for (Quote quote : quotes) {
             if (quote.getId() == null || quote.getId() != leftOut) others.add(quote);
         }
+        Map<Integer, float[]> vectors = embeddings.vectorsFor(others);
         fitter.execute(() -> {
-            HashtagSuggester fitted = HashtagSuggester.fit(others);
+            HashtagSuggester fitted = HashtagSuggester.fit(others, vectors);
             main.post(() -> {
                 if (fitter.isShutdown() || leftOut != editedQuoteId) return;
                 model = fitted;
@@ -135,13 +150,43 @@ final class HashtagSuggestionRow {
     void release() {
         main.removeCallbacksAndMessages(null);
         fitter.shutdownNow();
+        embedder.shutdownNow();
+    }
+
+    /**
+     * Brings {@link #textVector} up to the typed quote text: at once from the cache, else embedded on
+     * the embedding thread, which refreshes again when done.
+     */
+    private void updateTextVector() {
+        String current = text.getText().toString();
+        if (current.equals(vectorText) || current.equals(embedding) || embedder.isShutdown()) return;
+        float[] cached = embeddings.cached(current);
+        if (cached != null || current.trim().isEmpty()) {
+            textVector = cached;
+            vectorText = current;
+            embedding = null;
+            return;
+        }
+        embedding = current;
+        embedder.execute(() -> {
+            if (!current.equals(embedding)) return; // typed on meanwhile
+            float[] vector = embeddings.embed(current);
+            main.post(() -> {
+                if (embedder.isShutdown() || !current.equals(embedding)) return;
+                embedding = null;
+                textVector = vector;
+                vectorText = current;
+                refresh();
+            });
+        });
     }
 
     private void refresh() {
         main.removeCallbacks(refresh);
+        updateTextVector();
         List<String> suggestions = model == null ? Collections.emptyList()
                 : model.suggest(text.getText().toString(), author.getText().toString(),
-                        source.getText().toString(), field.getTags(), rejected, pinned);
+                        source.getText().toString(), field.getTags(), rejected, pinned, textVector);
         shown = suggestions;
         group.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(group.getContext());
@@ -161,7 +206,7 @@ final class HashtagSuggestionRow {
 
     private HashtagSuggester.Explanation explain(String tag) {
         return model.explain(text.getText().toString(), author.getText().toString(),
-                source.getText().toString(), field.getTags(), tag);
+                source.getText().toString(), field.getTags(), tag, textVector);
     }
 
     /** One suggestion's reasons, with "Don't suggest for this quote" (#55). */

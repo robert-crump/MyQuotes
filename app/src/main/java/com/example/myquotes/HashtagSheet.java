@@ -83,7 +83,8 @@ public class HashtagSheet extends BottomSheetDialogFragment {
         });
 
         // Read-only after fit, so the counting thread can share it.
-        HashtagSuggester model = HashtagSuggester.fit(quotes);
+        HashtagSuggester model = HashtagSuggester.fit(quotes,
+                MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes));
         TextView suggested = view.findViewById(R.id.sheet_suggested_quotes);
         suggested.setOnClickListener(v -> {
             dismiss();

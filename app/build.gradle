@@ -44,6 +44,10 @@ android {
             }
         }
     }
+    androidResources {
+        // ONNX Runtime memory-maps the model straight from the APK (#62).
+        noCompress 'onnx'
+    }
     buildFeatures {
         viewBinding true
         buildConfig = true
@@ -76,7 +80,7 @@ dependencies {
     implementation 'com.google.android.libraries.identity.googleid:googleid:1.2.0'
     implementation 'com.google.android.gms:play-services-auth:21.6.0'
 
-    // Text embeddings (#60). Not wired into any screen yet.
+    // Text embeddings (#60), for the similar-quotes hashtag reason (#62).
     implementation "com.microsoft.onnxruntime:onnxruntime-android:$onnxRuntimeVersion"
 
     testImplementation 'junit:junit:4.13.2'
@@ -318,5 +322,44 @@ tasks.withType(Test).configureEach {
             logger.warn("ONNX embedding tests will be skipped: $reason")
             systemProperty 'myquotes.onnxSkipReason', reason
         }
+    }
+}
+
+// The similar-quotes model chosen in ADR-006 ships in the APK (#62): its ONNX file and tokenizer go
+// into the assets under embedding/ (the ONNX file uncompressed, see androidResources). Keep in sync
+// with TextEmbeddingModel.PARAPHRASE_MULTILINGUAL_MINILM_L12. The other candidate is not packaged.
+// Offline without the files the APK still builds; the app then suggests without the reason.
+abstract class EmbeddingAssetsTask extends DefaultTask {
+    @InputFiles @PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract ConfigurableFileCollection getModelFiles()
+    @OutputDirectory abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void copy() {
+        File out = new File(outputDir.get().asFile, 'embedding')
+        out.deleteDir()
+        out.mkdirs()
+        modelFiles.files.each { File source ->
+            String name = source.name
+            if (!source.isFile()) {
+                logger.warn("$source is missing; the APK is built without the similar-quotes model.")
+                return
+            }
+            java.nio.file.Files.copy(source.toPath(), new File(out, name).toPath())
+        }
+    }
+}
+
+def embeddingAssets = tasks.register('embeddingAssets', EmbeddingAssetsTask) {
+    dependsOn downloadEmbeddingModels
+    File modelDir = new File(embeddingModelsDir,
+            'paraphrase-multilingual-MiniLM-L12-v2/2c4055b12046f11709e9df2c122e59ffbdc2f900')
+    modelFiles.from(new File(modelDir, 'model_quantized.onnx'), new File(modelDir, 'tokenizer.json'))
+    outputDir.set(layout.buildDirectory.dir('generated/embeddingAssets'))
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.assets.addGeneratedSourceDirectory(embeddingAssets, { it.outputDir })
     }
 }

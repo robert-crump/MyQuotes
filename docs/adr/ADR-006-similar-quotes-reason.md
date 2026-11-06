@@ -1,6 +1,6 @@
 # ADR-006: Similar quotes as a hashtag suggestion reason, with paraphrase-multilingual-MiniLM-L12-v2
 
-**Status:** Accepted (2026-11-06, issue #61; parent #58). App wiring follows in a later slice.
+**Status:** Accepted (2026-11-06, issue #61; parent #58). Wired into the app in #62 (Quote Embeddings).
 
 ## Context
 
@@ -36,7 +36,7 @@ Leave-one-out on the user's backup (451 quotes, 412 tagged, 39 untagged), top 3.
 ## Consequences
 
 - `HashtagSuggester.fit(quotes, vectors)` takes a read-only map from quote id to normalized vector. `fit(quotes)` is the same with no vectors, so existing callers behave exactly as before until the app computes vectors. `suggest(..., vector)` and `explain(..., vector)` take the judged text's vector. `Explanation.similar` and `similarQuoteIds` (most similar first) are there for the UI.
-- The app must store a vector per quote, keyed by `Embedder.modelId()` so a model change invalidates them, and embed the text being edited. That is the next slice.
+- The app must store a vector per quote, keyed by `Embedder.modelId()` so a model change invalidates them, and embed the text being edited. Done in #62 (`QuoteEmbeddings`, the model shipped uncompressed in the APK, +118 MB).
 - Broad tags (#Priorities, #Productivity, #Work) collect most of the doubtful additions. If that grates in use, a per-tag rule is the lever. It was not part of this decision.
 - The eval (`HashtagSuggestionEvalReport.similarQuotesBakeOff`) reruns everything, including the chunking comparison, from cached vectors in `app/build/embedding-cache`.
 

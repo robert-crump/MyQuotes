@@ -14,7 +14,8 @@ final class HashtagSuggestionText {
     static final String INTRO = "The app analyzes each of the quote's words. It searches for the word "
             + "in other quotes and looks at their hashtags, trying to find a pattern. The app also "
             + "suggests hashtags that are often used for the author or the source, hashtags that "
-            + "often appear together with the quote's hashtags, and hashtags whose name is in the quote.";
+            + "often appear together with the quote's hashtags, hashtags of the quotes closest in "
+            + "meaning, and hashtags whose name is in the quote.";
 
     private HashtagSuggestionText() {
     }
@@ -27,7 +28,8 @@ final class HashtagSuggestionText {
 
     /**
      * "gratitude (6/9 quotes), grateful (4/7) · by Rumi (4/5) · from Masnavi (3/4) · with #Death (6/9)
-     * · contains the tag's name"; the dialog's line per tag.
+     * · similar to 4 of the 10 closest tagged quotes · contains the tag's name"; the dialog's line per
+     * tag. Similar quotes are counts, never a similarity score (#62).
      */
     static String explanation(HashtagSuggester.Explanation explanation) {
         List<String> parts = new ArrayList<>();
@@ -50,6 +52,10 @@ final class HashtagSuggestionText {
             }
             String with = "with " + String.join(", ", tags);
             line = line.isEmpty() ? with : line + " · " + with;
+        }
+        if (explanation.similar != null) {
+            String similar = similar(explanation.similar);
+            line = line.isEmpty() ? similar : line + " · " + similar;
         }
         if (explanation.containsName) {
             String name = "contains the tag's name";
@@ -119,6 +125,12 @@ final class HashtagSuggestionText {
             if (!Hashtag.containsIgnoreCase(tags, tag)) parts.add(Hashtag.display(tag));
         }
         return parts.isEmpty() ? null : "Not suggested for this quote: " + String.join(", ", parts);
+    }
+
+    /** "similar to 4 of the 10 closest tagged quotes". */
+    static String similar(HashtagSuggester.Evidence similar) {
+        return "similar to " + similar.withTag + " of the " + similar.total + " closest tagged "
+                + (similar.total == 1 ? "quote" : "quotes");
     }
 
     /** "gratitude (6/9), grateful (4/7)". */
