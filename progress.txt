@@ -1,3 +1,7 @@
+2026-11-07 — Issue #64: Zero-shot hashtag reason: no-go
+
+Spot-check by the user: stem matches 8 of 20 right, meaning matches (bare name, floor 0.40, N=5) 8 of 20 right. Both are below the gate of 10 of 20, so nothing ships (the outcome rule from the grill-me). `ZeroShot.OFF` stays the default and is used only by the eval. The app, CONTEXT.md and QuoteEmbeddings are unchanged. ADR-006 has an addendum with the numbers and where to start a retry (template name, floor 0.50). Issue closed with the numbers.
+
 2026-11-07 — Issue #64: Zero-shot hashtag reason from the tag name: eval (the user's spot-check is pending)
 
 The grill-me decisions are in an issue comment. This step is eval only. The app is unchanged: `HashtagSuggester.ZeroShot.OFF` is the default everywhere, and only the eval switches it on.

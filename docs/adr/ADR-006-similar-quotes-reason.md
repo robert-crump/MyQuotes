@@ -53,3 +53,20 @@ Leave-one-out on the user's backup (451 quotes, 412 tagged, 39 untagged), top 3.
 **Weighted votes** (neighbours weighted by similarity). An unweighted count keeps the evidence in the same "withTag of total" form as every other reason, so it ranks and reads the same with no special case. Weights would need their own threshold and an explanation that isn't a count. The floor already removes weak neighbours. Not measured.
 
 **Chunking long quotes.** Measured, no gain for MiniLM (see Numbers). It would also roughly double the embedding work for long quotes in the app.
+
+## Addendum: zero-shot reason for small tags, measured and rejected (#64, 2026-11-07)
+
+**Question.** Can a tag on 1–4 quotes, below `MIN_QUOTES_PER_TAG`, be suggested from its name alone, so that a new tag finds its older quotes? Two reasons were tried, both ranked below every other reason:
+- **Stem:** the quote contains the tag's name (the existing name match, opened up to small tags).
+- **Meaning:** the quote's MiniLM vector is close to the vector of the tag's name, i.e. cosine ≥ floor and among the N quotes without the tag that are closest to the name. The name was either bare and CamelCase split ("life wisdom") or in a template ("A quote about life wisdom.").
+
+**Gate.** P@3 may drop by at most 5 points against the #61 model, **and** the user judges at least 10 of 20 spot-check items right. The items come from the per-tag "Suggested for" pass, and a missing tag counts as right.
+
+**Numbers** (`HashtagSuggestionEvalReport.zeroShotReason`, 451 quotes; only 35 tag occurrences are on 1–4 other quotes):
+- **P@3:** every one of the 49 variants passes (worst −1.3).
+- **Stem:** top-3 recall for small tags 2.9%. The per-tag pass finds 17% of hidden quotes, with 5% measured precision.
+- **Best meaning variant** (bare, floor 0.40, N=5): P@3 −0.1, top-3 recall for small tags 8.6%. The per-tag pass finds 28.6% of hidden quotes, with a mean size of 2.1 and 13.5% measured precision.
+- **Stem with meaning** was worse than meaning alone in every set.
+- **Spot-check:** stem 8 of 20, meaning 8 of 20. **Both fail** the 10 of 20 bar.
+
+**Decision.** Neither ships. `HashtagSuggester.ZeroShot` stays at `OFF` and is used only by the eval, the same way the `Knn` sweep options are kept, so the measurement can be rerun when the collection has more small tags. The 35-occurrence sample is small, and 8 of 20 is close to the bar. If the reason is retried, start from the template name at floor 0.50, the variant with the highest measured small-tag precision, and spot-check it.
