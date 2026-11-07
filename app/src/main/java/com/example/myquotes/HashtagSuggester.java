@@ -86,6 +86,7 @@ public final class HashtagSuggester {
     // Tuned for paraphrase-multilingual-MiniLM-L12-v2 (ADR-006); another model needs its own floor.
     static final float KNN_MIN_SIMILARITY = 0.40f;
     static final String SIMILAR_LABEL = "similar quotes";
+    static final String MEANING_LABEL = "meaning";
 
     /**
      * The similar-quotes reason's parameters (#61): {@link #DEFAULT} in the app, swept by the eval.
@@ -111,6 +112,63 @@ public final class HashtagSuggester {
         public String toString() {
             return String.format(Locale.ROOT, "k=%d m=%d floor=%.2f%s", k, minWithTag, minSimilarity,
                     belowCounted ? " below" : "");
+        }
+    }
+
+    /**
+     * How a small tag's name is written for the embedder (#64): {@code LifeWisdom} as "life wisdom"
+     * ({@link #BARE}) or "A quote about life wisdom." ({@link #TEMPLATE}).
+     */
+    enum NameText {
+        BARE, TEMPLATE;
+
+        String of(String tag) {
+            String words = splitName(tag);
+            return this == BARE ? words : "A quote about " + words + ".";
+        }
+    }
+
+    /** {@code LifeWisdom} → "life wisdom", {@code AIEthics} → "ai ethics"; underscores and dashes are spaces. */
+    static String splitName(String tag) {
+        return Hashtag.normalize(tag)
+                .replaceAll("([\\p{Ll}\\p{Nd}])(\\p{Lu})", "$1 $2")
+                .replaceAll("(\\p{Lu})(\\p{Lu}\\p{Ll})", "$1 $2")
+                .replaceAll("[_\\-]+", " ")
+                .trim().replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Reasons for small tags (#64), on 1 to {@link #MIN_QUOTES_PER_TAG} − 1 quotes, ranked below
+     * every other reason: {@code stem}, the quote contains the tag's name (as for eligible tags);
+     * {@code meaning}, the quote's vector is close to the name's vector: cosine at least
+     * {@code minSimilarity} and among the {@code topN} collection quotes without the tag closest to
+     * the name. {@link #OFF} in the app until the eval gate passes; swept by the eval.
+     */
+    static final class ZeroShot {
+        static final ZeroShot OFF = new ZeroShot(false, false, 0f, 0);
+
+        final boolean stem;
+        final boolean meaning;
+        final float minSimilarity;
+        final int topN;
+
+        ZeroShot(boolean stem, boolean meaning, float minSimilarity, int topN) {
+            this.stem = stem;
+            this.meaning = meaning;
+            this.minSimilarity = minSimilarity;
+            this.topN = topN;
+        }
+
+        boolean on() {
+            return stem || meaning;
+        }
+
+        @Override
+        public String toString() {
+            if (!meaning) return stem ? "stem" : "off";
+            return String.format(Locale.ROOT, "%sfloor=%.2f N=%d", stem ? "stem+meaning " : "meaning ",
+                    minSimilarity, topN);
         }
     }
 
@@ -174,6 +232,41 @@ public final class HashtagSuggester {
     private final Map<Integer, float[]> vectors;
     private final List<Candidate> candidates;
     private final Knn knn;
+    // Small tags (#64): per key, its spelling and name stems; every quote with a vector (tagged or
+    // not) to rank against a name; per small tag with a name vector, the ranking; the parameters.
+    private final Map<String, SmallTag> smallTags;
+    private final List<Candidate> withVectors;
+    private final Map<String, NameRank> names;
+    private final ZeroShot zeroShot;
+
+    /** A tag on fewer than {@link #MIN_QUOTES_PER_TAG} quotes. */
+    private static final class SmallTag {
+        final String spelling;
+        final Set<String> nameStems;
+
+        SmallTag(String spelling, Set<String> nameStems) {
+            this.spelling = spelling;
+            this.nameStems = nameStems;
+        }
+    }
+
+    /** A small tag's name vector and the cosines of the collection quotes without the tag, highest first. */
+    private static final class NameRank {
+        final float[] vector;
+        final float[] similarities;
+
+        NameRank(float[] vector, float[] similarities) {
+            this.vector = vector;
+            this.similarities = similarities;
+        }
+
+        /** The lowest cosine that is a reason: the floor, or the {@code topN}th quote's, whichever is higher. */
+        float cutoff(ZeroShot zeroShot) {
+            float nth = similarities.length >= zeroShot.topN && zeroShot.topN > 0
+                    ? similarities[zeroShot.topN - 1] : Float.NEGATIVE_INFINITY;
+            return Math.max(zeroShot.minSimilarity, nth);
+        }
+    }
 
     /** A tagged quote with a vector: a possible neighbour. */
     private static final class Candidate {
@@ -218,7 +311,12 @@ public final class HashtagSuggester {
         public final boolean nameMatch;
         /** {@code withTag} of the quote's {@code total} most similar quotes carry the tag (#61). */
         public final boolean similar;
-        // 0: counted, 1: similar quotes ranked below counted reasons, 2: name match.
+        /** The quote is close in meaning to a small tag's name (#64); no counts. */
+        public final boolean meaning;
+        /** For {@link #meaning}: the cosine of the quote and the name; ranks meaning evidence. */
+        final float closeness;
+        // 0: counted, 1: similar quotes ranked below counted reasons, 2: name match,
+        // 3: a small tag's name match, 4: close in meaning to a small tag's name (#64).
         private final int tier;
 
         Evidence(String label, int withTag, int total) {
@@ -226,17 +324,34 @@ public final class HashtagSuggester {
         }
 
         private Evidence(String label, int withTag, int total, boolean nameMatch, boolean similar, int tier) {
+            this(label, withTag, total, nameMatch, similar, false, 0f, tier);
+        }
+
+        private Evidence(String label, int withTag, int total, boolean nameMatch, boolean similar, boolean meaning,
+                         float closeness, int tier) {
             this.label = label;
             this.withTag = withTag;
             this.total = total;
             this.nameMatch = nameMatch;
             this.similar = similar;
+            this.meaning = meaning;
+            this.closeness = closeness;
             this.tier = tier;
         }
 
         /** The quote contains the tag's name, as the word stem {@code stem}. */
         static Evidence nameMatch(String stem) {
             return new Evidence(stem, 0, 0, true, false, 2);
+        }
+
+        /** The quote contains a small tag's name (#64), as the word stem {@code stem}. */
+        static Evidence smallNameMatch(String stem) {
+            return new Evidence(stem, 0, 0, true, false, 3);
+        }
+
+        /** The quote is close in meaning to a small tag's name (#64), at cosine {@code closeness}. */
+        static Evidence meaning(float closeness) {
+            return new Evidence(MEANING_LABEL, 0, 0, false, false, true, closeness, 4);
         }
 
         /** {@code withTag} of the quote's {@code total} neighbours carry the tag. */
@@ -253,27 +368,31 @@ public final class HashtagSuggester {
             if (!(o instanceof Evidence)) return false;
             Evidence other = (Evidence) o;
             return label.equals(other.label) && withTag == other.withTag && total == other.total
-                    && nameMatch == other.nameMatch && similar == other.similar && tier == other.tier;
+                    && nameMatch == other.nameMatch && similar == other.similar && meaning == other.meaning
+                    && Float.compare(closeness, other.closeness) == 0 && tier == other.tier;
         }
 
         @Override
         public int hashCode() {
-            return ((((label.hashCode() * 31 + withTag) * 31 + total) * 31 + (nameMatch ? 1 : 0)) * 31
-                    + (similar ? 1 : 0)) * 31 + tier;
+            return ((((((label.hashCode() * 31 + withTag) * 31 + total) * 31 + (nameMatch ? 1 : 0)) * 31
+                    + (similar ? 1 : 0)) * 31 + (meaning ? 1 : 0)) * 31 + Float.hashCode(closeness)) * 31 + tier;
         }
 
         @Override
         public String toString() {
+            if (meaning) return String.format(Locale.ROOT, "%s %.2f", label, closeness);
             return nameMatch ? label + " (name)" : label + " " + withTag + "/" + total;
         }
     }
 
     /**
      * Counted evidence before a name match (and before similar quotes ranked below counted
-     * reasons); then higher share first, then higher count; equal strength is 0.
+     * reasons), then a small tag's name match, then closeness in meaning to a small tag's name
+     * (#64, higher cosine first); otherwise higher share first, then higher count; equal strength is 0.
      */
     static int byStrength(Evidence a, Evidence b) {
         if (a.tier != b.tier) return a.tier - b.tier;
+        if (a.meaning) return Float.compare(b.closeness, a.closeness);
         int byShare = Long.compare((long) b.withTag * a.total, (long) a.withTag * b.total);
         return byShare != 0 ? byShare : b.withTag - a.withTag;
     }
@@ -397,10 +516,14 @@ public final class HashtagSuggester {
         candidates = new ArrayList<>();
         this.vectors = vectors;
         this.knn = knn;
+        smallTags = new HashMap<>();
+        withVectors = new ArrayList<>();
+        names = Collections.emptyMap();
+        zeroShot = ZeroShot.OFF;
     }
 
-    /** {@code fitted}'s counts, shared, with other similar-quotes parameters. */
-    private HashtagSuggester(HashtagSuggester fitted, Knn knn) {
+    /** {@code fitted}'s counts, shared, with other similar-quotes and small-tag parameters. */
+    private HashtagSuggester(HashtagSuggester fitted, Knn knn, Map<String, NameRank> names, ZeroShot zeroShot) {
         tokenCounts = fitted.tokenCounts;
         tags = fitted.tags;
         tagQuotes = fitted.tagQuotes;
@@ -411,6 +534,10 @@ public final class HashtagSuggester {
         candidates = fitted.candidates;
         vectors = fitted.vectors;
         this.knn = knn;
+        smallTags = fitted.smallTags;
+        withVectors = fitted.withVectors;
+        this.names = names;
+        this.zeroShot = zeroShot;
     }
 
     /**
@@ -450,10 +577,12 @@ public final class HashtagSuggester {
                 all.computeIfAbsent(Hashtag.key(tag), k -> new TagStats(tag)).quotes++;
             }
             float[] vector = quote.getId() == null ? null : vectors.get(quote.getId());
-            if (vector != null && !quote.getTags().isEmpty()) {
+            if (vector != null) {
                 Set<String> keys = new HashSet<>();
                 for (String tag : quote.getTags()) keys.add(Hashtag.key(tag));
-                model.candidates.add(new Candidate(quote.getId(), vector, keys));
+                Candidate candidate = new Candidate(quote.getId(), vector, keys);
+                model.withVectors.add(candidate);
+                if (!keys.isEmpty()) model.candidates.add(candidate);
             }
         }
         for (Map.Entry<String, TagStats> entry : all.entrySet()) {
@@ -462,6 +591,9 @@ public final class HashtagSuggester {
             if (entry.getValue().quotes >= MIN_QUOTES_PER_TAG) {
                 model.tags.put(entry.getKey(), entry.getValue());
                 entry.getValue().nameStems.addAll(nameStems(entry.getKey()));
+            } else {
+                model.smallTags.put(entry.getKey(),
+                        new SmallTag(entry.getValue().spelling, nameStems(entry.getKey())));
             }
         }
         for (int i = 0; i < quotes.size(); i++) {
@@ -476,7 +608,61 @@ public final class HashtagSuggester {
 
     /** This model with other similar-quotes parameters, sharing the fitted counts (the eval's sweep). */
     HashtagSuggester withKnn(Knn knn) {
-        return new HashtagSuggester(this, knn);
+        return new HashtagSuggester(this, knn, names, zeroShot);
+    }
+
+    /**
+     * This model with the small tags' name vectors (#64): {@code nameVectors} maps tag keys to the
+     * normalized vector of the tag's name text ({@link NameText}); tags without one have no meaning
+     * reason. Ranks every quote with a vector and without the tag against each name, once.
+     */
+    HashtagSuggester withNames(Map<String, float[]> nameVectors) {
+        Map<String, NameRank> ranks = new HashMap<>();
+        for (String key : smallTags.keySet()) {
+            float[] name = nameVectors.get(key);
+            if (name == null) continue;
+            float[] similarities = new float[withVectors.size()];
+            int n = 0;
+            for (Candidate quote : withVectors) {
+                if (!quote.tagKeys.contains(key)) similarities[n++] = dot(name, quote.vector);
+            }
+            similarities = Arrays.copyOf(similarities, n);
+            Arrays.sort(similarities);
+            for (int i = 0, j = n - 1; i < j; i++, j--) {
+                float swap = similarities[i];
+                similarities[i] = similarities[j];
+                similarities[j] = swap;
+            }
+            ranks.put(key, new NameRank(name, similarities));
+        }
+        return new HashtagSuggester(this, knn, ranks, zeroShot);
+    }
+
+    /** This model with other small-tag parameters (#64), sharing everything else (the eval's sweep). */
+    HashtagSuggester withZeroShot(ZeroShot zeroShot) {
+        return new HashtagSuggester(this, knn, names, zeroShot);
+    }
+
+    /**
+     * The small tag {@code key} for a quote with {@code tokens} and {@code vector} (null: none):
+     * its name in the quote, else closeness to its name; null when neither is a reason (#64).
+     */
+    private Suggestion smallSuggestion(String key, SmallTag small, Set<String> tokens, float[] vector) {
+        if (zeroShot.stem) {
+            for (String token : tokens) {
+                if (small.nameStems.contains(token)) return new Suggestion(small.spelling, Evidence.smallNameMatch(token));
+            }
+        }
+        if (zeroShot.meaning && vector != null) {
+            NameRank rank = names.get(key);
+            if (rank != null) {
+                float closeness = dot(vector, rank.vector);
+                if (closeness >= rank.cutoff(zeroShot)) {
+                    return new Suggestion(small.spelling, Evidence.meaning(closeness));
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -550,7 +736,7 @@ public final class HashtagSuggester {
         Set<String> tokens = tokens(text, author, source);
         addTagTokens(tokens, existingTags);
         List<String> tags = new ArrayList<>();
-        for (Suggestion suggestion : suggestions(tokens, neighbours(vector, null),
+        for (Suggestion suggestion : suggestions(tokens, neighbours(vector, null), vector,
                 excluded(existingTags, rejectedTags), 0, pinned)) {
             tags.add(suggestion.tag);
         }
@@ -567,8 +753,12 @@ public final class HashtagSuggester {
     public List<Suggestion> suggestionsFor(Quote quote) {
         Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
         addTagTokens(tokens, quote.getTags());
-        return suggestions(tokens, neighboursOf(quote), excluded(quote.getTags(), quote.getRejectedTags()), 1,
-                null);
+        return suggestions(tokens, neighboursOf(quote), vectorOf(quote),
+                excluded(quote.getTags(), quote.getRejectedTags()), 1, null);
+    }
+
+    private float[] vectorOf(Quote quote) {
+        return quote.getId() == null ? null : vectors.get(quote.getId());
     }
 
     /**
@@ -580,8 +770,11 @@ public final class HashtagSuggester {
     public Suggestion suggestionFor(Quote quote, String tag) {
         String key = Hashtag.key(Hashtag.normalize(tag));
         TagStats stats = tags.get(key);
-        if (stats == null || excluded(quote.getTags(), quote.getRejectedTags()).contains(key)) return null;
+        SmallTag small = zeroShot.on() ? smallTags.get(key) : null;
+        if ((stats == null && small == null)
+                || excluded(quote.getTags(), quote.getRejectedTags()).contains(key)) return null;
         Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
+        if (small != null) return smallSuggestion(key, small, tokens, vectorOf(quote));
         addTagTokens(tokens, quote.getTags());
         return suggestion(key, stats, tokens, neighboursOf(quote), 1);
     }
@@ -606,13 +799,20 @@ public final class HashtagSuggester {
      * The best tags for {@code tokens}, none of {@code excluded}, with {@code self} quotes left out
      * of each token's count.
      */
-    private List<Suggestion> suggestions(Set<String> tokens, Neighbours neighbours, Set<String> excluded, int self,
-                                         String pinned) {
+    private List<Suggestion> suggestions(Set<String> tokens, Neighbours neighbours, float[] vector,
+                                         Set<String> excluded, int self, String pinned) {
         List<Suggestion> ranked = new ArrayList<>();
         for (Map.Entry<String, TagStats> entry : tags.entrySet()) {
             if (excluded.contains(entry.getKey())) continue;
             Suggestion suggestion = suggestion(entry.getKey(), entry.getValue(), tokens, neighbours, self);
             if (suggestion != null) ranked.add(suggestion);
+        }
+        if (zeroShot.on()) {
+            for (Map.Entry<String, SmallTag> entry : smallTags.entrySet()) {
+                if (excluded.contains(entry.getKey())) continue;
+                Suggestion suggestion = smallSuggestion(entry.getKey(), entry.getValue(), tokens, vector);
+                if (suggestion != null) ranked.add(suggestion);
+            }
         }
         ranked.sort((a, b) -> {
             int byStrength = byStrength(a.strongest, b.strongest);

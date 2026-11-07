@@ -71,6 +71,23 @@ final class HashtagSuggestionEval {
         int eligibleHits;
         /** By tag key, sorted. */
         final Map<String, TagResult> perTag = new TreeMap<>();
+        /**
+         * #64: the quotes' tags by bucket of the tag's count on the other quotes ({@link #bucket}),
+         * and how many of them were suggested.
+         */
+        final int[] bucketTags = new int[BUCKETS.length];
+        final int[] bucketHits = new int[BUCKETS.length];
+        /** Suggestions of small tags (on 1–4 other quotes) and how many the quote has. */
+        int smallSuggested;
+        int smallHits;
+
+        double recallInBucket(int bucket) {
+            return ratio(bucketHits[bucket], bucketTags[bucket]);
+        }
+
+        double smallPrecision() {
+            return ratio(smallHits, smallSuggested);
+        }
 
         double precision() {
             return ratio(hits, suggested);
@@ -91,6 +108,16 @@ final class HashtagSuggestionEval {
         double coverageUntagged() {
             return ratio(untaggedCovered, untaggedQuotes);
         }
+    }
+
+    /** #64: tag-size buckets by the tag's count on the other quotes. */
+    static final String[] BUCKETS = {"0", "1-4", "5-9", "10+"};
+    static final int SMALL = 1;
+
+    static int bucket(int onOtherQuotes) {
+        if (onOtherQuotes <= 0) return 0;
+        if (onOtherQuotes < HashtagSuggester.MIN_QUOTES_PER_TAG) return SMALL;
+        return onOtherQuotes < 10 ? 2 : 3;
     }
 
     private HashtagSuggestionEval() {
@@ -122,6 +149,7 @@ final class HashtagSuggestionEval {
                 TagResult tagResult = tagResult(result, key, tag);
                 tagResult.quotes++;
                 result.tags++;
+                result.bucketTags[bucket(quotesPerTag.get(key) - 1)]++;
                 if (quotesPerTag.get(key) - 1 >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
                     tagResult.eligible++;
                     result.eligibleTags++;
@@ -134,9 +162,14 @@ final class HashtagSuggestionEval {
                 TagResult tagResult = tagResult(result, key, tag);
                 tagResult.suggested++;
                 result.suggested++;
+                int others = quotesPerTag.getOrDefault(key, 0) - (actual.contains(key) ? 1 : 0);
+                boolean small = bucket(others) == SMALL;
+                if (small) result.smallSuggested++;
                 if (!actual.contains(key)) continue;
                 tagResult.hits++;
                 result.hits++;
+                result.bucketHits[bucket(others)]++;
+                if (small) result.smallHits++;
                 if (quotesPerTag.get(key) - 1 >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
                     tagResult.eligibleHits++;
                     result.eligibleHits++;
@@ -196,6 +229,180 @@ final class HashtagSuggestionEval {
             }
         }
         return sweep;
+    }
+
+    /** #64: one small-tag variant, the name text its name vectors come from and its parameters. */
+    static final class ZeroShotConfig {
+        final HashtagSuggester.NameText text;
+        final HashtagSuggester.ZeroShot zeroShot;
+
+        ZeroShotConfig(HashtagSuggester.NameText text, HashtagSuggester.ZeroShot zeroShot) {
+            this.text = text;
+            this.zeroShot = zeroShot;
+        }
+
+        @Override
+        public String toString() {
+            return zeroShot.meaning ? text.name().toLowerCase(Locale.ROOT) + " " + zeroShot : zeroShot.toString();
+        }
+    }
+
+    /**
+     * Suggestions from one leave-one-out pass (#64): the #61 model with the quote's vector
+     * ({@link Sweep#baseline}) and each small-tag variant on top of it. {@code nameVectors} maps
+     * each name text to tag key → vector.
+     */
+    static Map<ZeroShotConfig, Map<Quote, List<String>>> zeroShotSweep(List<Quote> quotes,
+            Map<Integer, float[]> vectors, Map<HashtagSuggester.NameText, Map<String, float[]>> nameVectors,
+            List<ZeroShotConfig> configs, Map<Quote, List<String>> baselineOut) {
+        Map<ZeroShotConfig, Map<Quote, List<String>>> out = new LinkedHashMap<>();
+        for (ZeroShotConfig config : configs) out.put(config, new IdentityHashMap<>());
+        for (Quote quote : quotes) {
+            HashtagSuggester fitted = HashtagSuggester.fit(without(quotes, quote), vectors);
+            float[] vector = quote.getId() == null ? null : vectors.get(quote.getId());
+            baselineOut.put(quote, suggestAsNew(fitted, quote, vector));
+            Map<HashtagSuggester.NameText, HashtagSuggester> named = new HashMap<>();
+            for (ZeroShotConfig config : configs) {
+                HashtagSuggester model = named.computeIfAbsent(config.text,
+                        text -> fitted.withNames(nameVectors.get(text)));
+                out.get(config).put(quote, suggestAsNew(model.withZeroShot(config.zeroShot), quote, vector));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * #64, the per-tag "Suggested for" pass: for each quote q and each of its tags t that is small
+     * without q (on 1–4 other quotes), t is hidden on q (q stays in the collection, as an older
+     * quote the user hasn't tagged yet), the model is fitted, and t's pass is every quote
+     * {@link HashtagSuggester#suggestionFor} gives t for. A hit is q in the pass. Precision counts only
+     * q as right, so it understates (the spot-check judges the rest).
+     */
+    static final class PassResult {
+        /** Hidden (quote, tag) pairs, and those found in the tag's pass. */
+        int hidden;
+        int found;
+        /** Sum of the passes' sizes, and passes that were not empty. */
+        int passQuotes;
+        int nonEmpty;
+        /** Every pass member that isn't the hidden quote, for the spot-check. */
+        final List<PassMember> others = new ArrayList<>();
+
+        double recall() {
+            return ratio(found, hidden);
+        }
+
+        double precision() {
+            return ratio(found, passQuotes);
+        }
+
+        double meanSize() {
+            return ratio(passQuotes, hidden);
+        }
+    }
+
+    /** A quote in a small tag's pass that doesn't have the tag, with the reason. */
+    static final class PassMember {
+        final Quote quote;
+        final String tag;
+        final HashtagSuggester.Evidence evidence;
+
+        PassMember(Quote quote, String tag, HashtagSuggester.Evidence evidence) {
+            this.quote = quote;
+            this.tag = tag;
+            this.evidence = evidence;
+        }
+    }
+
+    static Map<ZeroShotConfig, PassResult> tagPasses(List<Quote> quotes, Map<Integer, float[]> vectors,
+            Map<HashtagSuggester.NameText, Map<String, float[]>> nameVectors, List<ZeroShotConfig> configs) {
+        Map<String, Integer> quotesPerTag = new HashMap<>();
+        for (Quote quote : quotes) {
+            for (String tag : quote.getTags()) quotesPerTag.merge(Hashtag.key(tag), 1, Integer::sum);
+        }
+        Map<ZeroShotConfig, PassResult> out = new LinkedHashMap<>();
+        for (ZeroShotConfig config : configs) out.put(config, new PassResult());
+        for (int i = 0; i < quotes.size(); i++) {
+            Quote quote = quotes.get(i);
+            for (String tag : quote.getTags()) {
+                if (bucket(quotesPerTag.get(Hashtag.key(tag)) - 1) != SMALL) continue;
+                List<Quote> hiddenOn = new ArrayList<>(quotes);
+                Quote copy = withoutTag(quote, tag);
+                hiddenOn.set(i, copy);
+                HashtagSuggester fitted = HashtagSuggester.fit(hiddenOn, vectors);
+                Map<HashtagSuggester.NameText, HashtagSuggester> named = new HashMap<>();
+                for (ZeroShotConfig config : configs) {
+                    HashtagSuggester model = named.computeIfAbsent(config.text,
+                            text -> fitted.withNames(nameVectors.get(text))).withZeroShot(config.zeroShot);
+                    PassResult result = out.get(config);
+                    result.hidden++;
+                    int size = 0;
+                    for (int j = 0; j < hiddenOn.size(); j++) {
+                        HashtagSuggester.Suggestion suggestion = model.suggestionFor(hiddenOn.get(j), tag);
+                        if (suggestion == null) continue;
+                        size++;
+                        if (j == i) {
+                            result.found++;
+                        } else {
+                            result.others.add(new PassMember(quotes.get(j), tag, suggestion.strongest));
+                        }
+                    }
+                    result.passQuotes += size;
+                    if (size > 0) result.nonEmpty++;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** A copy of {@code quote} (same id, text, author, source, rejected tags) without {@code tag}. */
+    static Quote withoutTag(Quote quote, String tag) {
+        Quote copy = new Quote(quote.getId(), quote.getAuthor(), quote.getQuoteText(), quote.getSource());
+        List<String> tags = new ArrayList<>(quote.getTags());
+        tags.removeIf(t -> Hashtag.key(t).equals(Hashtag.key(tag)));
+        copy.setTags(tags);
+        copy.setRejectedTags(quote.getRejectedTags());
+        return copy;
+    }
+
+    /** #64: per bucket recall@3, small-tag precision, and P@3 against the #61 model. */
+    static String formatBuckets(Result baseline, Map<String, Result> results) {
+        StringBuilder out = new StringBuilder();
+        out.append(String.format(Locale.ROOT, "%-36s %7s %7s %8s %8s %8s %8s %13s %7s%n", "", "P@3", "dP",
+                "R[1-4]", "R[5-9]", "R[10+]", "covUnt", "small P (n)", "dP<=5"));
+        out.append(bucketLine("#61 model (baseline)", baseline, baseline));
+        for (Map.Entry<String, Result> entry : results.entrySet()) {
+            out.append(bucketLine(entry.getKey(), baseline, entry.getValue()));
+        }
+        out.append(String.format(Locale.ROOT, "Tags per bucket (by count on the other quotes): 0: %d, 1-4: %d, "
+                        + "5-9: %d, 10+: %d%n", baseline.bucketTags[0], baseline.bucketTags[1], baseline.bucketTags[2],
+                baseline.bucketTags[3]));
+        return out.toString();
+    }
+
+    private static String bucketLine(String label, Result baseline, Result result) {
+        double dP = result.precision() - baseline.precision();
+        return String.format(Locale.ROOT, "%-36s %7s %7s %8s %8s %8s %8s %13s %7s%n", label,
+                percent(result.precision()), points(dP), percent(result.recallInBucket(1)),
+                percent(result.recallInBucket(2)), percent(result.recallInBucket(3)),
+                percent(result.coverageUntagged()),
+                percent(result.smallPrecision()) + " (" + result.smallSuggested + ")",
+                result == baseline ? "" : dP >= -0.05 - 1e-9 ? "ok" : "FAIL");
+    }
+
+    /** #64: the per-tag passes, one line per variant. */
+    static String formatPasses(Map<String, PassResult> results) {
+        StringBuilder out = new StringBuilder();
+        out.append(String.format(Locale.ROOT, "%-36s %8s %10s %10s %10s%n", "", "recall", "precision",
+                "mean size", "non-empty"));
+        for (Map.Entry<String, PassResult> entry : results.entrySet()) {
+            PassResult r = entry.getValue();
+            out.append(String.format(Locale.ROOT, "%-36s %8s %10s %10s %6d/%-4d%n", entry.getKey(),
+                    percent(r.recall()), percent(r.precision()),
+                    Double.isNaN(r.meanSize()) ? "-" : String.format(Locale.ROOT, "%.1f", r.meanSize()),
+                    r.nonEmpty, r.hidden));
+        }
+        return out.toString();
     }
 
     static List<Quote> without(List<Quote> quotes, Quote quote) {

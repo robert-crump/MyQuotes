@@ -146,6 +146,206 @@ public class HashtagSuggestionEvalReport {
         write(new File("build/reports/hashtag-eval-knn.txt"), report.toString());
     }
 
+    /**
+     * The zero-shot reason for small tags (#64), on top of the #61 model (MiniLM, decided k/m/floor):
+     * per tag-size bucket, recall@3 and P@3 against it; the per-tag "Suggested for" passes; and two
+     * spot-check lists (20 stem matches, 20 meaning matches of the best variant) that go to
+     * {@code build/reports/hashtag-spotcheck-zeroshot.txt} only (quote text, gitignored). Numbers go to
+     * {@code build/reports/hashtag-eval-zeroshot.txt}.
+     */
+    @Test
+    public void zeroShotReason() throws Exception {
+        File backup = backupFile();
+        assumeTrue("No private backup at " + backup.getAbsolutePath() + "; eval skipped", backup.isFile());
+        List<Quote> quotes = BackupDocument.decode(
+                new String(Files.readAllBytes(backup.toPath()), StandardCharsets.UTF_8)).quotes;
+        TextEmbeddingModel model = TextEmbeddingModel.PARAPHRASE_MULTILINGUAL_MINILM_L12;
+        File cache = new File("build/embedding-cache");
+        Map<Integer, float[]> vectors = QuoteVectors.load(model, quotes, cache);
+
+        Map<String, String> spellings = new java.util.TreeMap<>();
+        for (Quote quote : quotes) {
+            for (String tag : quote.getTags()) spellings.putIfAbsent(Hashtag.key(tag), tag);
+        }
+        Map<HashtagSuggester.NameText, Map<String, float[]>> nameVectors = new java.util.EnumMap<>(
+                HashtagSuggester.NameText.class);
+        for (HashtagSuggester.NameText text : HashtagSuggester.NameText.values()) {
+            List<String> texts = new ArrayList<>();
+            for (String spelling : spellings.values()) texts.add(text.of(spelling));
+            Map<String, float[]> byText = QuoteVectors.loadTexts(model, texts, cache);
+            Map<String, float[]> byKey = new HashMap<>();
+            for (Map.Entry<String, String> entry : spellings.entrySet()) {
+                byKey.put(entry.getKey(), byText.get(text.of(entry.getValue())));
+            }
+            nameVectors.put(text, byKey);
+        }
+
+        StringBuilder report = new StringBuilder("Zero-shot reason for small tags (#64), " + model.id()
+                + ", leave-one-out, " + quotes.size() + " quotes\n");
+        for (HashtagSuggester.NameText text : HashtagSuggester.NameText.values()) {
+            report.append(String.format(Locale.ROOT, "Name-to-quote cosine, %s (e.g. \"%s\"): %s%n",
+                    text.name().toLowerCase(Locale.ROOT), text.of("LifeWisdom"),
+                    nameStats(quotes, vectors, nameVectors.get(text))));
+        }
+
+        List<HashtagSuggestionEval.ZeroShotConfig> configs = zeroShotConfigs();
+        long start = System.nanoTime();
+        Map<Quote, List<String>> baselineSuggestions = new java.util.IdentityHashMap<>();
+        Map<HashtagSuggestionEval.ZeroShotConfig, Map<Quote, List<String>>> sweep =
+                HashtagSuggestionEval.zeroShotSweep(quotes, vectors, nameVectors, configs, baselineSuggestions);
+        HashtagSuggestionEval.Result baseline = HashtagSuggestionEval.evaluate(quotes, baselineSuggestions::get);
+        Map<HashtagSuggestionEval.ZeroShotConfig, HashtagSuggestionEval.Result> results = new LinkedHashMap<>();
+        for (HashtagSuggestionEval.ZeroShotConfig config : configs) {
+            results.put(config, HashtagSuggestionEval.evaluate(quotes, sweep.get(config)::get));
+        }
+        long sweepMillis = (System.nanoTime() - start) / 1_000_000;
+        start = System.nanoTime();
+        Map<HashtagSuggestionEval.ZeroShotConfig, HashtagSuggestionEval.PassResult> passes =
+                HashtagSuggestionEval.tagPasses(quotes, vectors, nameVectors, configs);
+        long passMillis = (System.nanoTime() - start) / 1_000_000;
+        report.append(String.format(Locale.ROOT, "Top-3 sweep: %d ms; per-tag passes: %d ms; %d variants%n",
+                sweepMillis, passMillis, configs.size()));
+
+        report.append("\nTop 3 per quote (editor), recall by the tag's count on the other quotes:\n");
+        Map<String, HashtagSuggestionEval.Result> rows = new LinkedHashMap<>();
+        for (HashtagSuggestionEval.ZeroShotConfig config : configs) rows.put(config.toString(), results.get(config));
+        report.append(HashtagSuggestionEval.formatBuckets(baseline, rows));
+
+        report.append("\nPer-tag \"Suggested for\" pass, small tags (one of its quotes hidden; precision counts "
+                + "only that quote as right):\n");
+        Map<String, HashtagSuggestionEval.PassResult> passRows = new LinkedHashMap<>();
+        for (HashtagSuggestionEval.ZeroShotConfig config : configs) passRows.put(config.toString(), passes.get(config));
+        report.append(HashtagSuggestionEval.formatPasses(passRows));
+
+        HashtagSuggestionEval.ZeroShotConfig stem = configs.get(0);
+        HashtagSuggestionEval.ZeroShotConfig best = null;
+        for (HashtagSuggestionEval.ZeroShotConfig config : configs) {
+            if (!config.zeroShot.meaning) continue;
+            if (results.get(config).precision() - baseline.precision() < -0.05 - 1e-9) continue;
+            if (best == null || passScore(passes.get(config)) > passScore(passes.get(best))) best = config;
+        }
+        report.append("\nBest meaning variant passing the P@3 guard (by F1 of the pass): ")
+                .append(best == null ? "none" : best.toString()).append('\n');
+        if (best != null) {
+            HashtagSuggestionEval.ZeroShotConfig other = null;
+            for (HashtagSuggestionEval.ZeroShotConfig config : configs) {
+                if (config.zeroShot.meaning && config.zeroShot.stem != best.zeroShot.stem && config.text == best.text
+                        && config.zeroShot.minSimilarity == best.zeroShot.minSimilarity
+                        && config.zeroShot.topN == best.zeroShot.topN) {
+                    other = config;
+                }
+            }
+            report.append("Same parameters, ").append(best.zeroShot.stem ? "meaning only: " : "with the stem: ")
+                    .append(other).append('\n');
+            report.append("\nPer-tag changes (top 3), ").append(best).append(":\n");
+            report.append(HashtagSuggestionEval.formatTagDeltas(baseline, results.get(best)));
+        }
+
+        StringBuilder spot = new StringBuilder("Spot-check (#64): " + model.id() + "\n"
+                + "Quotes in a small tag's \"Suggested for\" pass that don't have the tag (found while one of the "
+                + "tag's quotes was hidden). For each: would you want this tag on the quote? (yes / no / maybe)\n"
+                + "Gate: at least 10 of 20 yes, per list.\nPRIVATE: contains quote text. Never commit.\n");
+        spot.append("\n=== A. Stem: the quote contains the small tag's name (").append(stem).append(") ===\n");
+        spot.append(spotList(quotes, passes.get(stem).others, false));
+        if (best != null) {
+            spot.append("\n=== B. Meaning: close to the small tag's name (").append(best).append(") ===\n");
+            spot.append(spotList(quotes, passes.get(best).others, true));
+        }
+        write(new File("build/reports/hashtag-spotcheck-zeroshot.txt"), spot.toString());
+
+        System.out.println(report);
+        write(new File("build/reports/hashtag-eval-zeroshot.txt"), report.toString());
+    }
+
+    /** Stem only, then name text × floor × N, meaning only and with the stem. */
+    private static List<HashtagSuggestionEval.ZeroShotConfig> zeroShotConfigs() {
+        List<HashtagSuggestionEval.ZeroShotConfig> configs = new ArrayList<>();
+        configs.add(new HashtagSuggestionEval.ZeroShotConfig(HashtagSuggester.NameText.BARE,
+                new HashtagSuggester.ZeroShot(true, false, 0f, 0)));
+        for (boolean withStem : new boolean[]{false, true}) {
+            for (HashtagSuggester.NameText text : HashtagSuggester.NameText.values()) {
+                for (float floor : ZERO_SHOT_FLOORS) {
+                    for (int n : new int[]{5, 10, 20}) {
+                        configs.add(new HashtagSuggestionEval.ZeroShotConfig(text,
+                                new HashtagSuggester.ZeroShot(withStem, true, floor, n)));
+                    }
+                }
+            }
+        }
+        return configs;
+    }
+
+    private static final float[] ZERO_SHOT_FLOORS = {0f, 0.30f, 0.40f, 0.45f, 0.50f};
+
+    /** F1 of the pass's recall and (understated) precision. */
+    private static double passScore(HashtagSuggestionEval.PassResult pass) {
+        double r = pass.recall();
+        double p = pass.precision();
+        return Double.isNaN(r) || Double.isNaN(p) || r + p == 0 ? 0 : 2 * r * p / (r + p);
+    }
+
+    /** Percentiles of each tag name's cosine to its closest and 10th closest quote, and to all quotes. */
+    private static String nameStats(List<Quote> quotes, Map<Integer, float[]> vectors, Map<String, float[]> names) {
+        List<Float> first = new ArrayList<>();
+        List<Float> tenth = new ArrayList<>();
+        List<Float> all = new ArrayList<>();
+        for (float[] name : names.values()) {
+            List<Float> sims = new ArrayList<>();
+            for (Quote quote : quotes) {
+                float[] v = vectors.get(quote.getId());
+                if (v == null) continue;
+                float dot = 0;
+                for (int i = 0; i < v.length; i++) dot += v[i] * name[i];
+                sims.add(dot);
+            }
+            all.addAll(sims);
+            sims.sort(Collections.reverseOrder());
+            first.add(sims.get(0));
+            tenth.add(sims.get(Math.min(9, sims.size() - 1)));
+        }
+        return "closest " + percentiles(first) + "; 10th closest " + percentiles(tenth) + "; all "
+                + percentiles(all);
+    }
+
+    /** 20 random pass members (fixed seed, one per quote and tag) of the wanted kind, with the tag's own quotes. */
+    private static String spotList(List<Quote> quotes, List<HashtagSuggestionEval.PassMember> members,
+                                   boolean meaning) {
+        Map<String, HashtagSuggestionEval.PassMember> unique = new LinkedHashMap<>();
+        for (HashtagSuggestionEval.PassMember member : members) {
+            if (member.evidence.meaning != meaning) continue;
+            unique.putIfAbsent(member.quote.getId() + "|" + Hashtag.key(member.tag), member);
+        }
+        List<HashtagSuggestionEval.PassMember> sample = new ArrayList<>(unique.values());
+        Collections.shuffle(sample, new Random(64));
+        sample = sample.subList(0, Math.min(20, sample.size()));
+        StringBuilder out = new StringBuilder(String.format(Locale.ROOT, "(%d distinct candidates)%n", unique.size()));
+        int n = 0;
+        for (HashtagSuggestionEval.PassMember member : sample) {
+            Quote quote = member.quote;
+            out.append(String.format(Locale.ROOT, "%n%2d. \"%s\" (%s)%n", ++n, start(quote.getQuoteText(), 110),
+                    quote.getAuthor()));
+            out.append("    has: ").append(quote.getTags().isEmpty() ? "(no hashtags)" : tags(quote.getTags()))
+                    .append('\n');
+            out.append("    adds: ").append(Hashtag.display(member.tag)).append("   (")
+                    .append(member.evidence.meaning ? String.format(Locale.ROOT, "cosine %.2f", member.evidence.closeness)
+                            : "word \"" + member.evidence.label + "\"")
+                    .append(")\n");
+            int shown = 0;
+            for (Quote other : quotes) {
+                if (shown == 2 || other == quote) continue;
+                for (String tag : other.getTags()) {
+                    if (Hashtag.key(tag).equals(Hashtag.key(member.tag))) {
+                        out.append("      tagged: \"").append(start(other.getQuoteText(), 90)).append("\"\n");
+                        shown++;
+                        break;
+                    }
+                }
+            }
+            out.append("    verdict: \n");
+        }
+        return out.toString();
+    }
+
     /** k, m, floor and ranking; the floors span each model's cosine range (e5's is narrow, see #60). */
     private static List<HashtagSuggester.Knn> configs(TextEmbeddingModel model) {
         float[] floors = model == TextEmbeddingModel.MULTILINGUAL_E5_SMALL

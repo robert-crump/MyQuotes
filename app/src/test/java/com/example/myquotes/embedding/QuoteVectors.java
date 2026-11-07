@@ -73,6 +73,41 @@ public final class QuoteVectors {
         return vectors;
     }
 
+    /**
+     * Each of {@code texts} (tag names, #64) to its normalized vector, through the same cache as
+     * the quotes (never chunked).
+     */
+    public static Map<String, float[]> loadTexts(TextEmbeddingModel model, Iterable<String> texts, File cacheDir)
+            throws IOException {
+        File cacheFile = new File(cacheDir, model.id().replace('@', '_') + ".tsv");
+        Map<String, float[]> cache = read(cacheFile);
+        int before = cache.size();
+        OnnxEmbedder embedder = null;
+        Map<String, float[]> vectors = new HashMap<>();
+        try {
+            for (String text : texts) {
+                String hash = sha256(text);
+                float[] vector = cache.get(hash);
+                if (vector == null) {
+                    if (embedder == null) embedder = EmbeddingModelFiles.embedder(model);
+                    vector = embedder.embed(text);
+                    cache.put(hash, vector);
+                }
+                vectors.put(text, vector);
+            }
+        } finally {
+            if (embedder != null) {
+                try {
+                    embedder.close();
+                } catch (Exception ignored) {
+                    // Native memory is freed when the JVM exits anyway.
+                }
+            }
+        }
+        if (cache.size() != before) write(cacheFile, cache);
+        return vectors;
+    }
+
     /** How many quotes are longer than the model's input cap (prefix and special tokens included). */
     public static int cutOff(TextEmbeddingModel model, List<Quote> quotes) throws IOException {
         UnigramTokenizer tokenizer = EmbeddingModelFiles.tokenizer(model);
