@@ -23,6 +23,7 @@ public class MyApplication extends Application {
     private QuoteCollection quoteCollection;
     private Hashtags hashtags;
     private QuoteEmbeddings quoteEmbeddings;
+    private SuggestionModel suggestionModel;
     private Random shuffleRandom = new Random();
 
     private static final String PREFS_NAME = "AppSettings";
@@ -47,6 +48,11 @@ public class MyApplication extends Application {
                     android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
                     r.run();
                 }, "QuoteEmbeddings")), main::post);
+        suggestionModel = new SuggestionModel(quoteCollection, quoteEmbeddings,
+                Executors.newSingleThreadExecutor(r -> new Thread(() -> {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    r.run();
+                }, "SuggestionModel")), main::post);
         removeLegacyCategoryList();
         QuoteNotifications.initialize(this);
         LocalBackup.initialize(this);
@@ -71,6 +77,11 @@ public class MyApplication extends Application {
 
     public QuoteEmbeddings getQuoteEmbeddings() {
         return quoteEmbeddings;
+    }
+
+    /** The Hashtag suggestions model fitted on the current collection, shared by every screen (#65). */
+    SuggestionModel getSuggestionModel() {
+        return suggestionModel;
     }
 
     // Before #49 the user could keep category names without quotes; tags exist only in use.

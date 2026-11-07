@@ -38,8 +38,8 @@ import java.util.concurrent.Executors;
 /**
  * The Add/Edit "Suggested:" row ({@code hashtag_suggestions}) under the hashtag field (#50): up
  * to 3 tags from {@link HashtagSuggester}, as assist chips with a +. A tap adds the tag as a chip.
- * The model is fitted off the main thread whenever the Quote Collection emits (so on opening),
- * leaving out the quote being edited; the row refreshes 300 ms after the text, author or source
+ * The model comes from the shared {@link SuggestionModel} (#65), refitted there without the quote
+ * being edited whenever a newer fit is published (so on opening); the row refreshes 300 ms after the text, author or source
  * last changed, and at once when the quote's tags change. Hidden when nothing qualifies.
  * The info button next to the label explains all current suggestions in one dialog (#51, #52):
  * how suggesting works, then each tag's reasons with counts, then the tags not suggested for this
@@ -48,7 +48,7 @@ import java.util.concurrent.Executors;
  * the quote) and the next-best tag can take its place. In both dialogs a "similar to ..." part
  * is a link that shows and hides the neighbour quotes with the tag (#63).
  * With {@link QuoteEmbeddings} (#62) the model has the similar-quotes reason: it refits when
- * vectors are added, and the typed text is embedded on its own thread on each refresh; until its
+ * vectors are added (a newer shared fit), and the typed text is embedded on its own thread on each refresh; until its
  * vector arrives the previous text's vector is used.
  */
 final class HashtagSuggestionRow {
@@ -61,11 +61,14 @@ final class HashtagSuggestionRow {
     private final EditText source;
     private final HashtagChipField field;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService fitter = Executors.newSingleThreadExecutor();
     private final ExecutorService embedder = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::refresh;
     private final QuoteCollection collection;
     private final QuoteEmbeddings embeddings;
+    private final SuggestionModel suggestionModel;
+    // The latest shared fit (#65), and the leave-one-out fit being computed from it.
+    private SuggestionModel.Fitted base;
+    private SuggestionModel.Request fitting;
     // The vector of vectorText, the quote text last embedded; null for none.
     private float[] textVector;
     private String vectorText;
@@ -80,7 +83,7 @@ final class HashtagSuggestionRow {
 
     /** {@code editedQuoteId} is left out of the model; -1 when adding. */
     HashtagSuggestionRow(View root, LifecycleOwner owner, QuoteCollection collection, QuoteEmbeddings embeddings,
-                         int editedQuoteId, EditText author, EditText text, EditText source,
+                         SuggestionModel suggestionModel, int editedQuoteId, EditText author, EditText text, EditText source,
                          HashtagChipField field) {
         row = root.findViewById(R.id.hashtag_suggestions);
         group = root.findViewById(R.id.chip_group_suggestions);
@@ -90,6 +93,7 @@ final class HashtagSuggestionRow {
         this.field = field;
         this.collection = collection;
         this.embeddings = embeddings;
+        this.suggestionModel = suggestionModel;
         this.editedQuoteId = editedQuoteId;
 
         TextWatcher debounced = new TextWatcher() {
@@ -108,8 +112,10 @@ final class HashtagSuggestionRow {
         field.setOnTagsChangedListener(this::refresh);
         root.findViewById(R.id.button_suggestions_info).setOnClickListener(v -> showExplanation());
 
-        collection.getQuoteList().observe(owner, this::fit);
-        embeddings.getChanges().observe(owner, changes -> fit(collection.getQuoteList().getValue()));
+        suggestionModel.getFitted().observe(owner, fitted -> {
+            base = fitted;
+            fit();
+        });
     }
 
     /** The editor now shows another quote (the tagging run, #53): refits without it. */
@@ -117,7 +123,7 @@ final class HashtagSuggestionRow {
         editedQuoteId = quoteId;
         model = null;
         refresh();
-        fit(collection.getQuoteList().getValue());
+        fit();
     }
 
     /** Shows {@code tag} first whenever it is eligible (#56), still at most 3 chips; null for none. */
@@ -138,28 +144,30 @@ final class HashtagSuggestionRow {
         return new ArrayList<>(rejected);
     }
 
-    private void fit(List<Quote> quotes) {
-        if (fitter.isShutdown() || quotes == null) return;
-        int leftOut = editedQuoteId;
-        List<Quote> others = new ArrayList<>();
-        for (Quote quote : quotes) {
-            if (quote.getId() == null || quote.getId() != leftOut) others.add(quote);
+    /**
+     * The model from the latest shared fit: as it is when adding, else refitted without the edited
+     * quote on the Suggestion model's thread.
+     */
+    private void fit() {
+        if (fitting != null) fitting.cancel();
+        fitting = null;
+        if (base == null) return;
+        if (editedQuoteId == -1) {
+            model = base.model;
+            refresh();
+            return;
         }
-        Map<Integer, float[]> vectors = embeddings.vectorsFor(others);
-        fitter.execute(() -> {
-            HashtagSuggester fitted = HashtagSuggester.fit(others, vectors);
-            main.post(() -> {
-                if (fitter.isShutdown() || leftOut != editedQuoteId) return;
-                model = fitted;
-                refresh();
-            });
+        fitting = suggestionModel.fitWithout(base, editedQuoteId, fitted -> {
+            fitting = null;
+            model = fitted;
+            refresh();
         });
     }
 
-    /** Stops the fitting thread and pending refreshes (from the Activity's onDestroy). */
+    /** Drops the pending fit, refreshes and embedding (from the Activity's onDestroy). */
     void release() {
         main.removeCallbacksAndMessages(null);
-        fitter.shutdownNow();
+        if (fitting != null) fitting.cancel();
         embedder.shutdownNow();
     }
 

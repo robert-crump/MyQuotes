@@ -3,8 +3,6 @@ package com.example.myquotes;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -21,12 +19,12 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Adds or edits a quote. Opened from the ranked "No hashtag" list ({@link #taggingRunIntent}) it
@@ -85,8 +83,8 @@ public class AddEditActivity extends AppCompatActivity {
     // The tagging run when opened from a ranked list ("No hashtag", "Has suggestions"); else null.
     private TaggingRun run;
     private boolean loadedUntagged;
-    private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService runFitter = Executors.newSingleThreadExecutor();
+    // Answers awaited from the shared Suggestion model (#65); cancelled in onDestroy.
+    private final List<SuggestionModel.Request> runRequests = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,7 +99,8 @@ public class AddEditActivity extends AppCompatActivity {
                 : getIntent().getBundleExtra(EXTRA_TAGGING_RUN));
         handleIntent(savedInstanceState);
         hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
-                quoteCollection, MyApplication.getInstance().getQuoteEmbeddings(), quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
+                quoteCollection, MyApplication.getInstance().getQuoteEmbeddings(),
+                MyApplication.getInstance().getSuggestionModel(), quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
         if (run != null) hashtagSuggestions.setPinned(run.getSuggestedTag());
         if (savedInstanceState != null) {
             List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
@@ -404,15 +403,22 @@ public class AddEditActivity extends AppCompatActivity {
     private void updateTitle() {
         setTitle("Edit quote");
         if (run == null) return;
-        List<Quote> quotes = quoteCollection.getCurrentList();
-        Map<Integer, float[]> vectors = MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes);
-        runFitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-            int left = run.remaining(quotes, model);
-            main.post(() -> {
-                if (!isDestroyed()) setTitleLeft(left);
-            });
+        TaggingRun current = run;
+        awaitCurrentFit(fitted -> current.remaining(fitted.quotes, fitted.model), this::setTitleLeft);
+    }
+
+    /**
+     * Once the shared Suggestion model has a fit on the collection as it is now, runs {@code work}
+     * on it off the main thread, then {@code onMain} with the result unless the editor is gone.
+     */
+    private <T> void awaitCurrentFit(Function<SuggestionModel.Fitted, T> work, Consumer<T> onMain) {
+        runRequests.removeIf(SuggestionModel.Request::isCancelled);
+        SuggestionModel.Request[] request = new SuggestionModel.Request[1];
+        request[0] = MyApplication.getInstance().getSuggestionModel().onCurrent(work, result -> {
+            runRequests.remove(request[0]);
+            if (!isDestroyed()) onMain.accept(result);
         });
+        runRequests.add(request[0]);
     }
 
     private void setTitleLeft(int left) {
@@ -477,21 +483,25 @@ public class AddEditActivity extends AppCompatActivity {
     }
 
     /**
-     * Fits the model on the collection as it is now (after the save), then picks the run's next
+     * With the shared fit on the collection as it is now (after the save), picks the run's next
      * quote and counts the quotes left (the next one included).
      */
     private void withNextQuote(BiConsumer<Quote, Integer> action) {
-        List<Quote> quotes = quoteCollection.getCurrentList();
-        Map<Integer, float[]> vectors = MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes);
-        runFitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-            Quote next = run.next(quotes, model);
-            int left = run.remaining(quotes, model);
-            main.post(() -> {
-                if (isDestroyed()) return;
-                action.accept(next, left);
-            });
-        });
+        TaggingRun current = run;
+        awaitCurrentFit(fitted -> new NextQuote(current.next(fitted.quotes, fitted.model),
+                        current.remaining(fitted.quotes, fitted.model)),
+                result -> action.accept(result.next, result.left));
+    }
+
+    /** The run's next quote (null for none) and how many are left. */
+    private static final class NextQuote {
+        final Quote next;
+        final int left;
+
+        NextQuote(Quote next, int left) {
+            this.next = next;
+            this.left = left;
+        }
     }
 
     /** Loads {@code next} into the form in place of the current quote; {@code left} for the title. */
@@ -555,8 +565,7 @@ public class AddEditActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (hashtagSuggestions != null) hashtagSuggestions.release();
-        runFitter.shutdownNow();
-        main.removeCallbacksAndMessages(null);
+        for (SuggestionModel.Request request : runRequests) request.cancel();
         super.onDestroy();
     }
 

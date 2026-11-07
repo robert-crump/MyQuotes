@@ -1,8 +1,6 @@
 package com.example.myquotes;
 
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,24 +13,22 @@ import androidx.annotation.Nullable;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * One tag's bottom sheet on the Hashtags screen (#51), opened by a tap: Show N quotes (the
  * search with the tag filter), Rename, Delete, and what the suggester learned about the tag (#52:
  * every word and author that gets it suggested, with counts; read-only). Rename and delete are the
- * Hashtags screen's own dialogs ({@link Host}); the sheet closes before they open. The model is
- * fitted on the whole collection when the sheet opens. "Suggested for N quotes" (#56) opens the
- * list of quotes the tag is suggested for; counted off the main thread, shown once counted,
- * hidden at 0.
+ * Hashtags screen's own dialogs ({@link Host}); the sheet closes before they open. The profile
+ * and "Suggested for N quotes" (#56, opens the list of quotes the tag is suggested for; hidden at
+ * 0) come from the shared {@link SuggestionModel}'s tag pass, computed off the main thread and
+ * shown once it arrives.
  */
 public class HashtagSheet extends BottomSheetDialogFragment {
     static final String TAG = "HashtagSheet";
     private static final String ARG_TAG = "hashtag";
 
-    private final Handler main = new Handler(Looper.getMainLooper());
-    private ExecutorService counter;
+    // The tag pass being computed for the latest fit.
+    private SuggestionModel.Request passRequest;
 
     /** The Hashtags screen: rename and delete with its confirmation dialogs. */
     interface Host {
@@ -82,33 +78,33 @@ public class HashtagSheet extends BottomSheetDialogFragment {
             ((Host) requireActivity()).deleteHashtag(tag);
         });
 
-        // Read-only after fit, so the counting thread can share it.
-        HashtagSuggester model = HashtagSuggester.fit(quotes,
-                MyApplication.getInstance().getQuoteEmbeddings().vectorsFor(quotes));
         TextView suggested = view.findViewById(R.id.sheet_suggested_quotes);
         suggested.setOnClickListener(v -> {
             dismiss();
             startActivity(QuoteQuery.suggestedFor(tag).toIntent(requireContext()));
         });
-        counter = Executors.newSingleThreadExecutor();
-        counter.execute(() -> {
-            int suggestedCount = SuggestionRanking.countSuggestedFor(quotes, model, tag);
-            main.post(() -> {
-                if (getView() == null || suggestedCount == 0) return;
+        LinearLayout suggestions = view.findViewById(R.id.sheet_suggestions);
+        View suggestionsHeading = view.findViewById(R.id.sheet_suggestions_heading);
+        // The tag's profile and "Suggested for" count from the shared fit (#65), computed off the
+        // main thread; both stay hidden until the first one arrives.
+        SuggestionModel suggestionModel = MyApplication.getInstance().getSuggestionModel();
+        suggestionModel.getFitted().observe(getViewLifecycleOwner(), fitted -> {
+            if (passRequest != null) passRequest.cancel();
+            passRequest = suggestionModel.tagPass(fitted, tag, pass -> {
+                if (getView() == null) return;
+                suggestionsHeading.setVisibility(View.VISIBLE);
+                suggestions.removeAllViews();
+                for (String text : HashtagSuggestionText.suggestions(pass.profile)) suggestions.addView(paragraph(text));
+                int suggestedCount = pass.count();
                 suggested.setText("Suggested for " + HashtagSuggestionText.quotes(suggestedCount));
-                suggested.setVisibility(View.VISIBLE);
+                suggested.setVisibility(suggestedCount == 0 ? View.GONE : View.VISIBLE);
             });
         });
-
-        HashtagSuggester.TagProfile profile = model.profile(tag);
-        LinearLayout suggestions = view.findViewById(R.id.sheet_suggestions);
-        for (String text : HashtagSuggestionText.suggestions(profile)) suggestions.addView(paragraph(text));
     }
 
     @Override
     public void onDestroyView() {
-        if (counter != null) counter.shutdownNow();
-        main.removeCallbacksAndMessages(null);
+        if (passRequest != null) passRequest.cancel();
         super.onDestroyView();
     }
 

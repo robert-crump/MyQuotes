@@ -3,8 +3,6 @@ package com.example.myquotes;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -34,10 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-import java.util.concurrent.Executors;
 
 /**
  * Search over the Quote Collection: the Search tab in MainActivity, and the body of the pushed
@@ -49,9 +44,9 @@ import java.util.concurrent.Executors;
  * dialog's "Hashtag" button picks one, the chip's x removes it.
  * <p>
  * With the "No hashtag" or "Has suggestions" filter (#53, #55) the results are ranked by
- * {@link SuggestionRanking}, each with a "Suggested:" line. The model is fitted off the main
- * thread whenever the collection emits, with the count of quotes that have suggestions for the
- * filter dialog; ranked results wait for it. Editing a quote from a ranked list starts a tagging
+ * {@link SuggestionRanking}, each with a "Suggested:" line, from the shared
+ * {@link SuggestionModel} (#65), which also gives the count of quotes that have suggestions for
+ * the filter dialog; ranked results wait for a fit on the current list. Editing a quote from a ranked list starts a tagging
  * run in the editor ({@link AddEditActivity#taggingRunIntent}).
  */
 public class SearchFragment extends Fragment
@@ -76,22 +71,13 @@ public class SearchFragment extends Fragment
     private QuoteCollection quoteCollection;
     private SearchResultsAdapter adapter;
     private List<Quote> allQuotes = new ArrayList<>();
-    // Each quote's suggestions for the ranked lists, from a model fitted on fittedFor (with
-    // suggestedCount, the quotes with suggestions), or being fitted on fitting. For a "suggested
-    // for" query (#56) also that tag's suggestion and explanation line per quote (fittedTag).
-    private final Handler main = new Handler(Looper.getMainLooper());
-    private ExecutorService fitter;
-    private Map<Integer, List<HashtagSuggester.Suggestion>> suggestionsById = Collections.emptyMap();
-    private int suggestedCount;
-    private List<Quote> fittedFor;
-    private List<Quote> fitting;
-    // QuoteEmbeddings' change count the model was fitted (or is being fitted) with (#62).
-    private Integer fittedVectors;
-    private Integer fittingVectors;
-    private Map<Integer, HashtagSuggester.Suggestion> tagSuggestions = Collections.emptyMap();
-    private Map<Integer, String> tagLines = Collections.emptyMap();
-    private String fittedTag;
-    private String fittingTag;
+    // The shared fit (#65) the ranked lists use, and for a "suggested for" query (#56) that tag's
+    // pass on it; tagRequest is the pass being computed.
+    private SuggestionModel suggestionModel;
+    private SuggestionModel.Fitted fitted;
+    private SuggestionModel.TagPass tagPass;
+    private SuggestionModel.Fitted tagPassFitted;
+    private SuggestionModel.Request tagRequest;
 
     private QuoteQuery query = QuoteQuery.all("");
 
@@ -105,7 +91,6 @@ public class SearchFragment extends Fragment
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        fitter = Executors.newSingleThreadExecutor();
         QuoteQuery restored = savedInstanceState != null
                 ? QuoteQuery.fromBundle(savedInstanceState.getBundle(STATE_QUERY))
                 : QuoteQuery.fromBundle(getArguments());
@@ -135,6 +120,7 @@ public class SearchFragment extends Fragment
         hashtagFilterChip.setOnClickListener(v -> showHashtagFilterDialog());
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
+        suggestionModel = MyApplication.getInstance().getSuggestionModel();
 
         RecyclerView searchResultsRecyclerView = view.findViewById(R.id.search_scroll);
         searchResultsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -152,12 +138,13 @@ public class SearchFragment extends Fragment
         quoteCollection.getQuoteList().observe(getViewLifecycleOwner(), quotes -> {
             allQuotes = quotes != null ? quotes : new ArrayList<>();
             suggestionAdapter.setQuotes(allQuotes);
-            fitModel();
             rerunSearch();
         });
-        // Similar-quotes vectors arrived: refit so the ranked lists re-rank (#62).
-        MyApplication.getInstance().getQuoteEmbeddings().getChanges()
-                .observe(getViewLifecycleOwner(), changes -> fitModel());
+        // A newer fit (collection or similar-quotes vectors changed, #62): re-rank.
+        suggestionModel.getFitted().observe(getViewLifecycleOwner(), fit -> {
+            fitted = fit;
+            rerunSearch();
+        });
     }
 
     @Override
@@ -167,15 +154,10 @@ public class SearchFragment extends Fragment
     }
 
     @Override
-    public void onDestroy() {
-        fitter.shutdownNow();
-        main.removeCallbacksAndMessages(null);
-        super.onDestroy();
-    }
-
-    @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (tagRequest != null) tagRequest.cancel();
+        tagRequest = null;
         searchEditText = null;
         searchInputLayout = null;
         hashtagFilterChip = null;
@@ -272,7 +254,7 @@ public class SearchFragment extends Fragment
         List<String> tags = new ArrayList<>(counts.keySet());
         String[] labels = new String[tags.size() + 2];
         labels[0] = "No hashtag (" + untagged + ")";
-        labels[1] = "Has suggestions" + (fittedFor == allQuotes ? " (" + suggestedCount + ")" : "");
+        labels[1] = "Has suggestions" + (isFitted() ? " (" + fitted.countWithSuggestions + ")" : "");
         int checked = query.isUntagged() ? 0 : query.isSuggested() ? 1 : -1;
         for (int i = 0; i < tags.size(); i++) {
             labels[i + 2] = Hashtag.display(tags.get(i)) + " (" + counts.get(tags.get(i)) + ")";
@@ -334,19 +316,17 @@ public class SearchFragment extends Fragment
         Map<Integer, String> lines = null;
         if (query.isRankedBySuggestions()) {
             String tag = query.getSuggestedTag();
-            if (!isFitted(allQuotes, tag)) {
-                fitModel(); // reruns the search when the model is ready
-                return;
-            }
+            // Results wait for a fit on the current list; a vectors-only change keeps the previous fit.
+            if (!isFitted() || tag != null && !hasTagPass(tag)) return;
             Function<Quote, List<HashtagSuggester.Suggestion>> suggestions;
             if (tag != null) {
-                Map<Integer, HashtagSuggester.Suggestion> byTag = tagSuggestions;
+                Map<Integer, HashtagSuggester.Suggestion> byTag = tagPass.suggestions;
                 suggestions = quote -> {
                     HashtagSuggester.Suggestion suggestion = byTag.get(quote.getId());
                     return suggestion == null ? Collections.emptyList() : Collections.singletonList(suggestion);
                 };
             } else {
-                Map<Integer, List<HashtagSuggester.Suggestion>> byId = suggestionsById;
+                Map<Integer, List<HashtagSuggester.Suggestion>> byId = fitted.suggestionsById;
                 suggestions = quote -> byId.getOrDefault(quote.getId(), Collections.emptyList());
             }
             List<SuggestionRanking.Entry> ranked = SuggestionRanking.results(allQuotes, query, suggestions,
@@ -355,7 +335,7 @@ public class SearchFragment extends Fragment
             lines = new HashMap<>();
             for (SuggestionRanking.Entry entry : ranked) {
                 results.add(entry.quote);
-                lines.put(entry.quote.getId(), tag != null ? tagLines.get(entry.quote.getId())
+                lines.put(entry.quote.getId(), tag != null ? tagPass.lines.get(entry.quote.getId())
                         : HashtagSuggestionText.suggestedLine(entry.suggestions));
             }
         }
@@ -363,56 +343,27 @@ public class SearchFragment extends Fragment
         updateResultCount(results.size());
     }
 
-    /**
-     * Fits the suggestion model on the current collection and counts the quotes with suggestions,
-     * off the main thread; reruns the search when done.
-     */
-    private void fitModel() {
-        List<Quote> quotes = allQuotes;
-        if (quotes == null) return;
-        String tag = query.getSuggestedTag();
-        QuoteEmbeddings embeddings = MyApplication.getInstance().getQuoteEmbeddings();
-        Integer vectorsVersion = embeddings.getChanges().getValue();
-        // Lists show the last fit (older vectors) until the new one is ready.
-        if (fitter.isShutdown() || isFitted(quotes, tag) && Objects.equals(fittedVectors, vectorsVersion)) return;
-        if (fitting == quotes && Objects.equals(fittingVectors, vectorsVersion)
-                && (tag == null || tag.equalsIgnoreCase(fittingTag))) return;
-        fitting = quotes;
-        fittingTag = tag;
-        fittingVectors = vectorsVersion;
-        Map<Integer, float[]> vectors = embeddings.vectorsFor(quotes);
-        fitter.execute(() -> {
-            HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-            Map<Integer, List<HashtagSuggester.Suggestion>> byId = SuggestionRanking.suggestionsById(quotes, model);
-            int count = SuggestionRanking.countWithSuggestions(byId);
-            Map<Integer, HashtagSuggester.Suggestion> byTag = new HashMap<>();
-            Map<Integer, String> linesByTag = new HashMap<>();
-            if (tag != null) {
-                for (Quote quote : quotes) {
-                    HashtagSuggester.Suggestion suggestion = model.suggestionFor(quote, tag);
-                    if (suggestion == null) continue;
-                    byTag.put(quote.getId(), suggestion);
-                    linesByTag.put(quote.getId(),
-                            HashtagSuggestionText.suggestedForLine(model.explainFor(quote, tag)));
-                }
-            }
-            main.post(() -> {
-                if (fitter.isShutdown() || quotes != allQuotes) return;
-                suggestionsById = byId;
-                suggestedCount = count;
-                fittedFor = quotes;
-                fittedVectors = vectorsVersion;
-                tagSuggestions = byTag;
-                tagLines = linesByTag;
-                fittedTag = tag;
-                rerunSearch();
-            });
-        });
+    /** Whether the shared fit is on the current list. */
+    private boolean isFitted() {
+        return fitted != null && fitted.quotes == allQuotes;
     }
 
-    /** Whether the model is fitted on {@code quotes}, with {@code tag}'s list unless it is null. */
-    private boolean isFitted(List<Quote> quotes, String tag) {
-        return fittedFor == quotes && (tag == null || tag.equalsIgnoreCase(fittedTag));
+    /**
+     * Whether {@code tag}'s pass on the current fit is at hand; if not, asks for it (off the main
+     * thread) and reruns the search when it arrives.
+     */
+    private boolean hasTagPass(String tag) {
+        if (tagPass != null && tagPassFitted == fitted && tag.equalsIgnoreCase(tagPass.tag)) return true;
+        if (tagRequest != null) tagRequest.cancel();
+        SuggestionModel.Fitted fit = fitted;
+        tagRequest = suggestionModel.tagPass(fit, tag, pass -> {
+            tagRequest = null;
+            tagPass = pass;
+            tagPassFitted = fit;
+            rerunSearch();
+        });
+        // A cached pass answers at once (and has rerun the search).
+        return false;
     }
 
     private void updateResultCount(int count) {
