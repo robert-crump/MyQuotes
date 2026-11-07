@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * A vector per quote for the similar-quotes reason (#62), owned by {@link MyApplication} like
@@ -33,6 +35,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * at the end of a pass it saves and {@link #getChanges() emits}, so open lists re-rank as the
  * cache fills. Until then suggestions work without the reason. When the embedder fails (no model
  * in the APK), the cache stays as it is and nothing is embedded for the rest of the process.
+ *
+ * <p>It is the only module that runs the {@link Embedder} (#67): the editor's typed text is
+ * embedded through {@link #embedLatest} on the same {@code worker} thread, so two inferences never
+ * run at once. A waiting editor request is served before the pass's next item, and a newer one
+ * replaces it, so only the latest typed text is embedded.
  */
 public final class QuoteEmbeddings {
     private static final String TAG = "QuoteEmbeddings";
@@ -63,6 +70,8 @@ public final class QuoteEmbeddings {
     private final Map<Long, float[]> byText = new ConcurrentHashMap<>();
     private final MutableLiveData<Integer> changes = new MutableLiveData<>(0);
     private final AtomicInteger requested = new AtomicInteger();
+    // The editor's latest text waiting for its vector; null for none.
+    private final AtomicReference<Request> waiting = new AtomicReference<>();
     private volatile List<Quote> quotes = Collections.emptyList();
     private volatile boolean unavailable;
     // Worker thread only.
@@ -106,21 +115,61 @@ public final class QuoteEmbeddings {
     }
 
     /**
-     * The vector of {@code text} (the editor's text): the cached one, else embedded now. Blocks;
-     * call off the main thread. Null for empty text or when the embedder is unavailable. The
-     * result is not cached, since typed text is mostly never saved.
+     * The vector of {@code text} (the editor's text), answered on the main thread: at once (inside
+     * this call) from the cache, or null for empty text or when the embedder is unavailable; else
+     * embedded on the worker thread ahead of the cache pass's remaining texts. A newer call
+     * replaces a request still waiting, which is then never answered; nor is a cancelled one. The
+     * result is not cached, since typed text is mostly never saved (it is once the quote is saved).
+     * Call on the main thread.
      */
-    @Nullable
-    public float[] embed(String text) {
-        if (text == null || text.trim().isEmpty()) return null;
-        float[] vector = cached(text);
-        if (vector != null || unavailable) return vector;
-        try {
-            return embedder.embed(text);
-        } catch (RuntimeException | LinkageError e) {
-            markUnavailable(e);
-            return null;
+    public Request embedLatest(String text, Consumer<float[]> onMain) {
+        Request request = new Request(text, onMain);
+        Request replaced = waiting.getAndSet(null);
+        if (replaced != null) replaced.cancel();
+        float[] cached = cached(text);
+        if (cached != null || unavailable || text == null || text.trim().isEmpty()) {
+            onMain.accept(cached);
+            return request;
         }
+        waiting.set(request);
+        worker.execute(this::serveWaiting);
+        return request;
+    }
+
+    /** A pending {@link #embedLatest} answer. */
+    public final class Request {
+        private final String text;
+        private final Consumer<float[]> onMain;
+        private volatile boolean cancelled;
+
+        private Request(String text, Consumer<float[]> onMain) {
+            this.text = text;
+            this.onMain = onMain;
+        }
+
+        /** The answer is never delivered; a request still waiting is not embedded. */
+        public void cancel() {
+            cancelled = true;
+            waiting.compareAndSet(this, null);
+        }
+    }
+
+    /** Worker thread: embeds the waiting editor text, if any, and answers on the main thread. */
+    private void serveWaiting() {
+        Request request = waiting.getAndSet(null);
+        if (request == null || request.cancelled) return;
+        float[] vector = cached(request.text);
+        if (vector == null && !unavailable) {
+            try {
+                vector = embedder.embed(request.text);
+            } catch (RuntimeException | LinkageError e) {
+                markUnavailable(e);
+            }
+        }
+        float[] answer = vector;
+        main.execute(() -> {
+            if (!request.cancelled) request.onMain.accept(answer);
+        });
     }
 
     private void update(List<Quote> current) {
@@ -154,6 +203,8 @@ public final class QuoteEmbeddings {
             if (byText.containsKey(key) || unavailable || text == null || text.trim().isEmpty()) continue;
             // A newer collection is waiting: leave the rest to its pass.
             if (generation != requested.get()) break;
+            serveWaiting(); // the editor never waits for a whole pass
+            if (unavailable) break;
             float[] vector;
             try {
                 vector = embedder.embed(text);

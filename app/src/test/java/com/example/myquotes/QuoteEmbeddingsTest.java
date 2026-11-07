@@ -18,12 +18,14 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 public class QuoteEmbeddingsTest {
     @Rule
@@ -37,6 +39,8 @@ public class QuoteEmbeddingsTest {
         final String modelId;
         final List<String> embedded = new ArrayList<>();
         boolean broken;
+        // Runs after each embedding, on the embedding thread.
+        Runnable afterEmbed = () -> {};
 
         FakeEmbedder(String modelId) {
             this.modelId = modelId;
@@ -46,6 +50,7 @@ public class QuoteEmbeddingsTest {
         public float[] embed(String text) {
             if (broken) throw new IllegalStateException("no model");
             embedded.add(text);
+            afterEmbed.run();
             return new float[]{text.length(), 1};
         }
 
@@ -85,10 +90,41 @@ public class QuoteEmbeddingsTest {
         return new Quote(id, "Author", text, "");
     }
 
+    /** A worker that runs its tasks only when told to. */
+    private static final class ManualExecutor implements Executor {
+        final ArrayDeque<Runnable> tasks = new ArrayDeque<>();
+
+        @Override
+        public void execute(Runnable task) {
+            tasks.add(task);
+        }
+
+        void runAll() {
+            while (!tasks.isEmpty()) tasks.poll().run();
+        }
+    }
+
+    /** Collects the vectors {@link QuoteEmbeddings#embedLatest} answers with. */
+    private static final class Answers {
+        final List<String> texts = new ArrayList<>();
+        final List<float[]> vectors = new ArrayList<>();
+
+        java.util.function.Consumer<float[]> forText(String text) {
+            return vector -> {
+                texts.add(text);
+                vectors.add(vector);
+            };
+        }
+    }
+
     private QuoteEmbeddings start(FakeEmbedder embedder, Quote... quotes) {
+        return start(embedder, Runnable::run, quotes);
+    }
+
+    private QuoteEmbeddings start(FakeEmbedder embedder, Executor worker, Quote... quotes) {
         collection = new QuoteCollection(new InMemoryQuoteStore(Arrays.asList(quotes)));
         collection.loadFromStore();
-        embeddings = new QuoteEmbeddings(collection, embedder, store, Runnable::run, Runnable::run);
+        embeddings = new QuoteEmbeddings(collection, embedder, store, worker, Runnable::run);
         emissions = 0;
         embeddings.getChanges().observeForever(count -> emissions++);
         emissions = 0; // ignore the initial delivery
@@ -193,19 +229,102 @@ public class QuoteEmbeddingsTest {
         embedder.broken = true;
         start(embedder, quote(1, "ab"));
         assertTrue(embeddings.snapshot().isEmpty());
-        assertNull(embeddings.embed("typed text"));
+        Answers answers = new Answers();
+        embeddings.embedLatest("typed text", answers.forText("typed text"));
+        assertEquals(Collections.singletonList("typed text"), answers.texts);
+        assertNull(answers.vectors.get(0));
     }
 
     @Test
-    public void embedUsesTheCacheAndDoesNotCacheTypedText() {
+    public void anEditorRequestWhoseEmbedderFailsAnswersNull() {
         FakeEmbedder embedder = new FakeEmbedder("m1");
-        start(embedder, quote(1, "ab"));
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "ab"));
+        worker.runAll();
+        embedder.broken = true;
+        Answers answers = new Answers();
+        embeddings.embedLatest("typed", answers.forText("typed"));
+        assertTrue(answers.texts.isEmpty());
+        worker.runAll();
+        assertEquals(Collections.singletonList("typed"), answers.texts);
+        assertNull(answers.vectors.get(0));
+    }
+
+    @Test
+    public void aCachedTextAnswersAtOnceWithoutEmbedding() {
+        FakeEmbedder embedder = new FakeEmbedder("m1");
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "ab"));
+        worker.runAll();
         embedder.embedded.clear();
-        assertArrayEquals(new float[]{2, 1}, embeddings.embed("ab"), 0f);
+        Answers answers = new Answers();
+        embeddings.embedLatest("ab", answers.forText("ab"));
+        assertTrue(worker.tasks.isEmpty());
         assertTrue(embedder.embedded.isEmpty());
-        assertArrayEquals(new float[]{5, 1}, embeddings.embed("typed"), 0f);
+        assertArrayEquals(new float[]{2, 1}, answers.vectors.get(0), 0f);
+        embeddings.embedLatest(" ", answers.forText(" "));
+        assertNull(answers.vectors.get(1));
+        assertTrue(embedder.embedded.isEmpty());
+    }
+
+    @Test
+    public void quickRequestsEmbedOnlyTheLatestText() {
+        FakeEmbedder embedder = new FakeEmbedder("m1");
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "ab"));
+        worker.runAll();
+        embedder.embedded.clear();
+        Answers answers = new Answers();
+        embeddings.embedLatest("t", answers.forText("t"));
+        embeddings.embedLatest("ty", answers.forText("ty"));
+        embeddings.embedLatest("typ", answers.forText("typ"));
+        worker.runAll();
+        assertEquals(Collections.singletonList("typ"), embedder.embedded);
+        assertEquals(Collections.singletonList("typ"), answers.texts);
+        assertArrayEquals(new float[]{3, 1}, answers.vectors.get(0), 0f);
+    }
+
+    @Test
+    public void anEditorRequestDuringAPassIsServedBeforeTheRemainingTexts() {
+        FakeEmbedder embedder = new FakeEmbedder("m1");
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "a1"), quote(2, "b22"), quote(3, "c333"));
+        Answers answers = new Answers();
+        embedder.afterEmbed = () -> {
+            if (embedder.embedded.size() == 1) embeddings.embedLatest("typed", answers.forText("typed"));
+        };
+        worker.runAll();
+        assertEquals(Arrays.asList("a1", "typed", "b22", "c333"), embedder.embedded);
+        assertEquals(Collections.singletonList("typed"), answers.texts);
+        assertEquals(3, embeddings.snapshot().size());
+    }
+
+    @Test
+    public void theEditorsVectorIsNotCached() {
+        FakeEmbedder embedder = new FakeEmbedder("m1");
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "ab"));
+        worker.runAll();
+        Answers answers = new Answers();
+        embeddings.embedLatest("typed", answers.forText("typed"));
+        worker.runAll();
+        assertArrayEquals(new float[]{5, 1}, answers.vectors.get(0), 0f);
         assertNull(embeddings.cached("typed"));
-        assertNull(embeddings.embed(" "));
+        assertFalse(store.saved.vectors.containsKey(QuoteEmbeddings.hash("typed")));
+    }
+
+    @Test
+    public void aCancelledRequestIsNeitherEmbeddedNorAnswered() {
+        FakeEmbedder embedder = new FakeEmbedder("m1");
+        ManualExecutor worker = new ManualExecutor();
+        start(embedder, worker, quote(1, "ab"));
+        worker.runAll();
+        embedder.embedded.clear();
+        Answers answers = new Answers();
+        embeddings.embedLatest("typed", answers.forText("typed")).cancel();
+        worker.runAll();
+        assertTrue(embedder.embedded.isEmpty());
+        assertTrue(answers.texts.isEmpty());
     }
 
     @Test

@@ -32,8 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * The Add/Edit "Suggested:" row ({@code hashtag_suggestions}) under the hashtag field (#50): up
@@ -48,7 +46,8 @@ import java.util.concurrent.Executors;
  * the quote) and the next-best tag can take its place. In both dialogs a "similar to ..." part
  * is a link that shows and hides the neighbour quotes with the tag (#63).
  * With {@link QuoteEmbeddings} (#62) the model has the similar-quotes reason: it refits when
- * vectors are added (a newer shared fit), and the typed text is embedded on its own thread on each refresh; until its
+ * vectors are added (a newer shared fit), and on each refresh the typed text is embedded by
+ * {@link QuoteEmbeddings#embedLatest} (#67: on the cache's own thread, only the latest text); until its
  * vector arrives the previous text's vector is used.
  */
 final class HashtagSuggestionRow {
@@ -61,7 +60,6 @@ final class HashtagSuggestionRow {
     private final EditText source;
     private final HashtagChipField field;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService embedder = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::refresh;
     private final QuoteCollection collection;
     private final QuoteEmbeddings embeddings;
@@ -72,8 +70,10 @@ final class HashtagSuggestionRow {
     // The vector of vectorText, the quote text last embedded; null for none.
     private float[] textVector;
     private String vectorText;
-    // The text whose vector is being computed; newer requests make older ones moot.
-    private volatile String embedding;
+    // The text whose vector is being computed and its request; a newer text cancels it.
+    private String embeddingText;
+    private QuoteEmbeddings.Request embedding;
+    private boolean released;
     private int editedQuoteId;
     private HashtagSuggester model;
     private List<String> shown = Collections.emptyList();
@@ -168,35 +168,30 @@ final class HashtagSuggestionRow {
     void release() {
         main.removeCallbacksAndMessages(null);
         if (fitting != null) fitting.cancel();
-        embedder.shutdownNow();
+        if (embedding != null) embedding.cancel();
+        released = true;
     }
 
     /**
-     * Brings {@link #textVector} up to the typed quote text: at once from the cache, else embedded on
-     * the embedding thread, which refreshes again when done.
+     * Brings {@link #textVector} up to the typed quote text: at once from the cache, else through
+     * the Quote Embeddings' thread, which refreshes again when the vector arrives.
      */
     private void updateTextVector() {
         String current = text.getText().toString();
-        if (current.equals(vectorText) || current.equals(embedding) || embedder.isShutdown()) return;
-        float[] cached = embeddings.cached(current);
-        if (cached != null || current.trim().isEmpty()) {
-            textVector = cached;
-            vectorText = current;
+        if (released || current.equals(vectorText) || current.equals(embeddingText)) return;
+        if (embedding != null) embedding.cancel(); // typed on meanwhile
+        embedding = null;
+        embeddingText = current;
+        QuoteEmbeddings.Request request = embeddings.embedLatest(current, vector -> {
+            // Null while embedLatest answers at once: the running refresh uses the vector.
+            boolean later = embedding != null;
             embedding = null;
-            return;
-        }
-        embedding = current;
-        embedder.execute(() -> {
-            if (!current.equals(embedding)) return; // typed on meanwhile
-            float[] vector = embeddings.embed(current);
-            main.post(() -> {
-                if (embedder.isShutdown() || !current.equals(embedding)) return;
-                embedding = null;
-                textVector = vector;
-                vectorText = current;
-                refresh();
-            });
+            embeddingText = null;
+            textVector = vector;
+            vectorText = current;
+            if (later) refresh();
         });
+        if (current.equals(embeddingText)) embedding = request; // not answered yet
     }
 
     private void refresh() {
