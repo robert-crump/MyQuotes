@@ -27,15 +27,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Adds or edits a quote. Opened from the ranked "No hashtag" list ({@link #taggingRunIntent}) it
- * runs a tagging run (#53, {@link TaggingRun}): saving a quote that had no hashtags with some asks
- * once "Continue with next untagged quote?", and from then on each save loads the next quote in
- * place (best suggestions first, re-ranked with the refitted model). Skip moves on without saving,
- * and so does Delete after deleting; a save that leaves the quote untagged skips it. Back ends the
- * run. From the "Has suggestions" list (#55) every save is done with the quote: it is left out for
- * the rest of the run, and the first save asks "Continue with the next quote?". From one tag's
- * "Suggested for" list (#56) a save that adds or rejects the tag is done with the quote; one that
- * does neither counts as Skip once continued. The Suggested row pins that tag first.
+ * Adds or edits a quote. Opened from a ranked list ({@link #taggingRunIntent}) it runs a tagging
+ * run (#53, #55, #56): the {@link TaggingRun} decides what follows each save, Skip and Delete, and
+ * the editor carries it out (back to the list, the "Continue …?" dialog, or the next quote loaded
+ * in place). Back ends the run. In a "Suggested for" run the Suggested row pins that tag first.
  * <p>
  * The form also holds the quote's rejected suggestions (#55, kept by {@link HashtagSuggestionRow}),
  * saved with the quote and compared by the discard check.
@@ -82,7 +77,6 @@ public class AddEditActivity extends AppCompatActivity {
     private QuoteFormSnapshot baseline = QuoteFormSnapshot.EMPTY;
     // The tagging run when opened from a ranked list ("No hashtag", "Has suggestions"); else null.
     private TaggingRun run;
-    private boolean loadedUntagged;
     // Answers awaited from the shared Suggestion model (#65); cancelled in onDestroy.
     private final List<SuggestionModel.Request> runRequests = new ArrayList<>();
 
@@ -101,7 +95,7 @@ public class AddEditActivity extends AppCompatActivity {
         hashtagSuggestions = new HashtagSuggestionRow(findViewById(R.id.hashtag_field), this,
                 quoteCollection, MyApplication.getInstance().getQuoteEmbeddings(),
                 MyApplication.getInstance().getSuggestionModel(), quoteId, editTextAuthor, editTextQuote, editTextSource, hashtagField);
-        if (run != null) hashtagSuggestions.setPinned(run.getSuggestedTag());
+        if (run != null) hashtagSuggestions.setPinned(run.pinnedTag());
         if (savedInstanceState != null) {
             List<String> tags = savedInstanceState.getStringArrayList(STATE_TAGS);
             if (tags != null) hashtagField.setTags(tags);
@@ -353,7 +347,7 @@ public class AddEditActivity extends AppCompatActivity {
             if (hashtagSuggestions != null) hashtagSuggestions.setRejected(quote.getRejectedTags());
             isLoadingQuote = false;
             baseline = QuoteFormSnapshot.of(quote);
-            loadedUntagged = quote.getTags().isEmpty();
+            if (run != null) run.onQuoteLoaded(quote);
             Log.d(TAG, "Loaded quote #" + id);
         } else {
             Log.w(TAG, "Quote not found: " + id);
@@ -373,22 +367,13 @@ public class AddEditActivity extends AppCompatActivity {
         if (isEditMode) {
             quoteCollection.edit(quoteId, quote.getAuthor(), quote.getQuoteText(),
                     quote.getSource(), quote.getTags(), quote.getRejectedTags());
-            if (run != null && run.getSuggestedTag() != null) {
-                boolean decided = run.isDecided(quote.getTags(), quote.getRejectedTags());
-                if (decided) run.skip(quoteId); // done with it for this run
-                continueRun(decided);
+            if (run != null && run.afterSave(quoteId, quote.getTags(), quote.getRejectedTags())
+                    == TaggingRun.AfterSave.FIND_NEXT) {
+                baseline = readForm();
+                withNextQuote((next, left) -> carryOut(run.afterSaveNext(next), next, left));
                 return;
             }
-            if (run != null && run.isSuggestionsRun()) {
-                run.skip(quoteId); // done with it for this run, whatever the save changed
-                continueRun(true);
-                return;
-            }
-            if (run != null && loadedUntagged) {
-                continueRun(!quote.getTags().isEmpty());
-                return;
-            }
-            finishWith("Quote updated");
+            finishWith(TaggingRun.UPDATED);
         } else {
             quoteCollection.add(quote);
             Toast.makeText(this, "Quote added", Toast.LENGTH_SHORT).show();
@@ -430,40 +415,6 @@ public class AddEditActivity extends AppCompatActivity {
         finish();
     }
 
-    /**
-     * After a save in a tagging run: a quote that got hashtags (or any quote in a "Has suggestions"
-     * run) asks once whether to continue, then the next quote opens; one left untagged is skipped
-     * once the user has said to continue.
-     */
-    private void continueRun(boolean tagged) {
-        if (!tagged) {
-            if (!run.isContinued()) {
-                finishWith("Quote updated");
-                return;
-            }
-            run.skip(quoteId);
-        }
-        baseline = readForm();
-        withNextQuote((next, left) -> {
-            if (next == null) {
-                finishWith(run.isContinued() ? run.noMoreMessage() : "Quote updated");
-            } else if (run.isContinued()) {
-                Toast.makeText(this, "Quote updated", Toast.LENGTH_SHORT).show();
-                showQuote(next, left);
-            } else {
-                new AlertDialog.Builder(this)
-                        .setTitle(run.continuePrompt())
-                        .setPositiveButton("Continue", (dialog, which) -> {
-                            run.setContinued();
-                            showQuote(next, left);
-                        })
-                        .setNegativeButton("Back to list", (dialog, which) -> finishWith("Quote updated"))
-                        .setOnCancelListener(dialog -> finishWith("Quote updated"))
-                        .show();
-            }
-        });
-    }
-
     /** Leaves the quote out for the rest of the run and opens the next one. */
     private void skipQuote() {
         run.skip(quoteId);
@@ -472,14 +423,32 @@ public class AddEditActivity extends AppCompatActivity {
 
     /** Opens the run's next quote without asking (Skip, Delete), or ends the run when none is left. */
     private void moveOn() {
-        run.setContinued();
-        withNextQuote((next, left) -> {
-            if (next == null) {
-                finishWith(run.noMoreMessage());
-            } else {
+        run.moveOn();
+        withNextQuote((next, left) -> carryOut(run.afterMoveOn(next), next, left));
+    }
+
+    /** Carries out the run's {@code step} with {@code next} ({@code left} quotes left). */
+    private void carryOut(TaggingRun.Step step, Quote next, int left) {
+        switch (step.action) {
+            case FINISH:
+                finishWith(step.message);
+                break;
+            case SHOW:
+                if (step.message != null) Toast.makeText(this, step.message, Toast.LENGTH_SHORT).show();
                 showQuote(next, left);
-            }
-        });
+                break;
+            case ASK_CONTINUE:
+                new AlertDialog.Builder(this)
+                        .setTitle(step.message)
+                        .setPositiveButton("Continue", (dialog, which) -> {
+                            run.setContinued();
+                            showQuote(next, left);
+                        })
+                        .setNegativeButton("Back to list", (dialog, which) -> finishWith(TaggingRun.UPDATED))
+                        .setOnCancelListener(dialog -> finishWith(TaggingRun.UPDATED))
+                        .show();
+                break;
+        }
     }
 
     /**
