@@ -448,22 +448,21 @@ public class SettingsActivity extends AppCompatActivity {
     private void exportQuotesToJson(Uri uri) {
         ioExecutor.execute(() -> {
             try {
-                List<Quote> quotes = quoteCollection.getQuoteList().getValue();
-                if (quotes == null || quotes.isEmpty()) {
+                BackupDocument document = MyApplication.getInstance().getBackupRoundTrip().snapshot();
+                if (document.quotes.isEmpty()) {
                     runOnUiThread(() ->
                             Toast.makeText(this, "No quotes to export", Toast.LENGTH_SHORT).show()
                     );
                     return;
                 }
 
-                QuoteExporter.writeToUri(this, uri,
-                        new BackupDocument(quotes, QuoteNotifications.loadHistory(this)));
+                QuoteExporter.writeToUri(this, uri, document);
 
-                final int count = quotes.size();
+                final int count = document.quotes.size();
                 runOnUiThread(() ->
                         Toast.makeText(this, count + " quotes exported", Toast.LENGTH_SHORT).show()
                 );
-                Log.d(TAG, "Successfully exported " + quotes.size() + " quotes");
+                Log.d(TAG, "Successfully exported " + count + " quotes");
             } catch (Exception e) {
                 Log.e(TAG, "Export failed", e);
                 runOnUiThread(() ->
@@ -516,9 +515,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void applyImport(BackupDocument imported) {
         int totalQuotes = imported.quotes.size();
-        quoteCollection.setList(imported.quotes);
-        // Replaced, not merged: a file without history clears it (#37).
-        QuoteNotifications.replaceHistory(this, imported.history);
+        MyApplication.getInstance().getBackupRoundTrip().replace(imported);
         Toast.makeText(this,
                 "Import replaced database with " + totalQuotes + " quotes",
                 Toast.LENGTH_LONG).show();

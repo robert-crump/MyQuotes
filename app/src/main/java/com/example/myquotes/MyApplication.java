@@ -21,6 +21,7 @@ public class MyApplication extends Application {
     private static MyApplication instance;
     private QuoteStore quoteStore;
     private QuoteCollection quoteCollection;
+    private BackupRoundTrip backupRoundTrip;
     private Hashtags hashtags;
     private QuoteEmbeddings quoteEmbeddings;
     private SuggestionModel suggestionModel;
@@ -37,6 +38,8 @@ public class MyApplication extends Application {
         applyTheme();
         quoteStore = new SharedPreferencesQuoteStore(this);
         quoteCollection = new QuoteCollection(quoteStore);
+        backupRoundTrip = new BackupRoundTrip(quoteStore, quoteCollection,
+                BackupRoundTrip.notificationHistory(this));
         quoteCollection.loadFromStore();
         hashtags = new Hashtags(quoteCollection);
         Handler main = new Handler(Looper.getMainLooper());
@@ -69,6 +72,11 @@ public class MyApplication extends Application {
 
     public QuoteCollection getQuoteCollection() {
         return quoteCollection;
+    }
+
+    /** Snapshot and replace of the Backup Document (#68). */
+    public BackupRoundTrip getBackupRoundTrip() {
+        return backupRoundTrip;
     }
 
     public Hashtags getHashtags() {

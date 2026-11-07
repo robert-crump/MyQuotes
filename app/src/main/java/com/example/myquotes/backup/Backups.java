@@ -4,11 +4,7 @@ import android.content.Context;
 
 import com.example.myquotes.BackupDocument;
 import com.example.myquotes.MyApplication;
-import com.example.myquotes.Quote;
 import com.example.myquotes.drive.DriveBackup;
-import com.example.myquotes.notifications.QuoteNotifications;
-
-import java.util.List;
 
 /**
  * One backup of the Quote Store to a {@link BackupTarget}, shared by the daily {@link BackupWorker}
@@ -29,10 +25,9 @@ public final class Backups {
         BackupDestination destination = destination(context, target);
         if (destination == null) return null;
 
-        List<Quote> quotes = MyApplication.getInstance().getQuoteStore().load();
-        if (quotes.isEmpty()) return null;
+        BackupDocument document = MyApplication.getInstance().getBackupRoundTrip().snapshot();
+        if (document.quotes.isEmpty()) return null;
 
-        BackupDocument document = new BackupDocument(quotes, QuoteNotifications.loadHistory(context));
         BackupRun.Outcome outcome = BackupRun.run(document, destination, System.currentTimeMillis());
         if (outcome.kind == BackupRun.Kind.WRITTEN) {
             BackupState.record(context, target, System.currentTimeMillis());
