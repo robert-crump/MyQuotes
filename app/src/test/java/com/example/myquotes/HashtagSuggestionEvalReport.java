@@ -429,8 +429,7 @@ public class HashtagSuggestionEvalReport {
         for (HashtagSuggestionEval.Addition addition : sample) {
             Quote quote = addition.quote;
             HashtagSuggester fitted = HashtagSuggester.fit(HashtagSuggestionEval.without(quotes, quote), vectors, knn);
-            HashtagSuggester.Explanation why = fitted.explain(quote.getQuoteText(), quote.getAuthor(),
-                    quote.getSource(), Collections.emptyList(), addition.tag, vectors.get(quote.getId()));
+            HashtagSuggester.Explanation why = fitted.explain(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList()).withVector(vectors.get(quote.getId())), addition.tag);
             out.append(String.format(Locale.ROOT, "%n%2d. \"%s\" (%s)%n", ++n, start(quote.getQuoteText(), 110),
                     quote.getAuthor()));
             out.append("    has: ").append(quote.getTags().isEmpty() ? "(no hashtags)" : tags(quote.getTags()))

@@ -13,7 +13,7 @@ import java.util.function.Function;
  * The order of the ranked "No hashtag" and "Has suggestions" lists and of their tagging runs (#53,
  * #55): quotes ranked by how good their hashtag suggestions are, so the ones that only need a
  * suggestion accepted come first. Pure. A quote's suggestions come from
- * {@link HashtagSuggester#suggestionsFor} on a model fitted on the whole collection, so they are
+ * {@link HashtagSuggester#suggest(Quote)} on a model fitted on the whole collection, so they are
  * the ones the editor would show. Ranked by the strength of the top suggestion (higher share, then
  * higher count), ties by the 2nd, then the 3rd; quotes without suggestions last (the "Has
  * suggestions" list drops them); then newest first ({@link Quote#NEWEST_FIRST}).
@@ -51,7 +51,7 @@ final class SuggestionRanking {
 
     /** {@code quotes} with their suggestions, best first; {@code model} is fitted on the collection. */
     static List<Entry> rank(List<Quote> quotes, HashtagSuggester model) {
-        return rank(quotes, model::suggestionsFor);
+        return rank(quotes, model::suggest);
     }
 
     /** {@code quotes} with their suggestions ({@code suggestions}: per quote), best first. */
@@ -73,11 +73,11 @@ final class SuggestionRanking {
 
     /**
      * Each quote's suggestions in {@code query}'s list: for "suggested for" only that tag (or
-     * none), else {@link HashtagSuggester#suggestionsFor}. {@code model} is fitted on the collection.
+     * none), else {@link HashtagSuggester#suggest(Quote)}. {@code model} is fitted on the collection.
      */
     static Function<Quote, List<HashtagSuggester.Suggestion>> suggestionsOf(QuoteQuery query, HashtagSuggester model) {
         String tag = query.getSuggestedTag();
-        if (tag == null) return model::suggestionsFor;
+        if (tag == null) return model::suggest;
         return quote -> {
             HashtagSuggester.Suggestion suggestion = model.suggestionFor(quote, tag);
             return suggestion == null ? Collections.emptyList() : Collections.singletonList(suggestion);
@@ -119,7 +119,7 @@ final class SuggestionRanking {
     /** Each of {@code quotes}' suggestions by quote id; {@code model} is fitted on {@code quotes}. */
     static Map<Integer, List<HashtagSuggester.Suggestion>> suggestionsById(List<Quote> quotes, HashtagSuggester model) {
         Map<Integer, List<HashtagSuggester.Suggestion>> byId = new HashMap<>();
-        for (Quote quote : quotes) byId.put(quote.getId(), model.suggestionsFor(quote));
+        for (Quote quote : quotes) byId.put(quote.getId(), model.suggest(quote));
         return byId;
     }
 

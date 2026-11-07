@@ -177,7 +177,7 @@ public class SuggestionModelTest {
         for (Quote quote : currentList()) {
             assertEquals(model.suggestionFor(quote, "Love"), pass.suggestions.get(quote.getId()));
             if (pass.suggestions.containsKey(quote.getId())) {
-                assertEquals(HashtagSuggestionText.suggestedForLine(model.explainFor(quote, "Love")),
+                assertEquals(HashtagSuggestionText.suggestedForLine(model.explain(quote, "Love")),
                         pass.lines.get(quote.getId()));
             }
         }

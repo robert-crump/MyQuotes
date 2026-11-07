@@ -46,8 +46,7 @@ public class HashtagSuggesterSimilarQuotesTest {
     }
 
     private List<String> suggest(HashtagSuggester model, double degrees) {
-        return model.suggest("", "Someone New", "", Collections.emptyList(), Collections.emptyList(), null,
-                at(degrees));
+        return model.suggest(HashtagSuggester.Draft.of("", "Someone New", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(at(degrees)));
     }
 
     private HashtagSuggester fit(HashtagSuggester.Knn knn) {
@@ -62,8 +61,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(5, 90, "Rare");
         HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
         assertEquals(Arrays.asList("Other", "Sea"), suggest(model, 0));
-        HashtagSuggester.Explanation why = model.explain("", "Someone New", "", Collections.emptyList(), "Sea",
-                at(0));
+        HashtagSuggester.Explanation why = model.explain(HashtagSuggester.Draft.of("", "Someone New", "", Collections.emptyList()).withVector(at(0)), "Sea");
         assertEquals(HashtagSuggester.Evidence.similar(3, 10), why.similar);
         assertTrue(why.similar.similar);
     }
@@ -92,7 +90,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         // cos 20° = 0.94 passes, cos 30° = 0.87 doesn't.
         assertEquals(Collections.singletonList("Sea"), suggest(fit(floor), 20));
         assertEquals(Collections.emptyList(), suggest(fit(floor), 30));
-        HashtagSuggester.Explanation why = fit(floor).explain("", "X", "", Collections.emptyList(), "Sea", at(20));
+        HashtagSuggester.Explanation why = fit(floor).explain(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()).withVector(at(20)), "Sea");
         assertEquals(HashtagSuggester.Evidence.similar(3, 3), why.similar);
     }
 
@@ -103,7 +101,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(2, 45, "Sea");
         HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
         assertEquals(Collections.singletonList("Sea"), suggest(model, 0));
-        HashtagSuggester.Explanation why = model.explain("", "X", "", Collections.emptyList(), "Sea", at(0));
+        HashtagSuggester.Explanation why = model.explain(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()).withVector(at(0)), "Sea");
         assertEquals(HashtagSuggester.Evidence.similar(5, 5), why.similar);
     }
 
@@ -117,9 +115,9 @@ public class HashtagSuggesterSimilarQuotesTest {
         HashtagSuggester model = fit(new HashtagSuggester.Knn(3, 3, 0f, false));
         assertEquals(Collections.singletonList(
                         new HashtagSuggester.Suggestion("Sea", HashtagSuggester.Evidence.similar(3, 3))),
-                model.suggestionsFor(land));
+                model.suggest(land));
         assertEquals(HashtagSuggester.Evidence.similar(3, 3), model.suggestionFor(land, "Sea").strongest);
-        HashtagSuggester.Explanation why = model.explainFor(land, "Sea");
+        HashtagSuggester.Explanation why = model.explain(land, "Sea");
         assertEquals(HashtagSuggester.Evidence.similar(3, 3), why.similar);
         assertEquals(Arrays.asList(2, 3, 4), why.similarQuoteIds);
     }
@@ -132,7 +130,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         quote(20.0, "", "Sea");
         quote(5.0, "", "Other");
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes, vectors)
-                .explain("", "X", "", Collections.emptyList(), "Sea", at(0));
+                .explain(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()).withVector(at(0)), "Sea");
         assertEquals(Arrays.asList(4, 5, 3, 1, 2), why.similarQuoteIds);
     }
 
@@ -145,12 +143,10 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(9, 0, "Near");
         quote(1.0, "", "Filler");
         HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-        assertEquals(Arrays.asList("Near", "Words"), model.suggest("harbour", "X", "",
-                Collections.emptyList(), Collections.emptyList(), null, at(0)));
+        assertEquals(Arrays.asList("Near", "Words"), model.suggest(HashtagSuggester.Draft.of("harbour", "X", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(at(0))));
 
         HashtagSuggester below = fit(new HashtagSuggester.Knn(10, 3, 0f, true));
-        assertEquals(Arrays.asList("Words", "Near"), below.suggest("harbour", "X", "",
-                Collections.emptyList(), Collections.emptyList(), null, at(0)));
+        assertEquals(Arrays.asList("Words", "Near"), below.suggest(HashtagSuggester.Draft.of("harbour", "X", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(at(0))));
     }
 
     @Test
@@ -158,8 +154,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(5, 90, "Ocean");
         addMany(10, 0, "Near");
         HashtagSuggester below = fit(new HashtagSuggester.Knn(10, 3, 0f, true));
-        assertEquals(Arrays.asList("Near", "Ocean"), below.suggest("the ocean", "X", "",
-                Collections.emptyList(), Collections.emptyList(), null, at(0)));
+        assertEquals(Arrays.asList("Near", "Ocean"), below.suggest(HashtagSuggester.Draft.of("the ocean", "X", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(at(0))));
         assertTrue(HashtagSuggester.byStrength(HashtagSuggester.Evidence.similar(10, 10, true),
                 HashtagSuggester.Evidence.nameMatch("ocean")) < 0);
         assertTrue(HashtagSuggester.byStrength(HashtagSuggester.Evidence.similar(10, 10, true),
@@ -177,10 +172,8 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(5, 0, "Sea");
         addMany(5, 0, "Sky");
         HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-        assertEquals(Collections.singletonList("Sky"), model.suggest("", "X", "",
-                Collections.singletonList("Sea"), Collections.emptyList(), null, at(0)));
-        assertEquals(Collections.emptyList(), model.suggest("", "X", "",
-                Collections.singletonList("Sea"), Collections.singletonList("sky"), null, at(0)));
+        assertEquals(Collections.singletonList("Sky"), model.suggest(HashtagSuggester.Draft.of("", "X", "", Collections.singletonList("Sea")).rejecting(Collections.emptyList()).withVector(at(0))));
+        assertEquals(Collections.emptyList(), model.suggest(HashtagSuggester.Draft.of("", "X", "", Collections.singletonList("Sea")).rejecting(Collections.singletonList("sky")).withVector(at(0))));
     }
 
     @Test
@@ -188,7 +181,7 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(5, 0, "Sea");
         for (int i = 0; i < 5; i++) quote(0.0, "", "Sky").setRejectedTags(Collections.singletonList("Sea"));
         HashtagSuggester.Explanation why = HashtagSuggester.fit(quotes, vectors)
-                .explain("", "X", "", Collections.emptyList(), "Sea", at(0));
+                .explain(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()).withVector(at(0)), "Sea");
         assertEquals(HashtagSuggester.Evidence.similar(5, 10), why.similar);
     }
 
@@ -198,13 +191,12 @@ public class HashtagSuggesterSimilarQuotesTest {
         addMany(5, 0, "Sea");
         quote(null, "", "Sky");
         HashtagSuggester model = HashtagSuggester.fit(quotes, vectors);
-        assertEquals(Collections.emptyList(), model.suggest("", "X", "", Collections.emptyList()));
-        assertEquals(Collections.emptyList(), model.suggestionsFor(noVector));
-        HashtagSuggester.Explanation why = model.explain("", "X", "", Collections.emptyList(), "Sea");
+        assertEquals(Collections.emptyList(), model.suggest(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList())));
+        assertEquals(Collections.emptyList(), model.suggest(noVector));
+        HashtagSuggester.Explanation why = model.explain(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()), "Sea");
         assertNull(why.similar);
         assertEquals(Collections.emptyList(), why.similarQuoteIds);
-        assertFalse(HashtagSuggester.fit(quotes).suggest("", "X", "", Collections.emptyList(),
-                Collections.emptyList(), null, at(0)).contains("Sea"));
+        assertFalse(HashtagSuggester.fit(quotes).suggest(HashtagSuggester.Draft.of("", "X", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(at(0))).contains("Sea"));
     }
 
     @Test

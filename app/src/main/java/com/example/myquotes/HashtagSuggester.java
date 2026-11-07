@@ -1,9 +1,5 @@
 package com.example.myquotes;
 
-import org.tartarus.snowball.SnowballStemmer;
-import org.tartarus.snowball.ext.englishStemmer;
-import org.tartarus.snowball.ext.germanStemmer;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -11,24 +7,21 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 
 /**
  * Suggests hashtags for a quote being added or edited (#50), learned from the user's own
  * collection. Pure and on-device: {@link #fit} counts, per tag, which tokens its quotes contain;
- * {@link #suggest} looks for reasons to suggest each tag for a new quote (#52).
+ * {@code suggest} looks for reasons to suggest each tag for a quote (#52). Two subjects are judged (#70): a {@link Draft}, the editor's text against the full model, and a saved {@link Quote} of the fitted collection, counted as if it were left out.
  * <ul>
  *   <li><b>Tokens</b>: the quote text lowercased and split on non-letters; words shorter than
- *       {@link #MIN_WORD_LENGTH} and English/German stopwords dropped; the rest stemmed with the
- *       Snowball stemmer of the quote's language (German when it has more German than English
- *       stopwords, else English). Plus one {@code author:<name>} and one {@code source:<name>}
- *       token. A quote counts each token once. In {@link #fit}, each of the quote's
- *       tags adds a {@code tag:<key>} token; in {@link #suggest}, each of {@code existingTags}.</li>
+ *       {@link QuoteTokens#MIN_WORD_LENGTH} and English/German stopwords dropped; the rest stemmed
+ *       with the Snowball stemmer of the quote's language (see {@link QuoteTokens}). Plus one
+ *       {@code author:<name>}, one {@code source:<name>} and one {@code tag:<key>} token per tag
+ *       (the draft's chips for a draft). A quote counts each token once.</li>
  *   <li><b>Reasons</b>: a word of the quote is a reason for tag t when at least
  *       {@link #MIN_WORD_WITH_TAG} quotes contain it and have t, and that is at least
  *       {@link #MIN_SHARE_PERCENT}% of the quotes containing it. The author is a reason when at
@@ -57,7 +50,7 @@ import java.util.function.BiConsumer;
  * a tag. Stems are shown as a real word: the quote's own word in {@code explain}, otherwise the
  * collection's most frequent word with that stem.
  * <p>
- * The ranked "No hashtag" and "Has suggestions" lists (#53, #55) use {@link #suggestionsFor}: the
+ * The ranked "No hashtag" and "Has suggestions" lists (#53, #55) use {@link #suggest(Quote)}: the
  * same suggestions, each with its strongest reason, for a quote that is part of the fitted
  * collection, counted as if it were left out (as the editor fits without the quote being edited).
  * <p>
@@ -65,9 +58,9 @@ import java.util.function.BiConsumer;
  * own tags; they don't change any count.
  * <p>
  * One tag (#56): {@link #suggestionFor} gives that tag for a quote of the fitted collection, counted
- * like {@link #suggestionsFor} but whether or not it is in the top {@link #MAX_SUGGESTIONS}
- * ("Suggested for N quotes"); {@link #explainFor} explains it with the same counts; and
- * {@code suggest(..., pinned)} puts it first in the editor's row during that tag's tagging run.
+ * like {@link #suggest(Quote)} but whether or not it is in the top {@link #MAX_SUGGESTIONS}
+ * ("Suggested for N quotes"); {@link #explain(Quote, String)} explains it with the same counts; and
+ * {@link Draft#pinning} puts it first in the editor's row during that tag's tagging run.
  */
 public final class HashtagSuggester {
     static final int MIN_QUOTES_PER_TAG = 5;
@@ -77,10 +70,6 @@ public final class HashtagSuggester {
     static final int MIN_TAG_WITH_TAG = 4;
     static final int MIN_SHARE_PERCENT = 40;
     static final int MAX_SUGGESTIONS = 3;
-    static final int MIN_WORD_LENGTH = 3;
-    static final String AUTHOR_PREFIX = "author:";
-    static final String SOURCE_PREFIX = "source:";
-    static final String TAG_PREFIX = "tag:";
     static final int KNN_K = 10;
     static final int KNN_MIN_WITH_TAG = 3;
     // Tuned for paraphrase-multilingual-MiniLM-L12-v2 (ADR-006); another model needs its own floor.
@@ -170,51 +159,6 @@ public final class HashtagSuggester {
             return String.format(Locale.ROOT, "%sfloor=%.2f N=%d", stem ? "stem+meaning " : "meaning ",
                     minSimilarity, topN);
         }
-    }
-
-    private static final Set<String> ENGLISH_STOPWORDS = new HashSet<>(Arrays.asList(
-            "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "had", "her",
-            "was", "one", "our", "out", "has", "have", "him", "his", "how", "man", "its", "may",
-            "who", "did", "get", "let", "she", "too", "use", "they", "them", "their", "theirs",
-            "there", "then", "than", "that", "this", "these", "those", "with", "without", "from",
-            "into", "onto", "upon", "about", "above", "below", "after", "before", "again",
-            "against", "between", "through", "during", "under", "over", "off", "own", "same",
-            "such", "only", "very", "just", "also", "more", "most", "some", "much", "many",
-            "each", "every", "both", "few", "other", "what", "which", "whom", "whose", "when",
-            "where", "why", "while", "will", "would", "shall", "should", "could", "must", "might",
-            "been", "being", "were", "does", "doing", "done", "your", "yours", "yourself",
-            "yourselves", "ours", "ourselves", "hers", "herself", "himself", "itself", "themselves",
-            "myself", "because", "until", "here", "nor", "yet", "ever", "never", "always",
-            "don", "doesn", "didn", "isn", "aren", "wasn", "weren", "hasn", "haven", "hadn",
-            "won", "wouldn", "couldn", "shouldn", "cannot", "now", "well", "even",
-            "still", "like", "make", "made", "thus", "thee", "thou", "thy", "thine",
-            "unto", "whether", "within", "whatever", "whoever", "whenever", "wherever"));
-    private static final Set<String> GERMAN_STOPWORDS = new HashSet<>(Arrays.asList(
-            "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "eines", "einem",
-            "einen", "und", "oder", "aber", "doch", "denn", "sondern", "nicht", "kein", "keine",
-            "keiner", "keines", "keinem", "keinen", "ich", "du", "sie", "wir", "ihr", "mich",
-            "dich", "sich", "uns", "euch", "mir", "dir", "ihm", "ihn", "ihnen", "mein", "meine",
-            "meiner", "meines", "meinem", "meinen", "dein", "deine", "deiner", "deines", "deinem",
-            "deinen", "sein", "seine", "seiner", "seines", "seinem", "seinen", "ihre", "ihrer",
-            "ihres", "ihrem", "ihren", "unser", "unsere", "euer", "eure", "ist", "sind", "war",
-            "waren", "bin", "bist", "seid", "wird", "werden", "wurde", "wurden", "worden", "hat",
-            "habe", "hast", "haben", "hatte", "hatten", "kann", "kannst", "können", "konnte",
-            "muss", "musst", "müssen", "musste", "soll", "sollte", "sollen", "will", "wollen",
-            "wollte", "darf", "dürfen", "mag", "möchte", "auf", "aus", "bei", "mit", "nach", "von",
-            "vor", "zum", "zur", "über", "unter", "durch", "für", "gegen", "ohne", "um", "bis",
-            "seit", "als", "wie", "wenn", "weil", "dass", "daß", "damit", "dann", "noch", "schon",
-            "nur", "auch", "sehr", "mehr", "viel", "viele", "alle", "alles", "allem", "allen",
-            "aller", "was", "wer", "wem", "wen", "wo", "warum", "hier", "dort", "da",
-            "so", "nun", "immer", "nie", "niemals", "jetzt", "diese", "dieser", "dieses", "diesem",
-            "diesen", "jede", "jeder", "jedes", "jedem", "jeden", "selbst", "etwas", "nichts",
-            "zwischen", "während", "wieder", "ganz", "hin", "her", "ins", "im", "am",
-            "vom", "beim", "zu", "an", "in", "es", "er", "ja", "nein", "sei", "wäre", "hätte",
-            "würde", "einmal", "gibt", "gar", "eben", "halt", "mal", "wohl", "dies", "jener",
-            "jene", "welche", "welcher", "welches", "solche", "solcher", "andere", "anderen"));
-    private static final Set<String> STOPWORDS = new HashSet<>(ENGLISH_STOPWORDS);
-
-    static {
-        STOPWORDS.addAll(GERMAN_STOPWORDS);
     }
 
     // Quotes per token (document frequency).
@@ -563,15 +507,15 @@ public final class HashtagSuggester {
         Map<String, TagStats> all = new HashMap<>();
         List<Set<String>> quoteTokens = new ArrayList<>(quotes.size());
         for (Quote quote : quotes) {
-            Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
-            addTagTokens(tokens, quote.getTags());
+            Set<String> tokens = QuoteTokens.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(),
+                    quote.getTags());
             quoteTokens.add(tokens);
             for (String token : tokens) model.tokenCounts.merge(token, 1, Integer::sum);
-            forEachWord(quote.getQuoteText(), (stem, word) -> model.surfaceWords
+            QuoteTokens.forEachWord(quote.getQuoteText(), (stem, word) -> model.surfaceWords
                     .computeIfAbsent(stem, k -> new HashMap<>()).merge(word, 1, Integer::sum));
-            String authorToken = authorToken(quote.getAuthor());
+            String authorToken = QuoteTokens.authorToken(quote.getAuthor());
             if (authorToken != null) model.authorNames.putIfAbsent(authorToken, quote.getAuthor().trim());
-            String sourceToken = sourceToken(quote.getSource());
+            String sourceToken = QuoteTokens.sourceToken(quote.getSource());
             if (sourceToken != null) model.sourceNames.putIfAbsent(sourceToken, quote.getSource().trim());
             for (String tag : quote.getTags()) {
                 all.computeIfAbsent(Hashtag.key(tag), k -> new TagStats(tag)).quotes++;
@@ -590,10 +534,10 @@ public final class HashtagSuggester {
             model.tagSpellings.put(entry.getKey(), entry.getValue().spelling);
             if (entry.getValue().quotes >= MIN_QUOTES_PER_TAG) {
                 model.tags.put(entry.getKey(), entry.getValue());
-                entry.getValue().nameStems.addAll(nameStems(entry.getKey()));
+                entry.getValue().nameStems.addAll(QuoteTokens.nameStems(entry.getKey()));
             } else {
                 model.smallTags.put(entry.getKey(),
-                        new SmallTag(entry.getValue().spelling, nameStems(entry.getKey())));
+                        new SmallTag(entry.getValue().spelling, QuoteTokens.nameStems(entry.getKey())));
             }
         }
         for (int i = 0; i < quotes.size(); i++) {
@@ -704,55 +648,78 @@ public final class HashtagSuggester {
     }
 
     /**
-     * Up to {@link #MAX_SUGGESTIONS} tags for the quote, best first; never one of
-     * {@code existingTags}, which are reasons for other tags.
+     * What the editor is showing, the first subject the model judges (#70), judged against the full
+     * model. Immutable; {@link #of} gives one without rejected tags, pinned tag or vector, and the
+     * withers add them.
      */
-    public List<String> suggest(String text, String author, String source, Collection<String> existingTags) {
-        return suggest(text, author, source, existingTags, null);
-    }
+    public static final class Draft {
+        private final String text;
+        private final String author;
+        private final String source;
+        private final Collection<String> tags;
+        private final Collection<String> rejectedTags;
+        private final String pinned;
+        private final float[] vector;
 
-    /** {@link #suggest(String, String, String, Collection)}, never one of {@code rejectedTags} either. */
-    public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
-                                Collection<String> rejectedTags) {
-        return suggest(text, author, source, existingTags, rejectedTags, null);
+        private Draft(String text, String author, String source, Collection<String> tags,
+                      Collection<String> rejectedTags, String pinned, float[] vector) {
+            this.text = text;
+            this.author = author;
+            this.source = source;
+            this.tags = tags;
+            this.rejectedTags = rejectedTags;
+            this.pinned = pinned;
+            this.vector = vector;
+        }
+
+        /** A draft with the form's text, author, source and the chips ({@code tags}; null is none). */
+        public static Draft of(String text, String author, String source, Collection<String> tags) {
+            return new Draft(text, author, source, tags, null, null, null);
+        }
+
+        /** This draft, never suggesting {@code rejectedTags} (the form's rejected tags; null is none). */
+        public Draft rejecting(Collection<String> rejectedTags) {
+            return new Draft(text, author, source, tags, rejectedTags, pinned, vector);
+        }
+
+        /**
+         * This draft with {@code pinned} first whenever it is eligible, even when stronger tags would
+         * push it out (#56: the tagging run for one tag); null pins nothing.
+         */
+        public Draft pinning(String pinned) {
+            return new Draft(text, author, source, tags, rejectedTags, pinned, vector);
+        }
+
+        /** This draft with the text's normalized vector, for the similar-quotes reason (null: no such reason). */
+        public Draft withVector(float[] vector) {
+            return new Draft(text, author, source, tags, rejectedTags, pinned, vector);
+        }
     }
 
     /**
-     * {@link #suggest(String, String, String, Collection, Collection)} with {@code pinned} first
-     * whenever it is eligible, even when stronger tags would push it out (#56: the tagging run
-     * for one tag); still at most {@link #MAX_SUGGESTIONS}. Null pins nothing.
+     * Up to {@link #MAX_SUGGESTIONS} tags for the draft, best first; never one of its tags (which are
+     * reasons for other tags) or rejected tags; its pinned tag first when eligible.
      */
-    public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
-                                Collection<String> rejectedTags, String pinned) {
-        return suggest(text, author, source, existingTags, rejectedTags, pinned, null);
-    }
-
-    /**
-     * {@link #suggest(String, String, String, Collection, Collection, String)} with {@code vector},
-     * the text's normalized vector, for the similar-quotes reason (null: no such reason).
-     */
-    public List<String> suggest(String text, String author, String source, Collection<String> existingTags,
-                                Collection<String> rejectedTags, String pinned, float[] vector) {
-        Set<String> tokens = tokens(text, author, source);
-        addTagTokens(tokens, existingTags);
+    public List<String> suggest(Draft draft) {
+        Set<String> tokens = QuoteTokens.of(draft.text, draft.author, draft.source, draft.tags);
         List<String> tags = new ArrayList<>();
-        for (Suggestion suggestion : suggestions(tokens, neighbours(vector, null), vector,
-                excluded(existingTags, rejectedTags), 0, pinned)) {
+        for (Suggestion suggestion : suggestions(tokens, neighbours(draft.vector, null), draft.vector,
+                excluded(draft.tags, draft.rejectedTags), 0, draft.pinned)) {
             tags.add(suggestion.tag);
         }
         return tags;
     }
 
     /**
-     * What {@link #suggest} gives {@code quote}, a quote of the fitted collection, with its tags and
+     * What {@link #suggest(Draft)} gives {@code quote}, a quote of the fitted collection, with its tags and
      * rejected tags, if it were fitted without it: up to {@link #MAX_SUGGESTIONS}, best first, each
      * with its strongest reason. Leaving the quote out lowers the counts of its own tokens (its
      * tags' tokens included) by one; it changes nothing else a suggestion depends on, since only
      * its own tags, which are never suggested for it, count it among their quotes.
      */
-    public List<Suggestion> suggestionsFor(Quote quote) {
-        Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
-        addTagTokens(tokens, quote.getTags());
+    public List<Suggestion> suggest(Quote quote) {
+        Set<String> tokens = QuoteTokens.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(),
+                quote.getTags());
         return suggestions(tokens, neighboursOf(quote), vectorOf(quote),
                 excluded(quote.getTags(), quote.getRejectedTags()), 1, null);
     }
@@ -763,7 +730,7 @@ public final class HashtagSuggester {
 
     /**
      * {@code tag} for {@code quote}, a quote of the fitted collection, counted as in
-     * {@link #suggestionsFor} but whether or not stronger tags would push it out of the top
+     * {@link #suggest(Quote)} but whether or not stronger tags would push it out of the top
      * {@link #MAX_SUGGESTIONS} (#56): with its strongest reason, or null when it isn't eligible
      * (on too few quotes, no reason, one of the quote's tags or rejected tags).
      */
@@ -773,9 +740,12 @@ public final class HashtagSuggester {
         SmallTag small = zeroShot.on() ? smallTags.get(key) : null;
         if ((stats == null && small == null)
                 || excluded(quote.getTags(), quote.getRejectedTags()).contains(key)) return null;
-        Set<String> tokens = tokens(quote.getQuoteText(), quote.getAuthor(), quote.getSource());
-        if (small != null) return smallSuggestion(key, small, tokens, vectorOf(quote));
-        addTagTokens(tokens, quote.getTags());
+        if (small != null) {
+            return smallSuggestion(key, small,
+                    QuoteTokens.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), null), vectorOf(quote));
+        }
+        Set<String> tokens = QuoteTokens.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(),
+                quote.getTags());
         return suggestion(key, stats, tokens, neighboursOf(quote), 1);
     }
 
@@ -846,27 +816,20 @@ public final class HashtagSuggester {
     }
 
     /**
-     * Why {@code tag} is suggested for this quote: its reason words, strongest first, shown as
-     * they are written in {@code text}, the author and the source when they are a reason, and those
-     * of the quote's tags ({@code quoteTags}) that are a reason, strongest first. Null when the tag
-     * can't be suggested at all (on too few quotes).
+     * Why {@code tag} is suggested for the draft: its reason words, strongest first, shown as they are
+     * written in the text, the author and the source when they are a reason, and those of the draft's
+     * tags that are a reason, strongest first. Null when the tag can't be suggested at all (on too
+     * few quotes).
      */
-    public Explanation explain(String text, String author, String source, Collection<String> quoteTags,
-                               String tag) {
-        return explain(text, author, source, quoteTags, tag, null);
-    }
-
-    /** {@link #explain(String, String, String, Collection, String)} with the text's vector (null: none). */
-    public Explanation explain(String text, String author, String source, Collection<String> quoteTags,
-                               String tag, float[] vector) {
-        return explain(text, author, source, quoteTags, tag, neighbours(vector, null), 0);
+    public Explanation explain(Draft draft, String tag) {
+        return explain(draft.text, draft.author, draft.source, draft.tags, tag, neighbours(draft.vector, null), 0);
     }
 
     /**
-     * {@link #explain} for {@code quote}, a quote of the fitted collection, counted as if it were
-     * left out (like {@link #suggestionFor}): the "Suggested for" list's line (#56).
+     * {@link #explain(Draft, String)} for {@code quote}, a quote of the fitted collection, counted as
+     * if it were left out (like {@link #suggestionFor}): the "Suggested for" list's line (#56).
      */
-    public Explanation explainFor(Quote quote, String tag) {
+    public Explanation explain(Quote quote, String tag) {
         return explain(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), quote.getTags(), tag,
                 neighboursOf(quote), 1);
     }
@@ -877,24 +840,23 @@ public final class HashtagSuggester {
         TagStats stats = tags.get(key);
         if (stats == null) return null;
         Map<String, String> ownWords = new HashMap<>();
-        forEachWord(text, ownWords::putIfAbsent);
+        QuoteTokens.forEachWord(text, ownWords::putIfAbsent);
 
         List<Evidence> words = new ArrayList<>();
-        Set<String> wordTokens = tokens(text, null, null);
+        Set<String> wordTokens = QuoteTokens.of(text, null, null, null);
         for (String token : wordTokens) {
             if (isReason(stats, token, self)) {
                 words.add(evidence(stats, token, ownWords.getOrDefault(token, displayWord(token)), self));
             }
         }
         words.sort(STRONGEST_FIRST);
-        String authorToken = authorToken(author);
+        String authorToken = QuoteTokens.authorToken(author);
         Evidence authorEvidence = null;
         if (isReason(stats, authorToken, self)) authorEvidence = evidence(stats, authorToken, author.trim(), self);
-        String sourceToken = sourceToken(source);
+        String sourceToken = QuoteTokens.sourceToken(source);
         Evidence sourceEvidence = null;
         if (isReason(stats, sourceToken, self)) sourceEvidence = evidence(stats, sourceToken, source.trim(), self);
-        Set<String> tagTokens = new LinkedHashSet<>();
-        addTagTokens(tagTokens, quoteTags);
+        Set<String> tagTokens = QuoteTokens.of(null, null, null, quoteTags);
         List<Evidence> tagEvidence = new ArrayList<>();
         for (String token : tagTokens) {
             if (isTagReason(stats, token, self)) tagEvidence.add(evidence(stats, token, tagLabel(token), self));
@@ -925,13 +887,13 @@ public final class HashtagSuggester {
         List<Evidence> sources = new ArrayList<>();
         List<Evidence> tagEvidence = new ArrayList<>();
         for (String token : stats.tokens.keySet()) {
-            if (token.startsWith(TAG_PREFIX)) {
+            if (token.startsWith(QuoteTokens.TAG_PREFIX)) {
                 if (isTagReason(stats, token)) tagEvidence.add(evidence(stats, token, tagLabel(token)));
             } else if (!isReason(stats, token)) {
                 continue;
-            } else if (token.startsWith(AUTHOR_PREFIX)) {
+            } else if (token.startsWith(QuoteTokens.AUTHOR_PREFIX)) {
                 authors.add(evidence(stats, token, authorNames.get(token)));
-            } else if (token.startsWith(SOURCE_PREFIX)) {
+            } else if (token.startsWith(QuoteTokens.SOURCE_PREFIX)) {
                 sources.add(evidence(stats, token, sourceNames.get(token)));
             } else {
                 words.add(evidence(stats, token, displayWord(token)));
@@ -952,30 +914,18 @@ public final class HashtagSuggester {
         return null;
     }
 
-    /** The English and German stems of a tag's name ({@code key}, lowercase); none when it is too short. */
-    private static Set<String> nameStems(String key) {
-        Set<String> stems = new HashSet<>();
-        if (key.codePointCount(0, key.length()) < MIN_WORD_LENGTH) return stems;
-        for (SnowballStemmer stemmer : new SnowballStemmer[]{new englishStemmer(), new germanStemmer()}) {
-            stemmer.setCurrent(key);
-            stemmer.stem();
-            stems.add(stemmer.getCurrent());
-        }
-        return stems;
-    }
-
     /** Whether the tag token is a reason for the tag; a tag is never a reason for itself. */
     private boolean isTagReason(TagStats stats, String token) {
         return isTagReason(stats, token, 0);
     }
 
     private boolean isTagReason(TagStats stats, String token, int self) {
-        return !token.equals(TAG_PREFIX + Hashtag.key(stats.spelling)) && isReason(stats, token, self);
+        return !token.equals(QuoteTokens.TAG_PREFIX + Hashtag.key(stats.spelling)) && isReason(stats, token, self);
     }
 
     /** "#Death" for {@code tag:death}, in the collection's spelling. */
     private String tagLabel(String token) {
-        String key = token.substring(TAG_PREFIX.length());
+        String key = token.substring(QuoteTokens.TAG_PREFIX.length());
         return Hashtag.display(tagSpellings.getOrDefault(key, key));
     }
 
@@ -1017,93 +967,11 @@ public final class HashtagSuggester {
     private boolean isReason(TagStats stats, String token, int self) {
         if (token == null) return false;
         int together = stats.tokens.getOrDefault(token, 0);
-        int min = token.startsWith(AUTHOR_PREFIX) ? MIN_AUTHOR_WITH_TAG
-                : token.startsWith(SOURCE_PREFIX) ? MIN_SOURCE_WITH_TAG
-                : token.startsWith(TAG_PREFIX) ? MIN_TAG_WITH_TAG : MIN_WORD_WITH_TAG;
+        int min = token.startsWith(QuoteTokens.AUTHOR_PREFIX) ? MIN_AUTHOR_WITH_TAG
+                : token.startsWith(QuoteTokens.SOURCE_PREFIX) ? MIN_SOURCE_WITH_TAG
+                : token.startsWith(QuoteTokens.TAG_PREFIX) ? MIN_TAG_WITH_TAG : MIN_WORD_WITH_TAG;
         if (together < min) return false;
         return together * 100 >= MIN_SHARE_PERCENT * (tokenCounts.getOrDefault(token, 0) - self);
     }
 
-    /** The quote's tokens: stemmed content words of {@code text}, plus the author and source tokens. */
-    static Set<String> tokens(String text, String author, String source) {
-        Set<String> tokens = new LinkedHashSet<>();
-        forEachWord(text, (stem, word) -> tokens.add(stem));
-        String authorToken = authorToken(author);
-        if (authorToken != null) tokens.add(authorToken);
-        String sourceToken = sourceToken(source);
-        if (sourceToken != null) tokens.add(sourceToken);
-        return tokens;
-    }
-
-    /**
-     * Each content word of {@code text} (lowercased; stopwords and words under
-     * {@link #MIN_WORD_LENGTH} letters dropped) with its stem, from the stemmer of the text's
-     * language ({@link #stemmerFor}).
-     */
-    private static void forEachWord(String text, BiConsumer<String, String> action) {
-        if (text == null) return;
-        List<String> words = words(text);
-        SnowballStemmer stemmer = stemmerFor(words);
-        for (String w : words) {
-            if (w.codePointCount(0, w.length()) >= MIN_WORD_LENGTH && !STOPWORDS.contains(w)) {
-                stemmer.setCurrent(w);
-                stemmer.stem();
-                action.accept(stemmer.getCurrent(), w);
-            }
-        }
-    }
-
-    /** Every word of {@code text}: its runs of letters, lowercased. */
-    private static List<String> words(String text) {
-        List<String> words = new ArrayList<>();
-        StringBuilder word = new StringBuilder();
-        String lower = text.toLowerCase(Locale.ROOT);
-        for (int i = 0; i <= lower.length(); ) {
-            int cp = i < lower.length() ? lower.codePointAt(i) : ' ';
-            if (Character.isLetter(cp)) {
-                word.appendCodePoint(cp);
-            } else if (word.length() > 0) {
-                words.add(word.toString());
-                word.setLength(0);
-            }
-            i += Character.charCount(cp);
-        }
-        return words;
-    }
-
-    /** German when {@code words} hold more German than English stopwords, else English. */
-    private static SnowballStemmer stemmerFor(List<String> words) {
-        int english = 0;
-        int german = 0;
-        for (String w : words) {
-            if (ENGLISH_STOPWORDS.contains(w)) english++;
-            if (GERMAN_STOPWORDS.contains(w)) german++;
-        }
-        return german > english ? new germanStemmer() : new englishStemmer();
-    }
-
-    /** Adds a {@code tag:<key>} token for each of {@code tags} (normalized; null is none). */
-    private static void addTagTokens(Set<String> tokens, Collection<String> tags) {
-        if (tags == null) return;
-        for (String tag : tags) {
-            String normalized = Hashtag.normalize(tag);
-            if (!normalized.isEmpty()) tokens.add(TAG_PREFIX + Hashtag.key(normalized));
-        }
-    }
-
-    /** {@code author:<name>}, lowercased with whitespace collapsed; null when there is no author. */
-    static String authorToken(String author) {
-        return nameToken(AUTHOR_PREFIX, author);
-    }
-
-    /** {@code source:<name>}, like {@link #authorToken}; null when there is no source. */
-    static String sourceToken(String source) {
-        return nameToken(SOURCE_PREFIX, source);
-    }
-
-    private static String nameToken(String prefix, String name) {
-        if (name == null) return null;
-        String key = name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
-        return key.isEmpty() ? null : prefix + key;
-    }
 }

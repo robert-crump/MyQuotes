@@ -39,7 +39,7 @@ final class SuggestionModel {
         final Integer vectorsVersion;
         final Map<Integer, float[]> vectors;
         final HashtagSuggester model;
-        /** Each quote's leave-one-out suggestions ({@link HashtagSuggester#suggestionsFor}). */
+        /** Each quote's leave-one-out suggestions ({@link HashtagSuggester#suggest(Quote)}). */
         final Map<Integer, List<HashtagSuggester.Suggestion>> suggestionsById;
         /** The quotes with suggestions: the "Has suggestions" count. */
         final int countWithSuggestions;
@@ -85,7 +85,7 @@ final class SuggestionModel {
                 if (suggestion == null) continue;
                 byId.put(quote.getId(), suggestion);
                 linesById.put(quote.getId(),
-                        HashtagSuggestionText.suggestedForLine(fitted.model.explainFor(quote, tag)));
+                        HashtagSuggestionText.suggestedForLine(fitted.model.explain(quote, tag)));
             }
             suggestions = Collections.unmodifiableMap(byId);
             lines = Collections.unmodifiableMap(linesById);

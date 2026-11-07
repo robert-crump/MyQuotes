@@ -47,8 +47,7 @@ public class HashtagSuggesterZeroShotTest {
     }
 
     private static List<String> suggest(HashtagSuggester model, String text, Double degrees) {
-        return model.suggest(text, "Someone New", "", Collections.emptyList(), Collections.emptyList(), null,
-                degrees == null ? null : at(degrees));
+        return model.suggest(HashtagSuggester.Draft.of(text, "Someone New", "", Collections.emptyList()).rejecting(Collections.emptyList()).withVector(degrees == null ? null : at(degrees)));
     }
 
     private void smallCourage() {
@@ -145,8 +144,8 @@ public class HashtagSuggesterZeroShotTest {
         assertNull("3rd closest without the tag", model.suggestionFor(far, "Courage"));
         assertNull(model.suggestionFor(rejecting, "Courage"));
         assertNull("has the tag", model.suggestionFor(quotes.get(0), "Courage"));
-        assertTrue(model.suggestionsFor(rejecting).isEmpty());
-        assertEquals("Courage", model.suggestionsFor(close).get(0).tag);
+        assertTrue(model.suggest(rejecting).isEmpty());
+        assertEquals("Courage", model.suggest(close).get(0).tag);
     }
 
     @Test

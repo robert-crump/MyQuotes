@@ -107,7 +107,7 @@ public class HashtagSuggestionEvalTest {
         List<Quote> others = new ArrayList<>(quotes);
         others.remove(target);
         List<String> editor = HashtagSuggester.fit(others)
-                .suggest(target.getQuoteText(), target.getAuthor(), target.getSource(), Collections.emptyList());
+                .suggest(HashtagSuggester.Draft.of(target.getQuoteText(), target.getAuthor(), target.getSource(), Collections.emptyList()));
 
         assertEquals(editor, HashtagSuggestionEval.leaveOneOut(quotes).apply(target));
         assertEquals(Collections.singletonList("Nature"), editor);

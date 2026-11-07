@@ -190,8 +190,7 @@ final class HashtagSuggestionEval {
             for (Quote other : quotes) {
                 if (other != quote) others.add(other);
             }
-            return HashtagSuggester.fit(others).suggest(quote.getQuoteText(), quote.getAuthor(),
-                    quote.getSource(), Collections.emptyList(), quote.getRejectedTags());
+            return HashtagSuggester.fit(others).suggest(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList()).rejecting(quote.getRejectedTags()));
         };
     }
 
@@ -415,8 +414,7 @@ final class HashtagSuggestionEval {
 
     /** The editor on a new quote: no chips, the quote's rejected tags left out. */
     private static List<String> suggestAsNew(HashtagSuggester model, Quote quote, float[] vector) {
-        return model.suggest(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList(),
-                quote.getRejectedTags(), null, vector);
+        return model.suggest(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList()).rejecting(quote.getRejectedTags()).withVector(vector));
     }
 
     /**

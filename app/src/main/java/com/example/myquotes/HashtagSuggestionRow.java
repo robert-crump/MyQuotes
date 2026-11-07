@@ -198,8 +198,7 @@ final class HashtagSuggestionRow {
         main.removeCallbacks(refresh);
         updateTextVector();
         List<String> suggestions = model == null ? Collections.emptyList()
-                : model.suggest(text.getText().toString(), author.getText().toString(),
-                        source.getText().toString(), field.getTags(), rejected, pinned, textVector);
+                : model.suggest(draft());
         shown = suggestions;
         group.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(group.getContext());
@@ -218,8 +217,14 @@ final class HashtagSuggestionRow {
     }
 
     private HashtagSuggester.Explanation explain(String tag) {
-        return model.explain(text.getText().toString(), author.getText().toString(),
-                source.getText().toString(), field.getTags(), tag, textVector);
+        return model.explain(draft(), tag);
+    }
+
+    /** What the editor shows now: the form's fields and chips, rejected tags, pinned tag and the text's vector. */
+    private HashtagSuggester.Draft draft() {
+        return HashtagSuggester.Draft.of(text.getText().toString(), author.getText().toString(),
+                source.getText().toString(), field.getTags()).rejecting(rejected).pinning(pinned)
+                .withVector(textVector);
     }
 
     /** One suggestion's reasons, with "Don't suggest for this quote" (#55). */
