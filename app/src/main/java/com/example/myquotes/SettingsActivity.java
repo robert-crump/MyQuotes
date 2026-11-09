@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * Settings, laid out like Hue and You's: a bold title above each group (Library, General,
@@ -84,30 +85,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         quoteCollection = MyApplication.getInstance().getQuoteCollection();
 
-        // Initialize ActivityResultLaunchers
-        exportLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        Uri uri = result.getData().getData();
-                        if (uri != null) {
-                            exportQuotesToJson(uri);
-                        }
-                    }
-                }
-        );
-
-        importLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        Uri uri = result.getData().getData();
-                        if (uri != null) {
-                            importQuotesFromJson(uri);
-                        }
-                    }
-                }
-        );
+        exportLauncher = documentLauncher(this::exportQuotesToJson);
+        importLauncher = documentLauncher(this::importQuotesFromJson);
 
         backupFolderLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -151,6 +130,15 @@ public class SettingsActivity extends AppCompatActivity {
         setupBackupSection();
     }
 
+    /** Launches a document picker and passes the picked document to {@code onPicked}; nothing on cancel. */
+    private ActivityResultLauncher<Intent> documentLauncher(Consumer<Uri> onPicked) {
+        return registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            Uri uri = result.getResultCode() == RESULT_OK && result.getData() != null
+                    ? result.getData().getData() : null;
+            if (uri != null) onPicked.accept(uri);
+        });
+    }
+
     // Library rows: Hashtags and Statistics, each with a live count.
     private void setupLibrarySection() {
         SettingsRow hashtagsRow = new SettingsRow(binding.rowHashtags,
@@ -181,11 +169,8 @@ public class SettingsActivity extends AppCompatActivity {
         dailyNotificationRow = new SettingsRow(binding.rowDailyNotification,
                 R.drawable.ic_notifications_24dp, R.string.settings_daily_notification)
                 .withSwitch(QuoteNotifications.isEnabled(this), (buttonView, isChecked) -> {
-                    if (isChecked) {
-                        Toast.makeText(this, "Daily notifications enabled", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(this, "Daily notifications disabled", Toast.LENGTH_SHORT).show();
-                    }
+                    Toast.makeText(this, isChecked ? "Daily notifications enabled" : "Daily notifications disabled",
+                            Toast.LENGTH_SHORT).show();
                     QuoteNotifications.setEnabled(this, isChecked);
                 });
         dailyNotificationRow.setSummary(R.string.settings_daily_notification_summary);
