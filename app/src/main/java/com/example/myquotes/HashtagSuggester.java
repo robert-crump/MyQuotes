@@ -570,16 +570,20 @@ public final class HashtagSuggester {
             for (Candidate quote : withVectors) {
                 if (!quote.tagKeys.contains(key)) similarities[n++] = dot(name, quote.vector);
             }
-            similarities = Arrays.copyOf(similarities, n);
-            Arrays.sort(similarities);
-            for (int i = 0, j = n - 1; i < j; i++, j--) {
-                float swap = similarities[i];
-                similarities[i] = similarities[j];
-                similarities[j] = swap;
-            }
-            ranks.put(key, new NameRank(name, similarities));
+            ranks.put(key, new NameRank(name, sortedDescending(Arrays.copyOf(similarities, n))));
         }
         return new HashtagSuggester(this, knn, ranks, zeroShot);
+    }
+
+    /** {@code values}, sorted in place, highest first. */
+    private static float[] sortedDescending(float[] values) {
+        Arrays.sort(values);
+        for (int i = 0, j = values.length - 1; i < j; i++, j--) {
+            float swap = values[i];
+            values[i] = values[j];
+            values[j] = swap;
+        }
+        return values;
     }
 
     /** This model with other small-tag parameters (#64), sharing everything else (the eval's sweep). */
@@ -967,11 +971,16 @@ public final class HashtagSuggester {
     private boolean isReason(TagStats stats, String token, int self) {
         if (token == null) return false;
         int together = stats.tokens.getOrDefault(token, 0);
-        int min = token.startsWith(QuoteTokens.AUTHOR_PREFIX) ? MIN_AUTHOR_WITH_TAG
-                : token.startsWith(QuoteTokens.SOURCE_PREFIX) ? MIN_SOURCE_WITH_TAG
-                : token.startsWith(QuoteTokens.TAG_PREFIX) ? MIN_TAG_WITH_TAG : MIN_WORD_WITH_TAG;
-        if (together < min) return false;
+        if (together < minWithTag(token)) return false;
         return together * 100 >= MIN_SHARE_PERCENT * (tokenCounts.getOrDefault(token, 0) - self);
+    }
+
+    /** The quotes with both {@code token} and the tag that make the token a reason, by kind of token. */
+    private static int minWithTag(String token) {
+        if (token.startsWith(QuoteTokens.AUTHOR_PREFIX)) return MIN_AUTHOR_WITH_TAG;
+        if (token.startsWith(QuoteTokens.SOURCE_PREFIX)) return MIN_SOURCE_WITH_TAG;
+        if (token.startsWith(QuoteTokens.TAG_PREFIX)) return MIN_TAG_WITH_TAG;
+        return MIN_WORD_WITH_TAG;
     }
 
 }
