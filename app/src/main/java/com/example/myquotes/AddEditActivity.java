@@ -101,8 +101,9 @@ public class AddEditActivity extends AppCompatActivity {
             if (tags != null) hashtagField.setTags(tags);
             List<String> rejected = savedInstanceState.getStringArrayList(STATE_REJECTED);
             if (rejected != null) hashtagSuggestions.setRejected(rejected);
-        } else if (isEditMode && quoteCollection.findById(quoteId) != null) {
-            hashtagSuggestions.setRejected(quoteCollection.findById(quoteId).getRejectedTags());
+        } else if (isEditMode) {
+            Quote quote = quoteCollection.findById(quoteId);
+            if (quote != null) hashtagSuggestions.setRejected(quote.getRejectedTags());
         }
         setupBackHandling();
     }
@@ -145,13 +146,18 @@ public class AddEditActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (readForm().equals(baseline)) {
-                    finish();
-                } else {
-                    showDiscardDialog(AddEditActivity.this::finish);
-                }
+                discardChangesThen(AddEditActivity.this::finish);
             }
         });
+    }
+
+    /** Runs {@code action} at once when the form is unchanged, else after the user confirms discarding. */
+    private void discardChangesThen(Runnable action) {
+        if (readForm().equals(baseline)) {
+            action.run();
+        } else {
+            showDiscardDialog(action);
+        }
     }
 
     private void showDiscardDialog(Runnable onDiscard) {
@@ -202,11 +208,7 @@ public class AddEditActivity extends AppCompatActivity {
             saveQuote();
             return true;
         } else if (item.getItemId() == R.id.action_skip) {
-            if (readForm().equals(baseline)) {
-                skipQuote();
-            } else {
-                showDiscardDialog(this::skipQuote);
-            }
+            discardChangesThen(this::skipQuote);
             return true;
         } else if (item.getItemId() == R.id.action_delete) {
             showDeleteDialog();
@@ -215,65 +217,45 @@ public class AddEditActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    // Picking an author moves on to the source field.
     private void setupAuthorSuggestions() {
-        authorPopup = new ListPopupWindow(this);
-        authorPopup.setAnchorView(editTextAuthor);
-        authorPopup.setModal(false);
-
-        authorPopup.setOnItemClickListener((parent, view, position, id) -> {
-            String selected = ((SuggestionAdapter) parent.getAdapter()).getStringAt(position);
-            if (selected == null) return;
-            editTextAuthor.setText(selected);
-            editTextAuthor.setSelection(selected.length());
-            authorPopup.dismiss();
-            editTextSource.requestFocus();
-        });
-
-        editTextAuthor.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (isLoadingQuote) return;
-                String input = s.toString().trim();
-                if (input.length() < 2) {
-                    authorPopup.dismiss();
-                    return;
-                }
-                List<Quote> quotes = quoteCollection.getCurrentList();
-                List<String> suggestions = suggestionProvider.getAuthorSuggestions(quotes, input);
-                if (suggestions.isEmpty()) {
-                    authorPopup.dismiss();
-                    return;
-                }
-                SuggestionAdapter suggestionAdapter = SuggestionAdapter.forAuthors(AddEditActivity.this, suggestions);
-                authorPopup.setAdapter(suggestionAdapter);
-                authorPopup.setWidth(editTextAuthor.getWidth());
-                authorPopup.setHeight(calcPopupHeight(suggestionAdapter.getSuggestionCount(), false));
-                authorPopup.show();
-            }
-        });
-
-        editTextAuthor.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) authorPopup.dismiss();
+        authorPopup = suggestionPopup(editTextAuthor, editTextSource::requestFocus, input -> {
+            List<String> suggestions = suggestionProvider.getAuthorSuggestions(quoteCollection.getCurrentList(), input);
+            return suggestions.isEmpty() ? null : SuggestionAdapter.forAuthors(this, suggestions);
         });
     }
 
     private void setupSourceSuggestions() {
-        sourcePopup = new ListPopupWindow(this);
-        sourcePopup.setAnchorView(editTextSource);
-        sourcePopup.setModal(false);
+        sourcePopup = suggestionPopup(editTextSource, () -> {}, input -> {
+            String authorContext = editTextAuthor.getText().toString().trim();
+            SourceSuggestions suggestions = suggestionProvider.getSourceSuggestions(
+                    quoteCollection.getCurrentList(), input, authorContext);
+            if (suggestions.authorSources.isEmpty() && suggestions.otherSources.isEmpty()) return null;
+            return SuggestionAdapter.forSources(this, suggestions);
+        });
+    }
 
-        sourcePopup.setOnItemClickListener((parent, view, position, id) -> {
+    /**
+     * A dropdown under {@code field} that shows {@code adapterFor}'s suggestions (null: none) for
+     * the trimmed input from 2 characters on, while the field has focus and no quote is loading.
+     * Picking one fills the field, then runs {@code afterPick}.
+     */
+    private ListPopupWindow suggestionPopup(EditText field, Runnable afterPick,
+                                            Function<String, SuggestionAdapter> adapterFor) {
+        ListPopupWindow popup = new ListPopupWindow(this);
+        popup.setAnchorView(field);
+        popup.setModal(false);
+
+        popup.setOnItemClickListener((parent, view, position, id) -> {
             String selected = ((SuggestionAdapter) parent.getAdapter()).getStringAt(position);
             if (selected == null) return;
-            editTextSource.setText(selected);
-            editTextSource.setSelection(selected.length());
-            sourcePopup.dismiss();
+            field.setText(selected);
+            field.setSelection(selected.length());
+            popup.dismiss();
+            afterPick.run();
         });
 
-        editTextSource.addTextChangedListener(new TextWatcher() {
+        field.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
@@ -281,37 +263,31 @@ public class AddEditActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {
                 if (isLoadingQuote) return;
                 String input = s.toString().trim();
-                if (input.length() < 2) {
-                    sourcePopup.dismiss();
+                SuggestionAdapter adapter = input.length() < 2 ? null : adapterFor.apply(input);
+                if (adapter == null) {
+                    popup.dismiss();
                     return;
                 }
-                String authorContext = editTextAuthor.getText().toString().trim();
-                List<Quote> quotes = quoteCollection.getCurrentList();
-                SourceSuggestions suggestions = suggestionProvider.getSourceSuggestions(quotes, input, authorContext);
-                if (suggestions.authorSources.isEmpty() && suggestions.otherSources.isEmpty()) {
-                    sourcePopup.dismiss();
-                    return;
-                }
-                SuggestionAdapter suggestionAdapter = SuggestionAdapter.forSources(AddEditActivity.this, suggestions);
-                sourcePopup.setAdapter(suggestionAdapter);
-                sourcePopup.setWidth(editTextSource.getWidth());
-                sourcePopup.setHeight(calcPopupHeight(suggestionAdapter.getSuggestionCount(), suggestions.hasSplit()));
-                sourcePopup.show();
+                popup.setAdapter(adapter);
+                popup.setWidth(field.getWidth());
+                popup.setHeight(calcPopupHeight(adapter));
+                popup.show();
             }
         });
 
-        editTextSource.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) sourcePopup.dismiss();
+        field.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) popup.dismiss();
         });
+        return popup;
     }
 
-    private int calcPopupHeight(int suggestionCount, boolean hasDivider) {
+    /** Up to 4 rows of 48dp, plus 1dp for the divider row when the adapter has one. */
+    private int calcPopupHeight(SuggestionAdapter adapter) {
         float density = getResources().getDisplayMetrics().density;
-        int itemHeightPx = Math.round(48 * density);
-        int dividerHeightPx = Math.round(density); // 1dp
-        int visibleItems = Math.min(suggestionCount, 4);
-        int height = visibleItems * itemHeightPx;
-        if (hasDivider) height += dividerHeightPx;
+        int suggestionCount = adapter.getSuggestionCount();
+        boolean hasDivider = adapter.getCount() > suggestionCount;
+        int height = Math.min(suggestionCount, 4) * Math.round(48 * density);
+        if (hasDivider) height += Math.round(density);
         return height;
     }
 
