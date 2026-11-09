@@ -2,6 +2,7 @@ package com.example.myquotes;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -31,6 +32,10 @@ import java.util.function.Function;
  * separately, and precision and recall per tag.
  */
 final class HashtagSuggestionEval {
+
+    /** Tags on more quotes first, then by name ignoring case. */
+    private static final Comparator<TagResult> MOST_QUOTES_FIRST =
+            (a, b) -> a.quotes != b.quotes ? b.quotes - a.quotes : a.tag.compareToIgnoreCase(b.tag);
 
     /** Counts for one tag; the ratios are computed from them. */
     static final class TagResult {
@@ -125,14 +130,10 @@ final class HashtagSuggestionEval {
 
     /** Runs {@code suggester} on every quote and compares its top suggestions with the quote's tags. */
     static Result evaluate(List<Quote> quotes, Function<Quote, List<String>> suggester) {
-        Map<String, Integer> quotesPerTag = new HashMap<>();
-        for (Quote quote : quotes) {
-            for (String tag : quote.getTags()) quotesPerTag.merge(Hashtag.key(tag), 1, Integer::sum);
-        }
+        Map<String, Integer> quotesPerTag = quotesPerTag(quotes);
         Result result = new Result();
         for (Quote quote : quotes) {
-            List<String> suggestions = suggester.apply(quote);
-            List<String> top = suggestions.subList(0, Math.min(HashtagSuggester.MAX_SUGGESTIONS, suggestions.size()));
+            List<String> top = top(suggester.apply(quote));
             boolean tagged = !quote.getTags().isEmpty();
             if (!tagged) {
                 result.untaggedQuotes++;
@@ -149,8 +150,9 @@ final class HashtagSuggestionEval {
                 TagResult tagResult = tagResult(result, key, tag);
                 tagResult.quotes++;
                 result.tags++;
-                result.bucketTags[bucket(quotesPerTag.get(key) - 1)]++;
-                if (quotesPerTag.get(key) - 1 >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
+                int others = quotesPerTag.get(key) - 1;
+                result.bucketTags[bucket(others)]++;
+                if (others >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
                     tagResult.eligible++;
                     result.eligibleTags++;
                 }
@@ -170,7 +172,7 @@ final class HashtagSuggestionEval {
                 result.hits++;
                 result.bucketHits[bucket(others)]++;
                 if (small) result.smallHits++;
-                if (quotesPerTag.get(key) - 1 >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
+                if (others >= HashtagSuggester.MIN_QUOTES_PER_TAG) {
                     tagResult.eligibleHits++;
                     result.eligibleHits++;
                 }
@@ -185,13 +187,7 @@ final class HashtagSuggestionEval {
      * is fine for a collection of a few thousand quotes.
      */
     static Function<Quote, List<String>> leaveOneOut(List<Quote> quotes) {
-        return quote -> {
-            List<Quote> others = new ArrayList<>(quotes.size());
-            for (Quote other : quotes) {
-                if (other != quote) others.add(other);
-            }
-            return HashtagSuggester.fit(others).suggest(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), quote.getSource(), Collections.emptyList()).rejecting(quote.getRejectedTags()));
-        };
+        return quote -> suggestAsNew(HashtagSuggester.fit(without(quotes, quote)), quote, null);
     }
 
     /**
@@ -221,7 +217,7 @@ final class HashtagSuggestionEval {
         for (HashtagSuggester.Knn knn : configs) sweep.byKnn.put(knn, new IdentityHashMap<>());
         for (Quote quote : quotes) {
             HashtagSuggester fitted = HashtagSuggester.fit(without(quotes, quote), vectors);
-            float[] vector = quote.getId() == null ? null : vectors.get(quote.getId());
+            float[] vector = vectorOf(quote, vectors);
             sweep.baseline.put(quote, suggestAsNew(fitted, quote, null));
             for (HashtagSuggester.Knn knn : configs) {
                 sweep.byKnn.get(knn).put(quote, suggestAsNew(fitted.withKnn(knn), quote, vector));
@@ -258,7 +254,7 @@ final class HashtagSuggestionEval {
         for (ZeroShotConfig config : configs) out.put(config, new IdentityHashMap<>());
         for (Quote quote : quotes) {
             HashtagSuggester fitted = HashtagSuggester.fit(without(quotes, quote), vectors);
-            float[] vector = quote.getId() == null ? null : vectors.get(quote.getId());
+            float[] vector = vectorOf(quote, vectors);
             baselineOut.put(quote, suggestAsNew(fitted, quote, vector));
             Map<HashtagSuggester.NameText, HashtagSuggester> named = new HashMap<>();
             for (ZeroShotConfig config : configs) {
@@ -315,10 +311,7 @@ final class HashtagSuggestionEval {
 
     static Map<ZeroShotConfig, PassResult> tagPasses(List<Quote> quotes, Map<Integer, float[]> vectors,
             Map<HashtagSuggester.NameText, Map<String, float[]>> nameVectors, List<ZeroShotConfig> configs) {
-        Map<String, Integer> quotesPerTag = new HashMap<>();
-        for (Quote quote : quotes) {
-            for (String tag : quote.getTags()) quotesPerTag.merge(Hashtag.key(tag), 1, Integer::sum);
-        }
+        Map<String, Integer> quotesPerTag = quotesPerTag(quotes);
         Map<ZeroShotConfig, PassResult> out = new LinkedHashMap<>();
         for (ZeroShotConfig config : configs) out.put(config, new PassResult());
         for (int i = 0; i < quotes.size(); i++) {
@@ -404,6 +397,18 @@ final class HashtagSuggestionEval {
         return out.toString();
     }
 
+    private static Map<String, Integer> quotesPerTag(List<Quote> quotes) {
+        Map<String, Integer> quotesPerTag = new HashMap<>();
+        for (Quote quote : quotes) {
+            for (String tag : quote.getTags()) quotesPerTag.merge(Hashtag.key(tag), 1, Integer::sum);
+        }
+        return quotesPerTag;
+    }
+
+    private static float[] vectorOf(Quote quote, Map<Integer, float[]> vectors) {
+        return quote.getId() == null ? null : vectors.get(quote.getId());
+    }
+
     static List<Quote> without(List<Quote> quotes, Quote quote) {
         List<Quote> others = new ArrayList<>(quotes.size());
         for (Quote other : quotes) {
@@ -460,7 +465,7 @@ final class HashtagSuggestionEval {
         for (Map.Entry<String, TagResult> entry : baseline.perTag.entrySet()) {
             if (!candidate.perTag.containsKey(entry.getKey())) tags.add(entry.getValue());
         }
-        tags.sort((a, b) -> a.quotes != b.quotes ? b.quotes - a.quotes : a.tag.compareToIgnoreCase(b.tag));
+        tags.sort(MOST_QUOTES_FIRST);
         TagResult none = new TagResult("");
         for (TagResult tag : tags) {
             String key = Hashtag.key(tag.tag);
@@ -537,7 +542,7 @@ final class HashtagSuggestionEval {
                 percent(result.coverageUntagged()), result.untaggedCovered, result.untaggedQuotes));
 
         List<TagResult> tags = new ArrayList<>(result.perTag.values());
-        tags.sort((a, b) -> a.quotes != b.quotes ? b.quotes - a.quotes : a.tag.compareToIgnoreCase(b.tag));
+        tags.sort(MOST_QUOTES_FIRST);
         out.append(String.format(Locale.ROOT, "%n%-28s %6s %8s %9s %5s %9s %7s%n",
                 "Tag", "quotes", "eligible", "suggested", "hits", "precision", "recall"));
         for (TagResult tag : tags) {
