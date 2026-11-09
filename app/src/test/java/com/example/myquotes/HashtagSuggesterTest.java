@@ -1,6 +1,7 @@
 package com.example.myquotes;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -9,7 +10,6 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 public class HashtagSuggesterTest {
@@ -23,12 +23,8 @@ public class HashtagSuggesterTest {
     }
 
     // Each author once, so the author is never a reason.
-    private void addTagged(int count, String text, String tag) {
-        for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tag);
-    }
-
-    private void addTagged(int count, String text, String tag, String other) {
-        for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tag, other);
+    private void addTagged(int count, String text, String... tags) {
+        for (int i = 0; i < count; i++) add("Author " + quotes.size(), text, tags);
     }
 
     private void addUntagged(int count, String text) {
@@ -41,7 +37,23 @@ public class HashtagSuggesterTest {
     }
 
     private List<String> suggest(String text) {
-        return HashtagSuggester.fit(quotes).suggest(HashtagSuggester.Draft.of(text, "Someone New", "", Collections.emptyList()));
+        return suggest(text, "Someone New", "");
+    }
+
+    private List<String> suggest(String text, String author, String source) {
+        return HashtagSuggester.fit(quotes).suggest(HashtagSuggester.Draft.of(text, author, source, Collections.emptyList()));
+    }
+
+    private List<Quote> without(Quote quote) {
+        List<Quote> others = new ArrayList<>(quotes);
+        others.remove(quote);
+        return others;
+    }
+
+    private static List<String> tagsOf(List<HashtagSuggester.Suggestion> suggestions) {
+        List<String> tags = new ArrayList<>();
+        for (HashtagSuggester.Suggestion s : suggestions) tags.add(s.tag);
+        return tags;
     }
 
     private void addEmerson(int withTag, int without) {
@@ -93,12 +105,10 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addEmerson(2, 3);
-        assertEquals(Collections.singletonList("Nature"), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "  emerson ", "", Collections.emptyList())));
+        assertEquals(Collections.singletonList("Nature"), suggest("gold coin", "  emerson ", ""));
 
         addEmerson(0, 1);
-        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "Emerson", "", Collections.emptyList())));
+        assertEquals(Collections.emptyList(), suggest("gold coin", "Emerson", ""));
     }
 
     @Test
@@ -106,8 +116,7 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addEmerson(1, 0);
-        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "Emerson", "", Collections.emptyList())));
+        assertEquals(Collections.emptyList(), suggest("gold coin", "Emerson", ""));
     }
 
     private void addMeditations(int withTag, int without) {
@@ -122,12 +131,10 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addMeditations(2, 3);
-        assertEquals(Collections.singletonList("Nature"), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "Someone New", "  meditations ", Collections.emptyList())));
+        assertEquals(Collections.singletonList("Nature"), suggest("gold coin", "Someone New", "  meditations "));
 
         addMeditations(0, 1);
-        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "Someone New", "Meditations", Collections.emptyList())));
+        assertEquals(Collections.emptyList(), suggest("gold coin", "Someone New", "Meditations"));
     }
 
     @Test
@@ -135,8 +142,7 @@ public class HashtagSuggesterTest {
         addTagged(5, "forest river mountain", "Nature");
         addFiller(10);
         addMeditations(1, 0);
-        assertEquals(Collections.emptyList(), HashtagSuggester.fit(quotes)
-                .suggest(HashtagSuggester.Draft.of("gold coin", "Someone New", "Meditations", Collections.emptyList())));
+        assertEquals(Collections.emptyList(), suggest("gold coin", "Someone New", "Meditations"));
     }
 
     @Test
@@ -215,7 +221,7 @@ public class HashtagSuggesterTest {
         addFiller(10);
         HashtagSuggester model = HashtagSuggester.fit(quotes);
         assertTrue(model.explain(HashtagSuggester.Draft.of("Nature heals.", "", "", null), "Nature").containsName);
-        assertEquals(false, model.explain(HashtagSuggester.Draft.of("A forest.", "", "", null), "Nature").containsName);
+        assertFalse(model.explain(HashtagSuggester.Draft.of("A forest.", "", "", null), "Nature").containsName);
     }
 
     @Test
@@ -283,8 +289,7 @@ public class HashtagSuggesterTest {
         assertTrue(HashtagSuggester.fit(quotes)
                 .suggest(HashtagSuggester.Draft.of(edited.getQuoteText(), "Anon", "", Collections.emptyList())).contains("Nature"));
 
-        List<Quote> others = new ArrayList<>(quotes);
-        others.remove(edited);
+        List<Quote> others = without(edited);
         assertEquals(Collections.emptyList(), HashtagSuggester.fit(others)
                 .suggest(HashtagSuggester.Draft.of(edited.getQuoteText(), "Anon", "", Collections.emptyList())));
     }
@@ -313,7 +318,7 @@ public class HashtagSuggesterTest {
         // "river" 6/6, then "forests" (stem "forest") 5/6; "lake" is on no quote.
         assertEquals(Arrays.asList(new HashtagSuggester.Evidence("river", 6, 6),
                 new HashtagSuggester.Evidence("forests", 5, 6)), why.words);
-        assertEquals(null, why.author);
+        assertNull(why.author);
     }
 
     @Test
@@ -339,7 +344,7 @@ public class HashtagSuggesterTest {
     @Test
     public void explainIsNullForATagThatCannotBeSuggested() {
         addTagged(4, "forest river mountain", "Nature");
-        assertEquals(null, HashtagSuggester.fit(quotes).explain(HashtagSuggester.Draft.of("forest river", "", "", null), "Nature"));
+        assertNull(HashtagSuggester.fit(quotes).explain(HashtagSuggester.Draft.of("forest river", "", "", null), "Nature"));
     }
 
     @Test
@@ -381,7 +386,7 @@ public class HashtagSuggesterTest {
     public void profileOfASmallTagSaysItIsNotSuggestable() {
         addTagged(3, "forest river mountain", "Nature");
         HashtagSuggester.TagProfile profile = HashtagSuggester.fit(quotes).profile("Nature");
-        assertEquals(false, profile.suggestable);
+        assertFalse(profile.suggestable);
         assertEquals(3, profile.quotes);
         assertEquals(Collections.emptyList(), profile.words);
     }
@@ -492,8 +497,7 @@ public class HashtagSuggesterTest {
         Quote quote = add("Someone New", "forest silver");
         addFiller(10);
         // With the quote "forest" is 4/9, below half; the editor, without it, sees 4/8.
-        List<Quote> others = new ArrayList<>(quotes);
-        others.remove(quote);
+        List<Quote> others = without(quote);
         assertEquals(Collections.singletonList("Nature"),
                 HashtagSuggester.fit(others).suggest(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), "", Collections.emptyList())));
         assertEquals(Collections.singletonList(new HashtagSuggester.Suggestion("Nature",
@@ -509,12 +513,10 @@ public class HashtagSuggesterTest {
         addUntagged(1, "forest gold");
         Quote quote = add("Someone New", "forest grief", "Death");
         addFiller(10);
-        List<Quote> others = new ArrayList<>(quotes);
-        others.remove(quote);
+        List<Quote> others = without(quote);
         List<String> editor = HashtagSuggester.fit(others)
                 .suggest(HashtagSuggester.Draft.of(quote.getQuoteText(), quote.getAuthor(), "", quote.getTags()));
-        List<String> listed = new ArrayList<>();
-        for (HashtagSuggester.Suggestion s : HashtagSuggester.fit(quotes).suggest(quote)) listed.add(s.tag);
+        List<String> listed = tagsOf(HashtagSuggester.fit(quotes).suggest(quote));
         assertEquals(Collections.singletonList("Nature"), editor);
         assertEquals(editor, listed);
     }
@@ -546,9 +548,7 @@ public class HashtagSuggesterTest {
     public void suggestionForFindsATagBeyondTheTopThree() {
         Quote quote = addFourTagQuote();
         HashtagSuggester model = HashtagSuggester.fit(quotes);
-        List<String> top = new ArrayList<>();
-        for (HashtagSuggester.Suggestion s : model.suggest(quote)) top.add(s.tag);
-        assertEquals(Arrays.asList("Sea", "Sky", "Tree"), top);
+        assertEquals(Arrays.asList("Sea", "Sky", "Tree"), tagsOf(model.suggest(quote)));
         // "virtue" is on 8 quotes with this one, 7 without it, as the editor counts.
         assertEquals(new HashtagSuggester.Suggestion("Stoicism", new HashtagSuggester.Evidence("virtu", 5, 7)),
                 model.suggestionFor(quote, "stoicism"));
@@ -570,8 +570,7 @@ public class HashtagSuggesterTest {
     @Test
     public void aPinnedTagComesFirstWhenEligibleStillAtMostThree() {
         Quote quote = addFourTagQuote();
-        List<Quote> others = new ArrayList<>(quotes);
-        others.remove(quote);
+        List<Quote> others = without(quote);
         HashtagSuggester model = HashtagSuggester.fit(others);
         String text = quote.getQuoteText();
         assertEquals(Arrays.asList("Sea", "Sky", "Tree"),
